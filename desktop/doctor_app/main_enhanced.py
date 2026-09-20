@@ -124,6 +124,7 @@ class DoctorWindow(QMainWindow):
         self.current_patient_btn.setObjectName("nav")
         self.current_patient_btn.setEnabled(False)
         self.current_patient_btn.setVisible(False)
+        self.current_patient_btn.clicked.connect(lambda: self._go("patient"))
         sl.addWidget(self.current_patient_btn)
 
         self.settings_group = QLabel("SETTINGS")
@@ -234,7 +235,6 @@ class DoctorWindow(QMainWindow):
             self.current_patient_btn.setVisible(True)
             self.current_group.setVisible(True)
             self.current_patient_btn.setEnabled(True)
-            self.current_patient_btn.clicked.connect(lambda: self._go("patient")) if self.current_patient_btn.receivers(self.current_patient_btn.clicked) == 0 else None
             self.patient_badge.setText(f"Patient • {self.current_case.patient}")
         elif self.live_patient:
             alias = str(self.live_patient.get("display_name") or self.live_patient.get("anonymous_id") or "Local patient")
