@@ -341,3 +341,89 @@ private fun SettingsPage() {
         item { SectionCard("Scientific status", "Research prototype", "Clinical validation and diagnostic performance are NOT ESTABLISHED.") }
     }
 }
+
+
+@Composable
+private fun PageTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.displaySmall)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, value: String, detail: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun InfoChip(text: String) {
+    Surface(shape = RoundedCornerShape(9.dp), color = Color(0xFF2A303D)) {
+        Text(text, Modifier.padding(horizontal = 9.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun StatusChip(text: String, kind: String = "neutral") {
+    val (bg, fg) = when (kind) {
+        "good" -> Color(0xFF193F39) to Color(0xFF78D9BE)
+        "info" -> Color(0xFF39345A) to Color(0xFFB8AEFF)
+        "warn" -> Color(0xFF4E3C20) to Color(0xFFF0B969)
+        "error" -> Color(0xFF4D2B2C) to Color(0xFFFF9C90)
+        else -> Color(0xFF2A303D) to Color(0xFFBBC4D5)
+    }
+    Surface(shape = RoundedCornerShape(8.dp), color = bg) {
+        Text(text, Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = fg, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun TrendCard(title: String, value: String, values: List<Float>, provenance: String) {
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.weight(1f))
+                StatusChip(provenance, if (provenance == "MEASURED") "good" else "info")
+            }
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+            MiniTrend(values)
+        }
+    }
+}
+
+@Composable
+private fun MiniTrend(values: List<Float>) {
+    Canvas(Modifier.fillMaxWidth().height(86.dp)) {
+        if (values.size < 2) return@Canvas
+        val min = values.minOrNull() ?: return@Canvas
+        val max = values.maxOrNull() ?: return@Canvas
+        val span = (max - min).coerceAtLeast(.001f)
+        val path = Path()
+        values.forEachIndexed { i, v ->
+            val x = size.width * i / values.lastIndex.coerceAtLeast(1)
+            val y = size.height - (v - min) / span * size.height
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawLine(Color(0xFF353B49), Offset(0f, size.height * .55f), Offset(size.width, size.height * .55f), 1f)
+        drawPath(path, color = Color(0xFF63D8C3), style = Stroke(width = 3f, cap = StrokeCap.Round))
+    }
+}
