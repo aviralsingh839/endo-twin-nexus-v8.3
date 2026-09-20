@@ -33,7 +33,8 @@ class PatientWindow(QMainWindow):
     def _refresh_mode(self):
         live=self.mode.mode=="live"; self.mode_label.setText("LIVE SENSOR" if live else "DEMO DATA"); self.state_label.setText(self.mode.port if live else "Synthetic showcase stream"); self.mode_badge.setText("LIVE • USB" if live else "DEMO • SYNTHETIC"); self.mode_badge.setStyleSheet("background:#123e36;color:#7ce5c2;border:1px solid #1e6c5b;border-radius:10px;padding:7px 11px;font-weight:850;" if live else "background:#162f4a;color:#86d8ff;border:1px solid #245878;border-radius:10px;padding:7px 11px;font-weight:850;")
     def _go(self,key):
-        keys=list(self.nav); self.stack.setCurrentIndex(keys.index(key)); [b.setChecked(k==key) for k in self.nav.values()]
+        keys=list(self.nav); self.stack.setCurrentIndex(keys.index(key))
+        for k,b in self.nav.items(): b.setChecked(k==key)
     def _home(self):
         w,o=self._page("Overview","One patient, one stream, one timeline. Measurements and model layers stay visibly separate."); g=QGridLayout()
         for a,b,c in [("Heart rate","—","processed from PPG"),("HRV RMSSD","—","cleaned beat-to-beat intervals"),("SpO₂","—","research estimate; quality-gated"),("Signal quality","—","channel-aware quality gate")]: f=card(a,b,c); g.addWidget(f,0,g.count()); self.metric_labels[a]=f.findChildren(QLabel)[1]
