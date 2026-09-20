@@ -28,7 +28,7 @@ case "$c" in
  *) echo "Invalid choice"; exit 2 ;;
 esac
 }
-MODE="$1"; [[ -n "$MODE" ]] || MODE=menu
+MODE=""; [[ $# -ge 1 ]] && MODE="$1"; [[ -n "$MODE" ]] || MODE=menu
 case "$MODE" in
  menu) menu ;;
  patient) build_one patient ;;

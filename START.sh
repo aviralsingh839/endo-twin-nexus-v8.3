@@ -39,14 +39,14 @@ EOF
   esac
  done
 }
-MODE="$1"; [[ -n "$MODE" ]] || MODE=menu
+MODE=""; [[ $# -ge 1 ]] && MODE="$1"; [[ -n "$MODE" ]] || MODE=menu
 case "$MODE" in
  menu) menu ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
  patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
  endo-twin|endo|general) runpy "$ROOT/apps/main/main_app.py" ;;
  gui|control-center) runpy "$ROOT/launcher/main.py" ;;
- build-apks|build) TARGET="$2"; [[ -n "$TARGET" ]] || TARGET=menu; "$ROOT/build_apks.sh" "$TARGET" ;;
+ build-apks|build) TARGET=""; [[ $# -ge 2 ]] && TARGET="$2"; [[ -n "$TARGET" ]] || TARGET=menu; "$ROOT/build_apks.sh" "$TARGET" ;;
  setup-android) "$ROOT/setup_android.sh" ;;
  setup) "$ROOT/setup_garuda.sh" ;;
  test|tests) need; "$VENV" -m pytest -q ;;
