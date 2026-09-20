@@ -11,6 +11,7 @@ Preserves V8.3 scientific core, improves architecture.
 
 import ast
 import sys
+import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -180,9 +181,8 @@ def test_main_without_disease_model():
     """Test that main app works without disease model (TEST3)"""
     print("\n=== TEST3: Main App Without Disease Model ===")
     # Run the acceptance test
-    import subprocess
     result = subprocess.run(
-        [f"{PROJECT_ROOT}/.venv/bin/python", f"{PROJECT_ROOT}/apps/main/main_app.py"],
+        [sys.executable, str(PROJECT_ROOT / "apps/main/main_app.py")],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT
