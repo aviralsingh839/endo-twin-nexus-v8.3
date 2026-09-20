@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import List
 
 # V8.4 branding
-APP_VERSION = "8.6.0"
-APP_VERSION_LABEL = "V8.6, Personalized Physiological Modelling Platform — adaptive workstations + live sensor processing (research prototype, not clinically validated)"
+APP_VERSION = "8.6.1"
+APP_VERSION_LABEL = "V8.6.1, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
 APP_NAME = "ENDO-TWIN"
 APP_TAGLINE = "Understand your physiological patterns over time."
 # Disease-specific module identity remains separate from the general platform name.
