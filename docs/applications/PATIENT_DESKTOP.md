@@ -1,7 +1,15 @@
-# ENDO-TWIN Patient Desktop Workstation V8.5
+# ENDO-TWIN V8.6 — Patient Desktop
 
-Launch: `./START.sh patient-pc`
+Launch:
+```bash
+./START.sh patient-pc
+```
 
-**Home · My Health · Measurements · Timeline · Connect · Reports**
+Choose **DEMO MODE** or **LIVE SENSOR MODE** before the workstation opens.
 
-Single-patient local workstation. Bridge port **7778**.
+Single-patient surface:
+**Overview · My Health · Measurements · Timeline · Connect · Reports**
+
+LIVE SENSOR MODE uses the same CRC-checked Arduino packet and quality-gated processing path as the Doctor Workstation.
+
+Patient bridge: **7778**.
