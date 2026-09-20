@@ -1,13 +1,19 @@
-# Doctor PC Workstation — ENDO-TWIN V8.5
+# Doctor PC Workstation — ENDO-TWIN V8.6
 
-Launch: `./START.sh doctor`
+Launch:
+```bash
+./START.sh doctor
+```
 
-**Dashboard · Patients · Signals · Analysis · Ultrasound · Reports · Mobile Link**
+Startup asks for **DEMO MODE** or **LIVE SENSOR MODE**.
 
-Mobile Link runs a local bridge on **7777**, shows endpoint + pairing code, and accepts deliberately shared packages.
+Surface:
+**Command Center · Patient Registry · Live Signals · CHRONO-PCOS · Ultrasound · Reports · Mobile Link**
 
-Patient rows store the internal database ID with the visible anonymous ID before opening the patient-scoped workspace.
+DEMO MODE presents named synthetic cases and supports condition/module filtering plus sorting by research priority, research risk or condition. Tier/risk/driver values are synthetic UI examples.
 
-Ultrasound unsupported anatomical features remain `UNKNOWN`.
+LIVE SENSOR MODE reads CRC-checked Arduino packets and processes PPG/HRV, IMU, GSR and temperature signals with visible quality gates.
+
+The Doctor Workstation keeps CHRONO-PCOS as the first disease-specific module inside the general ENDO-TWIN platform. Unsupported ultrasound anatomy stays UNKNOWN.
 
 Research / risk-screening output — not a medical diagnosis.
