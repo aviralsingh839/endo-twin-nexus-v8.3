@@ -45,3 +45,10 @@ The current Android transport is deliberately DEMO_DATA. See the application and
 > **Research Prototype — Not a Medical Device — Not Clinically Validated — Not a Diagnosis**
 
 The historical architecture and preserved PCOS work remain documented below. The current V8.6 workstation experience adds a mode-safe live acquisition surface without turning research signals into clinical claims.
+
+## Website / Research Portal
+The public-facing static research website remains part of the repository at `website/` and is aligned with the current ENDO-TWIN V8.6.1 branding.
+
+```bash
+./START.sh website
+```
