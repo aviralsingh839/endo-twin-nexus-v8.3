@@ -285,7 +285,7 @@ launch_benchmark() {
     log "Running performance benchmark"
     cd "$PROJECT_ROOT"
     "$VENV_PYTHON" - << 'PY' 2>&1 | tee -a "$LOG_FILE"
-import time, sys
+import os, time, sys
 from pathlib import Path
 PROJECT_ROOT = Path(os.environ.get("ENDO_TWIN_PROJECT_ROOT", str(Path.cwd())))
 sys.path.insert(0, str(PROJECT_ROOT))
