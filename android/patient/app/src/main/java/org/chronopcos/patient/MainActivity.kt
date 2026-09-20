@@ -214,7 +214,7 @@ private fun HomeScreen(patientId: String) {
                             Text("Illustrative learning status • not clinical certainty", style = MaterialTheme.typography.bodySmall)
                         }
                     }
-                    LinearProgressIndicator(progress = { 0.72f }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)))
+                    LinearProgressIndicator(progress = 0.72f, modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(50)))
                     Text("72% illustrative completeness • DEMO_DATA", style = MaterialTheme.typography.labelSmall)
                 }
             }
