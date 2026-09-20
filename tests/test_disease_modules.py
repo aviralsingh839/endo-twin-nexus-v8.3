@@ -36,7 +36,7 @@ def test_module_isolation():
     results = {}
     for mod_name in GLOBAL_REGISTRY.list_implemented():
         mod = GLOBAL_REGISTRY.create(mod_name)
-        result = mod.predict(shared=shared, clinical={"bmi": 23.5, "age_years": 22}, history=vectors[-10:])
+        result = mod.predict(shared=shared, clinical={"bmi": 23.5, "age_years": 22, "cycle_irregular": True, "clinical_hyperandrogenism": True, "exclusions_completed": True}, history=vectors[-10:])
         # Module internal name may be longer (e.g. pcos_reproductive_metabolic)
         assert mod_name in result.module or result.module in mod_name or True  # allow flexible naming
         assert result.signal is not None
@@ -64,7 +64,7 @@ def test_pcos_module_provenance():
     shared = shared_ext.extract(vectors[-1], vectors[-10:])
 
     pcos_mod = GLOBAL_REGISTRY.create("pcos")
-    result = pcos_mod.predict(shared=shared, clinical={"bmi": 26, "age_years": 22, "cycle_irregular": True},
+    result = pcos_mod.predict(shared=shared, clinical={"bmi": 26, "age_years": 22, "cycle_irregular": True, "clinical_hyperandrogenism": True, "exclusions_completed": True},
                               ultrasound={"cyst_size_mm": 5, "source": "CLINICALLY-ENTERED"},
                               history=vectors[-10:])
     assert "clinical_variables" in result.provenance
