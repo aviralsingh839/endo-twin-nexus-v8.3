@@ -51,7 +51,7 @@ class EndoTwinBridgeServer:
                     except Exception:self._json(400,{"status":"invalid_request"});return
                     if not isinstance(p,dict):self._json(400,{"status":"invalid_request"});return
                     p.setdefault("received_at_epoch_ms",int(time.time()*1000));p.setdefault("bridge_label","LOCAL_LAN_TRANSFER")
-                    out=self.inbox/f"{int(time.time()*1000)}_{uuid.uuid4().hex}.json";out.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding="utf-8")
+                    out=bridge.inbox/f"{int(time.time()*1000)}_{uuid.uuid4().hex}.json";out.write_text(json.dumps(p,indent=2,ensure_ascii=False),encoding="utf-8")
                     self._json(200,{"status":"received","received_packages":bridge.received_count,"filename":out.name});return
                 self._json(404,{"status":"not_found"})
         self.server=ThreadingHTTPServer(("0.0.0.0",self.port),Handler);self.thread=threading.Thread(target=self.server.serve_forever,name="endo-twin-bridge",daemon=True);self.thread.daemon=True;self.thread.start()
