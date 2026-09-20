@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package org.chronopcos.doctor
 
 import android.os.Bundle
@@ -80,7 +82,7 @@ private fun DoctorApp() {
                         Column {
                             Text("ENDO-TWIN NEXUS", fontWeight = FontWeight.ExtraBold)
                             Text(
-                                if (selected == null) "Doctor research workstation" else "Patient workspace • \${selected!!.id}",
+                                if (selected == null) "Doctor research workstation" else "Patient workspace • ${selected!!.id}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFE0E5F6)
                             )
@@ -166,7 +168,7 @@ private fun Patients(onOpen: (DemoPatient) -> Unit) {
     val conditions = listOf("All", "CHRONO-PCOS", "Cardiometabolic pattern", "Autonomic pattern", "Sleep pattern")
     val rows = demoPatients.filter { p ->
         (filter == "All" || p.condition == filter) &&
-            (query.isBlank() || "\${p.alias} \${p.id} \${p.condition}".contains(query, ignoreCase = true))
+            (query.isBlank() || "${p.alias} ${p.id} ${p.condition}".contains(query, ignoreCase = true))
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { PageTitle("Patients", "Registry • condition/module filter • patient-scoped context") }
@@ -202,7 +204,7 @@ private fun PatientRow(patient: DemoPatient, onOpen: (DemoPatient) -> Unit) {
                     Text(patient.lastSeen, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("\${patient.risk}%", fontWeight = FontWeight.ExtraBold)
+                    Text("${patient.risk}%", fontWeight = FontWeight.ExtraBold)
                     Text(String.format("%.0f%% quality", patient.quality * 100), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -225,8 +227,8 @@ private fun PatientWorkspace(patient: DemoPatient) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(patient.alias, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                        Text("\${patient.id} • patient-scoped", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        Text("\${patient.condition} • \${patient.lastSeen}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${patient.id} • patient-scoped", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("${patient.condition} • ${patient.lastSeen}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     StatusChip(patient.tier, if (patient.tier == "High") "error" else if (patient.tier == "Elevated") "warn" else "neutral")
                 }
