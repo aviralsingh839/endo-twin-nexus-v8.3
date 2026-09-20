@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package org.chronopcos.patient
 
 import android.os.Bundle
@@ -292,7 +294,7 @@ private fun HealthScreen(patientId: String) {
                     listOf("Personal baseline", "Repeated measurements + quality", "Persistence / change over time", "Patient-reported or clinical context").forEachIndexed { index, item ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF2A4A48)), contentAlignment = Alignment.Center) {
-                                Text("\${index + 1}", color = Color(0xFF7DE1C7), fontWeight = FontWeight.Bold)
+                                Text("${index + 1}", color = Color(0xFF7DE1C7), fontWeight = FontWeight.Bold)
                             }
                             Text(item)
                         }
