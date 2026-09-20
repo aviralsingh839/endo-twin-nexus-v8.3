@@ -29,3 +29,12 @@ Doctor Workstation: port **7777**.
 Patient Workstation: port **7778**.
 
 The current phone transport path remains DEMO_DATA and is not a replacement for clinically validated acquisition or secure production health infrastructure.
+
+## Website / Research Portal
+The static research website is preserved at `website/index.html`.
+
+Launch it from the main menu with **Website / Research Portal**, or directly:
+```bash
+./START.sh website
+```
+The launcher is available at `LAUNCH/WEBSITE.sh` and `launchers/WEBSITE.sh` for compatibility with the existing project layout.
