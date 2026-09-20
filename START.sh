@@ -30,7 +30,7 @@ EOF
    1) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
    2) runpy "$ROOT/desktop/patient_app/main.py" ;;
    3) runpy "$ROOT/apps/main/main_app.py" ;;
-   4) "$ROOT/LAUNCH/WEBSITE.sh" ;;
+   4) bash "$ROOT/LAUNCH/WEBSITE.sh" ;;
    5) "$ROOT/build_apks.sh" menu ;;
    6) "$ROOT/setup_android.sh" ;;
    7) need; "$VENV" -m pytest -q ;;
@@ -47,7 +47,7 @@ case "$MODE" in
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
  patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
  endo-twin|endo|general) runpy "$ROOT/apps/main/main_app.py" ;;
- website|web|site) "$ROOT/LAUNCH/WEBSITE.sh" ;;
+ website|web|site) bash "$ROOT/LAUNCH/WEBSITE.sh" ;;
  gui|control-center) runpy "$ROOT/launcher/main.py" ;;
  build-apks|build) TARGET=""; [[ $# -ge 2 ]] && TARGET="$2"; [[ -n "$TARGET" ]] || TARGET=menu; "$ROOT/build_apks.sh" "$TARGET" ;;
  setup-android) "$ROOT/setup_android.sh" ;;
