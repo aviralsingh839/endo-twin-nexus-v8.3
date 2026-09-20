@@ -265,18 +265,18 @@ launch_test() {
     check_venv
     log "Running tests: pytest -q"
     cd "$PROJECT_ROOT"
-    "$VENV_PYTHON" -m pytest -q 2>&1 | tee -a "$LOG_FILE" || true
+    "$VENV_PYTHON" -m pytest -q 2>&1 | tee -a "$LOG_FILE"
     # Also run acceptance tests
-    "$VENV_PYTHON" "$PROJECT_ROOT/apps/main/main_app.py" 2>&1 | tee -a "$LOG_FILE" || true
+    "$VENV_PYTHON" "$PROJECT_ROOT/apps/main/main_app.py" 2>&1 | tee -a "$LOG_FILE"
 }
 
 launch_test_cross() {
     check_venv
     log "Running cross-patient isolation tests"
     cd "$PROJECT_ROOT"
-    "$VENV_PYTHON" "$PROJECT_ROOT/tests/test_endo_twin_isolation.py" 2>&1 | tee -a "$LOG_FILE" || true
+    "$VENV_PYTHON" "$PROJECT_ROOT/tests/test_endo_twin_isolation.py" 2>&1 | tee -a "$LOG_FILE"
     if [[ -f "$PROJECT_ROOT/tests/test_multi_patient_isolation.py" ]]; then
-        "$VENV_PYTHON" "$PROJECT_ROOT/tests/test_multi_patient_isolation.py" 2>&1 | tee -a "$LOG_FILE" || true
+        "$VENV_PYTHON" "$PROJECT_ROOT/tests/test_multi_patient_isolation.py" 2>&1 | tee -a "$LOG_FILE"
     fi
 }
 
@@ -285,9 +285,9 @@ launch_benchmark() {
     log "Running performance benchmark"
     cd "$PROJECT_ROOT"
     "$VENV_PYTHON" - << 'PY' 2>&1 | tee -a "$LOG_FILE"
-import time, sys
+import os, time, sys
 from pathlib import Path
-PROJECT_ROOT = Path("/home/user/chrono-pcos-v8.1")
+PROJECT_ROOT = Path(os.environ.get("ENDO_TWIN_PROJECT_ROOT", str(Path.cwd())))
 sys.path.insert(0, str(PROJECT_ROOT))
 print("=== Performance Benchmark - Real Measurements ===")
 start = time.time()
