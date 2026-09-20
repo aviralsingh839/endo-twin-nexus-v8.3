@@ -12,7 +12,7 @@ android {
         applicationId = "org.chronopcos.doctor"
         minSdk = 24
         targetSdk = 34
-        versionCode = 86
+        versionCode = 87
         versionName = "8.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
