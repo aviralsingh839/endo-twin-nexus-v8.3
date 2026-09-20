@@ -1,4 +1,4 @@
-name: ENDO-TWIN V8.4 Quality Gate
+name: ENDO-TWIN V8.5 Quality Gate
 
 on:
   push:
@@ -29,6 +29,10 @@ jobs:
         run: python -m compileall -q src disease_models database apps tests
       - name: Run test suite
         run: pytest -q tests
+      - name: Compile workstation and bridge sources
+        run: python -m compileall -q desktop services
+      - name: Check launcher shell syntax
+        run: bash -n START.sh setup_android.sh build_apks.sh
       - name: Run architecture acceptance
         run: python apps/main/main_app.py
 
