@@ -22,3 +22,9 @@ chrono_pcos_project V8/models/*.joblib
 .freebuff/
 .freebuff_scratch/
 logs/
+
+# Local runtime/build outputs
+local.properties
+data/bridge/inbox/
+android/*/app/build/
+DIST/android/*.apk

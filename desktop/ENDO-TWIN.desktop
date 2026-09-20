@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ENDO-TWIN Control Center
+Comment=ENDO-TWIN developer control center
+Exec=bash -c 'cd "$(dirname -- "%k")/.." && ./START.sh gui'
+Icon=applications-science
+Terminal=false
+Type=Application
+Categories=Science;Education;
+StartupNotify=true

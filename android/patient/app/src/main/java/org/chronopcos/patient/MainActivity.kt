@@ -21,6 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
 
 /**
@@ -46,7 +52,7 @@ private enum class PatientTab(val route: String, val label: String) {
     Health("health", "Health"),
     Measure("measure", "Measure"),
     Timeline("timeline", "Timeline"),
-    Care("care", "Care")
+    Connect("connect", "Connect")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,7 +109,7 @@ fun PatientApp(currentPatientId: String) {
                                     PatientTab.Health -> Icons.Outlined.FavoriteBorder
                                     PatientTab.Measure -> Icons.Outlined.MonitorHeart
                                     PatientTab.Timeline -> Icons.Outlined.Timeline
-                                    PatientTab.Care -> Icons.Outlined.LocationOn
+                                    PatientTab.Connect -> Icons.Outlined.Link
                                 },
                                 contentDescription = tab.label
                             )
@@ -123,7 +129,7 @@ fun PatientApp(currentPatientId: String) {
             composable("health") { HealthScreen(currentPatientId) }
             composable("measure") { MeasureScreen(currentPatientId) }
             composable("timeline") { TimelineScreen(currentPatientId) }
-            composable("care") { CareScreen() }
+            composable("connect") { ConnectionScreen() }
         }
     }
 }
@@ -381,6 +387,98 @@ private fun TimelineScreen(patientId: String) {
     }
 }
 
+
+@Composable
+private fun ConnectionScreen() {
+    val scope=rememberCoroutineScope()
+    var endpoint by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("Not connected") }
+    var detail by remember { mutableStateOf("Start Doctor Workstation on the same Wi-Fi. Open Mobile Link to see its address and 6-digit code.") }
+    var token by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    fun request(action:suspend()->String){
+        if(busy)return
+        busy=true
+        scope.launch {
+            try{
+                val json=JSONObject(action())
+                if(json.optBoolean("paired",false)){
+                    token=json.optString("token").takeIf{it.isNotBlank()}
+                    status="Connected"
+                    detail="Paired to "+json.optString("server_name","ENDO-TWIN Workstation")+"."
+                }else{
+                    status=json.optString("status","Completed")
+                    detail=json.optString("message","Request completed.")
+                }
+            }catch(e:Exception){
+                status="Connection failed"
+                detail=e.message ?: "Check Wi-Fi, address, code and firewall."
+            }finally{busy=false}
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+        item{SectionTitle("Connect to a workstation","Local Wi-Fi pairing • no cloud account required")}
+        item{
+            Card(shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(
+                containerColor=if(status=="Connected") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            )){
+                Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Icon(if(status=="Connected") Icons.Default.Link else Icons.Default.Wifi,null,tint=MaterialTheme.colorScheme.primary,modifier=Modifier.size(30.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column{
+                            Text(status,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                            Text("ENDO-TWIN local bridge",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Text(detail)
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        ProvenanceBadge("LOCAL NETWORK",MaterialTheme.colorScheme.secondaryContainer)
+                        ProvenanceBadge(if(token==null)"PAIRING REQUIRED" else "PAIRED",MaterialTheme.colorScheme.tertiaryContainer)
+                    }
+                }
+            }
+        }
+        item{OutlinedTextField(value=endpoint,onValueChange={endpoint=it},modifier=Modifier.fillMaxWidth(),label={Text("Workstation address")},placeholder={Text("192.168.1.20:7777")},singleLine=true,supportingText={Text("Use Doctor Workstation → Mobile Link.")})}
+        item{OutlinedTextField(value=code,onValueChange={v->code=v.filter(Char::isDigit).take(6)},modifier=Modifier.fillMaxWidth(),label={Text("6-digit pairing code")},placeholder={Text("123456")},singleLine=true)}
+        item{
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                Button(onClick={request{postJson(endpointFor(endpoint,"/v1/pair"),JSONObject().put("code",code).toString())}},modifier=Modifier.weight(1f),enabled=!busy&&endpoint.isNotBlank()&&code.length==6){Text("Pair")}
+                OutlinedButton(onClick={request{getJson(endpointFor(endpoint,"/v1/health"))}},modifier=Modifier.weight(1f),enabled=!busy&&endpoint.isNotBlank()){Text("Test")}
+            }
+        }
+        item{
+            Card(shape=RoundedCornerShape(20.dp)){
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text("Send a deliberate session package",style=MaterialTheme.typography.titleMedium)
+                    Text("This build sends DEMO_DATA only. Production transfer should populate from the local patient repository and retain provenance.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick={
+                        val t=token
+                        if(t==null){status="Pair first";detail="Enter the workstation address and code, then press Pair.";return@Button}
+                        request{
+                            val payload=JSONObject().put("schema_version","1.0").put("source_app","ENDO-TWIN Patient Android").put("patient_id","DEMO-001").put("label","DEMO_DATA").put("provenance","DEMO_DATA").put("created_at_epoch_ms",System.currentTimeMillis())
+                                .put("measurements",JSONObject().put("heart_rate_bpm",72).put("hrv_rmssd_ms",48).put("skin_temperature_c",32.5).put("activity_index",35))
+                                .put("note","Demonstration payload only; not a clinical record.")
+                            postJson(endpointFor(endpoint,"/v1/upload"),payload.toString(),t)
+                        }
+                    },modifier=Modifier.fillMaxWidth(),enabled=!busy&&token!=null){Text("Send latest session")}
+                }
+            }
+        }
+        item{Text("Security boundary: trusted LAN research bridge only. Pairing is not production authentication, authorization, encryption or clinical security.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.error)}
+        item{Text("Research / risk-screening output — not a medical diagnosis.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold)}
+    }
+}
+private fun endpointFor(raw:String,path:String):String{val v=raw.trim().trimEnd('/');val base=if(v.startsWith("http://")||v.startsWith("https://"))v else "http://"+v;return base+path}
+private suspend fun getJson(url:String):String=withContext(Dispatchers.IO){
+    val c=(URL(url).openConnection() as HttpURLConnection).apply{requestMethod="GET";connectTimeout=5000;readTimeout=5000;useCaches=false}
+    try{val r=c.responseCode;val s=if(r in 200..299)c.inputStream else c.errorStream;val b=s?.bufferedReader()?.use{it.readText()}.orEmpty();if(r !in 200..299)error("HTTP "+r+": "+b);b}finally{c.disconnect()}
+}
+private suspend fun postJson(url:String,body:String,token:String?=null):String=withContext(Dispatchers.IO){
+    val c=(URL(url).openConnection() as HttpURLConnection).apply{requestMethod="POST";connectTimeout=5000;readTimeout=5000;doOutput=true;useCaches=false;setRequestProperty("Content-Type","application/json");token?.let{setRequestProperty("X-Endo-Token",it)}}
+    try{c.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))};val r=c.responseCode;val s=if(r in 200..299)c.inputStream else c.errorStream;val b=s?.bufferedReader()?.use{it.readText()}.orEmpty();if(r !in 200..299)error("HTTP "+r+": "+b);b}finally{c.disconnect()}
+}
 @Composable
 private fun CareScreen() {
     val providers = listOf(

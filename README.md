@@ -1,3 +1,32 @@
+# ENDO-TWIN V8.5 — Current Operating Path
+
+ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is its first disease-specific research module.
+
+## Start
+\`\`\`bash
+./START.sh
+\`\`\`
+
+## Workstations
+\`\`\`bash
+./START.sh doctor
+./START.sh patient-pc
+\`\`\`
+
+## Android
+\`\`\`bash
+./setup_android.sh
+./build_apks.sh all
+\`\`\`
+
+## Mobile connection
+Doctor Workstation → Mobile Link → address + 6-digit code.
+Patient Android → Connect → Pair → Send latest session.
+
+The bridge is local-LAN research infrastructure, not production clinical security.
+
+---
+
 # ENDO-TWIN - Personalized Physiological Modelling Platform
 ### CHRONO-PCOS is First Disease-Specific Model
 ### **Sense • Model • Predict • Personalize • Connect**
