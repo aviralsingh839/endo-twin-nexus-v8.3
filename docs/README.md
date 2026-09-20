@@ -17,3 +17,9 @@
 V8.6 workstation flow: startup-only DEMO/LIVE selection, processed live sensor monitoring, richer Doctor review, single-patient Patient Workstation and explicit provenance.
 
 `docs/legacy/` remains historical reference, not the current workflow.
+
+## V8.6.1 reference UI + science
+
+- [UI System](UI_SYSTEM_V8_6_1.md) — reference-inspired design language, component rules, responsive Android strategy.
+- [Scientific Methods](SCIENTIFIC_METHODS_V8_6_1.md) — evidence gates, PPG/HRV methodology, PCOS reasoning and engineering performance notes.
+- [Science Guardrails](SCIENCE_GUARDRAILS.md) — provenance, diagnostic boundaries, validation requirements and safety language.
