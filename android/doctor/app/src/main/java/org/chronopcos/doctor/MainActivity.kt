@@ -86,6 +86,7 @@ fun DoctorApp() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
     LazyColumn(
@@ -145,6 +146,7 @@ private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
     var tab by remember { mutableStateOf("Overview") }
