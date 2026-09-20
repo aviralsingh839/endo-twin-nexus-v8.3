@@ -6,200 +6,248 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-
-/**
- * Doctor Android MainActivity - Kotlin + Jetpack Compose, Material 3, Multi-patient
- * MAIN: Dashboard, Patients, Recent Activity, Pending Review, Reports, Settings
- * Patient List: Patient ID, Name/alias, Age, Last session, Last analysis, Status, Search, Filter, Sort, Open, Archive, Create, Import/export
- * Patient Profile: Opening patient CP-0001 must switch entire context to CP-0001
- * Tabs: OVERVIEW, TIMELINE, PHYSIOLOGY, SENSORS, ULTRASOUND, AI/MODELS, CLINICAL DATA, REPORTS, NOTES, PROVENANCE, AUDIT
- * Everything displayed must belong to that patient
- * DEMO-001 cannot see DEMO-002 - implemented at database level not merely UI hidden
- * Reports patient-specific, Ultrasounds patient-specific, AI runs patient-specific, Sensor sessions patient-specific, Timeline patient-specific
- */
+import org.chronopcos.doctor.ui.theme.EndoTwinTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                DoctorApp()
-            }
+            EndoTwinTheme { DoctorApp() }
         }
     }
 }
+
+private data class DemoPatient(
+    val id: String,
+    val alias: String,
+    val status: String,
+    val lastSeen: String,
+    val quality: String
+)
+
+private val demoPatients = listOf(
+    DemoPatient("DEMO-001", "Research demo 001", "Needs review", "19 Sep 2026", "0.91"),
+    DemoPatient("DEMO-002", "Research demo 002", "Stable demo", "18 Sep 2026", "0.84"),
+    DemoPatient("DEMO-003", "Research demo 003", "Incomplete data", "16 Sep 2026", "0.58")
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorApp() {
-    val navController = rememberNavController()
-    var selectedPatientId by remember { mutableStateOf<String?>(null) }
+    var selectedPatient by remember { mutableStateOf<DemoPatient?>(null) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        if (selectedPatientId != null) "Doctor - Patient $selectedPatientId" 
-                        else "CHRONO-PCOS Doctor - Multi-Patient"
-                    ) 
+                title = {
+                    Column {
+                        Text("ENDO-TWIN", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (selectedPatient == null) "Doctor research workstation"
+                            else "Patient workspace • " + selectedPatient!!.id,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                navigationIcon = {
+                    if (selectedPatient != null) {
+                        IconButton(onClick = { selectedPatient = null }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back to patients")
+                        }
+                    }
+                },
+                actions = {
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Text("DEMO", Modifier.padding(horizontal = 12.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         }
-    ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = "dashboard",
-            modifier = Modifier.padding(paddingValues)
-        ) {
-            composable("dashboard") {
-                DoctorDashboardScreen(
-                    onPatientSelected = { patientId ->
-                        selectedPatientId = patientId
-                        navController.navigate("patient/$patientId")
-                    }
-                )
-            }
-            composable("patient/{patientId}") { backStackEntry ->
-                val patientId = backStackEntry.arguments?.getString("patientId") ?: "DEMO-001"
-                PatientWorkspaceScreen(patientId = patientId)
-            }
+    ) { padding ->
+        if (selectedPatient == null) {
+            DoctorDashboard(Modifier.padding(padding), onOpen = { selectedPatient = it })
+        } else {
+            PatientWorkspace(Modifier.padding(padding), selectedPatient!!)
         }
     }
 }
 
 @Composable
-fun DoctorDashboardScreen(
-    onPatientSelected: (String) -> Unit
-) {
-    // Demo patients with deliberately different data
-    val demoPatients = listOf(
-        Triple("DEMO-001", "Demo Patient 001 (DEMO DATA)", "HR 72 bpm, HRV 48 ms, Activity 35%, Temp 32.5C - low risk"),
-        Triple("DEMO-002", "Demo Patient 002 (DEMO DATA)", "HR 78 bpm, HRV 35 ms, Activity 25%, Temp 32.8C - high risk"),
-        Triple("DEMO-003", "Demo Patient 003 (DEMO DATA)", "HR 68 bpm, HRV 55 ms, Activity 45%, Temp 32.3C - low risk")
-    )
-
+private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Doctor Dashboard - Multi-Patient", style = MaterialTheme.typography.headlineSmall)
-            Text("Research / risk-screening output — not a medical diagnosis", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-            Text("Patient List: Patient ID, Name/alias, Age, Last session, Last analysis, Status, Search, Filter, Sort, Open, Archive, Create, Import/export")
+            Text("Review queue", style = MaterialTheme.typography.displaySmall)
+            Text("Multi-patient workstation • every workspace is explicitly scoped.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Recent Activity", style = MaterialTheme.typography.titleMedium)
-                    Text("Sensor sessions, model runs, reports generated")
-                }
-            }
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Pending Review", style = MaterialTheme.typography.titleMedium)
-                    Text("Sessions needing review, data quality checks")
-                }
-            }
-        }
-
-        item {
-            Text("Patients - DEMO-001, DEMO-002, DEMO-003 with deliberately different data", style = MaterialTheme.typography.titleMedium)
-            Text("Test: DEMO-001 cannot see DEMO-002 - implemented at database level not merely UI hidden", style = MaterialTheme.typography.labelSmall)
-        }
-
-        items(demoPatients) { (patientId, displayName, details) ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onPatientSelected(patientId) }
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("$patientId - $displayName", style = MaterialTheme.typography.titleSmall)
-                    Text(details, style = MaterialTheme.typography.bodySmall)
-                    Text("Patient ID: $patientId - Stable ID, foreign keys, patient-scoped queries, no cross-patient contamination", style = MaterialTheme.typography.labelSmall)
-                    Button(onClick = { onPatientSelected(patientId) }) {
-                        Text("Open $patientId - Switch entire context to $patientId")
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("Research workflow", style = MaterialTheme.typography.titleMedium)
+                    Text("Patient → measurements → quality → baseline → longitudinal context → research model → provenance → report")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Chip("3 demo patients")
+                        Chip("offline-first")
+                        Chip("provenance visible")
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun PatientWorkspaceScreen(patientId: String) {
-    // When patient CP-0001 is selected, EVERY SCREEN becomes scoped to CP-0001
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
         item {
-            Text("Patient Workspace - $patientId", style = MaterialTheme.typography.headlineSmall)
-            Text("EVERY SCREEN becomes scoped to $patientId - Patient overview, Personal baseline, Recent sessions, Longitudinal timeline, Physiology, Sensors, Ultrasound, AI, Clinical data, Reports, Notes, Provenance, Audit", style = MaterialTheme.typography.bodySmall)
-            Text("Multi-Patient Safety: $patientId cannot see other patients - database level", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-        }
-
-        item {
-            TabSection(title = "OVERVIEW", patientId = patientId, content = "Patient overview for $patientId - Age 22 BMI 23.5 USER-ENTERED, Personal baseline mean 71 std 2, Recent sessions, Longitudinal timeline")
+            SectionCard("Pending review", "2 demo workspaces", "Illustrative queue only. Real workflows should be backed by authorization and patient-scoped database queries.")
         }
         item {
-            TabSection(title = "TIMELINE", patientId = patientId, content = "Timeline for $patientId - sensor_session 2026-09-19 MEASURED quality 0.85, symptom_entry CLINICALLY_ENTERED, ultrasound_study IMAGE-DERIVED quality UNKNOWN, model_run MODEL-INFERRED confidence 0.75, report_generated - patient-specific timeline")
+            SectionCard("Data quality attention", "1 incomplete demo", "Low quality should lower downstream confidence and should never be silently repaired into fabricated observations.")
+        }
+        item { Text("Patients", style = MaterialTheme.typography.titleLarge) }
+        items(demoPatients) { patient ->
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), onClick = { onOpen(patient) }) {
+                Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(patient.alias, style = MaterialTheme.typography.titleMedium)
+                            Text(patient.id, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                        }
+                        Chip(patient.status)
+                    }
+                    Text("Last activity • " + patient.lastSeen, style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Illustrative channel quality", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.width(10.dp))
+                        LinearProgressIndicator(progress = { patient.quality.toFloat() }, Modifier.weight(1f))
+                        Spacer(Modifier.width(10.dp))
+                        Text(patient.quality, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text("DEMO_DATA • open to switch entire context to " + patient.id, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
         item {
-            TabSection(title = "PHYSIOLOGY", patientId = patientId, content = "Physiology for $patientId - HR 72 bpm MEASURED quality 0.91 source MAX30102, HRV RMSSD 48 ms DERIVED quality 0.85 limitations PPG less accurate than ECG, GSR, Temp, Motion - patient-specific")
-        }
-        item {
-            TabSection(title = "SENSORS", patientId = patientId, content = "Sensors for $patientId - raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts visualization time-series - sensor sessions patient-specific")
-        }
-        item {
-            TabSection(title = "ULTRASOUND", patientId = patientId, content = "Ultrasound for $patientId - study list ultrasound_${patientId}_001 date now, image /demo/ultrasound_${patientId}.png, metadata, analysis, image-derived features cyst size mm volume cc morphology quality source confidence, model results inference requires trained model if insufficient state insufficient never fabricate percentages confidence None unless computed, uncertainty quality UNKNOWN by design unless computed, provenance IMAGE-DERIVED clearly labelled - ultrasounds patient-specific")
-        }
-        item {
-            TabSection(title = "AI / MODELS", patientId = patientId, content = "AI/ML for $patientId - PCOSModule v8.3.0 pcos_associated_risk low/moderate/high NOT diagnosis confidence 0.75 data quality 0.85 clinical validation NOT ESTABLISHED, SleepModule circadian_disruption_pattern moderate confidence 0.68, Model registry name version dataset version training date features target metrics validation strategy limitations never hide uncertainty - AI runs patient-specific")
-        }
-        item {
-            TabSection(title = "CLINICAL DATA", patientId = patientId, content = "Clinical data for $patientId - age BMI cycle info USER-ENTERED CLINICALLY_ENTERED, glucose BP if entered")
-        }
-        item {
-            TabSection(title = "REPORTS", patientId = patientId, content = "Reports for $patientId - Report pcos_risk_screening for $patientId - Risk low - Research / risk-screening output — not a medical diagnosis - patient-specific reports never expose another patient's report")
-        }
-        item {
-            TabSection(title = "NOTES", patientId = patientId, content = "Doctor notes for $patientId - patient-specific notes")
-        }
-        item {
-            TabSection(title = "PROVENANCE", patientId = patientId, content = "Provenance for $patientId - MEASURED HR 72 bpm quality 0.91 source MAX30102, CLINICALLY_ENTERED age BMI cycle info USER-ENTERED, IMAGE-DERIVED cyst size morphology quality UNKNOWN by design unless computed provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20, MODEL-INFERRED sleep regularity circadian disruption confidence limitations, UNKNOWN if cannot reliably extract return UNKNOWN never invent - provenance visible")
-        }
-        item {
-            TabSection(title = "AUDIT", patientId = patientId, content = "Audit for $patientId - audit_events patient_id, user_id, action, timestamp, patient-scoped audit history")
+            Text("Research / risk-screening output — not a medical diagnosis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
-fun TabSection(title: String, patientId: String, content: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("$title - $patientId", style = MaterialTheme.typography.titleMedium)
-            Text(content, style = MaterialTheme.typography.bodySmall)
-            Text("Scoped to $patientId - no cross-patient contamination", style = MaterialTheme.typography.labelSmall)
+private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
+    var tab by remember { mutableStateOf("Overview") }
+    val tabs = listOf("Overview", "Physiology", "Signals", "Ultrasound", "Models", "Reports", "Audit")
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(patient.alias, style = MaterialTheme.typography.headlineSmall)
+                    Text(patient.id, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Chip(patient.status)
+                        Chip("DEMO_DATA")
+                    }
+                    Text(
+                        "Patient context lock: all cards below are scoped to " + patient.id + ". No other demo patient is referenced in this workspace.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                tabs.forEach { name ->
+                    FilterChip(selected = tab == name, onClick = { tab = name }, label = { Text(name) })
+                }
+            }
+        }
+        when (tab) {
+            "Overview" -> {
+                item { SectionCard("Observed examples", "HR 72 bpm", "DEMO_DATA • illustrative example; not a live measurement.") }
+                item { SectionCard("Derived examples", "RMSSD 48 ms", "DEMO_DATA • derived feature example; signal quality and acquisition context matter.") }
+                item { SectionCard("Baseline", "Illustrative 10-observation window", "A personal baseline requires enough valid observations and should remain patient-scoped.") }
+                item { SafetyCard("No clinical diagnosis", "Research output is separated from observed/entered data and carries uncertainty + limitations.") }
+            }
+            "Physiology" -> {
+                item { SectionCard("Heart rate", "72 bpm", "DEMO_DATA • illustrative value • active sensor provenance is required for real data.") }
+                item { SectionCard("HRV", "48 ms RMSSD", "DEMO_DATA • illustrative pulse-derived feature.") }
+                item { SectionCard("Activity", "35%", "DEMO_DATA • illustrative motion index.") }
+                item { SectionCard("Temperature", "32.5 °C", "DEMO_DATA • illustrative skin-temperature example.") }
+            }
+            "Signals" -> {
+                item { SectionCard("PPG", "20 Hz", "Raw/filtered PPG example • quality should be per channel.") }
+                item { SectionCard("GSR", "Tonic + phasic", "Electrodermal example • artifact handling remains explicit.") }
+                item { SectionCard("Motion", "6-axis IMU", "MPU6050 example • activity and motion artifact context.") }
+                item { SafetyCard("Missing is a state", "Long gaps should remain missing; bounded interpolation should carry a quality penalty.") }
+            }
+            "Ultrasound" -> {
+                item { SectionCard("Study provenance", "IMAGE-DERIVED", "The image can be stored and quality-checked; unsupported anatomical features remain UNKNOWN.") }
+                item { SectionCard("Feature state", "UNKNOWN when unsupported", "Do not invent cyst count, volume, morphology, accuracy, or confidence without validated labelled evidence.") }
+                item { SafetyCard("Model gate", "Image inference requires an actual trained and validated model", "A missing model must produce an insufficient/unknown state, not a fabricated probability.") }
+            }
+            "Models" -> {
+                item { SectionCard("CHRONO-PCOS", "Research module", "Disease-specific model inside ENDO-TWIN • clinical validation NOT ESTABLISHED.") }
+                item { SectionCard("Model confidence", "Context-dependent", "Confidence is model/data quality context, not clinical certainty.") }
+                item { SectionCard("Inputs", "Measured + derived + entered", "Only supported provenance contributes to the appropriate model layer.") }
+                item { SafetyCard("Explainability", "Show model name, version, dataset, validation strategy, limitations, and uncertainty.") }
+            }
+            "Reports" -> {
+                item { SectionCard("Report", "Patient-scoped", "Report generation preserves provenance, uncertainty, model version, and limitations.") }
+                item { SectionCard("Sharing", "Deliberate export", "No automatic exposure of another patient’s report; sharing remains controlled.") }
+            }
+            "Audit" -> {
+                item { SectionCard("Audit trail", "Timestamped", "Track patient-scoped review/export/model/report actions.") }
+                item { SectionCard("Privacy", "Local-first", "The mobile research workstation is designed around local data boundaries; real deployments need authorization controls.") }
+                item { SafetyCard("Demo boundary", "DEMO_DATA is not a clinical record", "Illustrative patients, values, provider entries, and distances are intentionally separated from real-world data.") }
+            }
+        }
+        item {
+            Text("Research / risk-screening output — not a medical diagnosis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, value: String, detail: String) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SafetyCard(title: String, detail: String, detail2: String? = null) {
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF15263A))) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Icon(Icons.Default.Shield, null, tint = MaterialTheme.colorScheme.secondary)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail)
+                detail2?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Chip(text: String) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primaryContainer) {
+        Text(text, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall)
     }
 }
