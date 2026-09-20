@@ -427,7 +427,7 @@ private fun ConnectionScreen() {
                 if (json.optBoolean("paired", false)) {
                     token = json.optString("token").takeIf { it.isNotBlank() }
                     status = "Connected"
-                    detail = "Paired to \${json.optString("server_name", "ENDO-TWIN Workstation")}."
+                    detail = "Paired to ${json.optString("server_name", "ENDO-TWIN Workstation")}."
                 } else {
                     status = json.optString("status", "Completed")
                     detail = json.optString("message", "Request completed.")
