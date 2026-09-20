@@ -131,7 +131,7 @@ private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Illustrative channel quality", style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.width(10.dp))
-                        LinearProgressIndicator(progress = { patient.quality.toFloat() }, Modifier.weight(1f))
+                        LinearProgressIndicator(progress = patient.quality.toFloat(), Modifier.weight(1f))
                         Spacer(Modifier.width(10.dp))
                         Text(patient.quality, style = MaterialTheme.typography.labelMedium)
                     }
