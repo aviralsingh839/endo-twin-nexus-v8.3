@@ -1,12 +1,13 @@
-# Patient Apps — ENDO-TWIN V8.5
+# Patient Apps — ENDO-TWIN V8.6
 
-Patient Android: native Kotlin + Compose, **Home · Health · Measure · Timeline · Connect**.
-
-Patient PC:
+## Patient Desktop
 ```bash
 ./START.sh patient-pc
 ```
+Startup asks for **DEMO MODE** or **LIVE SENSOR MODE**. The workstation is single-patient and has no global patient list.
 
-The Patient PC is single-patient and has no global patient list.
+## Patient Android
+Native Kotlin + Jetpack Compose:
+**Home · Health · Measure · Timeline · Connect**
 
-The Android Connect screen pairs to a workstation by address + six-digit code and sends a clearly labelled DEMO_DATA package.
+The Android Connect screen pairs to the Doctor/Patient workstation by endpoint + six-digit code. The current transport payload is deliberately **DEMO_DATA**.
