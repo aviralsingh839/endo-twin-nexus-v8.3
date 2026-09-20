@@ -1,0 +1,83 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ENDO-TWIN Desktop",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/apps/main/main_app.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Doctor Desktop",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launcher/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Patient Demo (Kivy)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/android/patient_app/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Diagnostics",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launcher/diagnostics.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Full Showcase Demo (17 steps)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo/full_showcase.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Architecture Isolation Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_endo_twin_isolation.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Performance Benchmark",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-q", "tests/"],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ]
+}

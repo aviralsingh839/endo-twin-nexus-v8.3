@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=CHRONO-PCOS Doctor PC
+Comment=Doctor PC - Full Workstation - Patient Management, Physiological Data, Advanced Analysis, Ultrasound, Reports
+Exec=bash -c 'SCRIPT_DIR="$(cd -- "$(dirname -- "%k")" && pwd)"; PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"; bash "$PROJECT_ROOT/launchers/DOCTOR_PC.sh"'
+Icon=applications-medical
+Terminal=false
+Type=Application
+Categories=Science;MedicalSoftware;

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=CHRONO-PCOS Patient App
+Comment=Patient Application - Dashboard, Measurements, Symptoms, Cycle, Results, Find Care - Offline-first
+Exec=bash -c 'SCRIPT_DIR="$(cd -- "$(dirname -- "%k")" && pwd)"; PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"; bash "$PROJECT_ROOT/launchers/PATIENT_APP.sh"'
+Icon=smartphone
+Terminal=false
+Type=Application
+Categories=Science;MedicalSoftware;

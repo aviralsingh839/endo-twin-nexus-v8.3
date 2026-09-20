@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local runtime state. The database and calibration files contain whatever was
+# measured on this machine, so they never belong in the repository.
+data/chrono_pcos.db
+data/chrono_twin_nexus.db
+data/raw/
+data/baselines/
+data/training_audit.jsonl
+data/ai_config.json
+*.db-shm
+*.db-wal
+
+# Large model files - legacy preserved but not required for core
+models/*.joblib
+chrono_pcos_project V8/models/*.joblib
+
+# Scratch folders left behind by editors and preview tools
+.freebuff/
+.freebuff_scratch/
+logs/
