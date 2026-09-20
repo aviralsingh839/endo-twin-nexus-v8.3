@@ -294,6 +294,7 @@ private fun HealthScreen(patientId: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MeasureScreen(patientId: String) {
     var selected by remember { mutableStateOf("Overview") }
@@ -329,7 +330,7 @@ private fun MeasureScreen(patientId: String) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Data quality", style = MaterialTheme.typography.titleMedium)
                         Text("Sensor quality should be reported per channel and carried into downstream model uncertainty.")
-                        LinearProgressIndicator(progress = { 0.91f }, modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(progress = 0.91f, modifier = Modifier.fillMaxWidth())
                         Text("Illustrative quality: 0.91 • DEMO_DATA")
                     }
                 }
