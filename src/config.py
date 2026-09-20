@@ -1,4 +1,4 @@
-"""Global configuration for CHRONO-TWIN NEXUS V8.3.
+"""Global configuration for ENDO-TWIN V8.4.
 
 Conservative defaults - this is an educational research prototype,
 not a medical device.
@@ -9,11 +9,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
-# V8.3 branding
-APP_VERSION = "8.3.0"
-APP_VERSION_LABEL = "V8.3, Modular Multimodal Longitudinal Health Platform (research prototype, not clinically validated)"
-APP_NAME = "CHRONO-TWIN NEXUS"
-APP_TAGLINE = "Sense • Understand • Track • Personalize"
+# V8.4 branding
+APP_VERSION = "8.4.0"
+APP_VERSION_LABEL = "V8.4, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
+APP_NAME = "ENDO-TWIN"
+APP_TAGLINE = "Understand your physiological patterns over time."
+# Disease-specific module identity remains separate from the general platform name.
+CHRONO_PCOS_MODEL_NAME = "CHRONO-PCOS"
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
