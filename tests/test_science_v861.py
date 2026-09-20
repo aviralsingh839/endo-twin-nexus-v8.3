@@ -39,6 +39,7 @@ def test_adult_context_requires_supported_diagnostic_groups_and_exclusions():
     clinical = {
         "age_years": 27,
         "usual_cycle_length_days": 50,
+        "cycle_irregular": True,
         "clinical_hyperandrogenism": True,
         "exclusions_completed": True,
     }
