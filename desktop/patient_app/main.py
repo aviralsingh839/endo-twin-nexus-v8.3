@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:sys.path.insert(0,str(PROJECT_ROOT))
 from services.bridge.server import EndoTwinBridgeServer
 from desktop.workstation_theme import APP_QSS,card
 try:
- from PySide6.QtWidgets import QApplication,QFrame,QGridLayout,QLabel,QMainWindow,QMessageBox,QPushButton,QStackedWidget,QVBoxLayout,QWidget
+ from PySide6.QtWidgets import QApplication,QFrame,QGridLayout,QHBoxLayout,QLabel,QMainWindow,QMessageBox,QPushButton,QStackedWidget,QVBoxLayout,QWidget
  PYSIDE_AVAILABLE=True
 except ImportError:PYSIDE_AVAILABLE=False
 DISCLAIMER="Research / risk-screening output — not a medical diagnosis."
