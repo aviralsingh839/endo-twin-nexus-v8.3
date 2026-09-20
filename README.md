@@ -1,4 +1,4 @@
-# ENDO-TWIN V8.6 — Current Operating Path
+# ENDO-TWIN V8.6.1 — Current Operating Path
 
 ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is its first disease-specific research module.
 
