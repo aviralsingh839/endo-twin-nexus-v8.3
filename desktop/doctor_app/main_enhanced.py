@@ -47,7 +47,8 @@ class DoctorWindow(QMainWindow):
     def _dashboard(self):
         w,o=self._page("Command center","Priority cases, current sensor quality and the evidence boundary around every model output.")
         g=QGridLayout(); g.setSpacing(12)
-        for i,(a,b,c) in enumerate([("Patients in queue","—","Updates for this session"),("High signal tier","—","Synthetic demo tier only"),("CHRONO-PCOS cases","—","First disease-specific module"),("Live signal quality","—","Updates from processed stream")]):\n            f=card(a,b,c); g.addWidget(f,0,i); self.kpi_labels[a]=f.findChildren(QLabel)[1]
+        for i,(a,b,c) in enumerate([("Patients in queue","—","Updates for this session"),("High signal tier","—","Synthetic demo tier only"),("CHRONO-PCOS cases","—","First disease-specific module"),("Live signal quality","—","Updates from processed stream")]):
+            f=card(a,b,c); g.addWidget(f,0,i); self.kpi_labels[a]=f.findChildren(QLabel)[1]
         split=QSplitter(Qt.Orientation.Horizontal); left=QFrame(); left.setObjectName("card"); lv=QVBoxLayout(left); lv.addWidget(section_header("Priority review","Sorted by signal tier → research risk → condition")); self.queue=QTableWidget(0,5); self.queue.setHorizontalHeaderLabels(["Patient","Condition / module","Tier","Research risk","Quality"]); self._fit_table(self.queue); lv.addWidget(self.queue)
         right=QFrame(); right.setObjectName("card"); rv=QVBoxLayout(right); rv.addWidget(section_header("Processed sensor feed","PPG + IMU + GSR + temperature")); self.live_big=QLabel("Waiting for signal…"); self.live_big.setObjectName("bigValue"); rv.addWidget(self.live_big)
         for label,key in [("Heart rate","hr_bpm"),("HRV RMSSD","rmssd_ms"),("Skin temperature","skin_temp_c"),("Signal quality","signal_quality")]: q=QLabel(f"{label}  —"); q.setObjectName("muted"); rv.addWidget(q); self.metric_labels["dash_"+key]=q
