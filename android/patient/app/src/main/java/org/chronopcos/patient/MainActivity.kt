@@ -30,7 +30,7 @@ import java.net.URL
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
 
 /**
- * ENDO-TWIN Patient V8.4
+ * ENDO-TWIN Patient V8.6
  *
  * Single-patient, offline-first research interface.
  * DEMO_DATA is deliberately separated from real measured/derived/clinical data.
