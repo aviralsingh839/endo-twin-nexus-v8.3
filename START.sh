@@ -30,12 +30,13 @@ EOF
    1) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
    2) runpy "$ROOT/desktop/patient_app/main.py" ;;
    3) runpy "$ROOT/apps/main/main_app.py" ;;
-   4) "$ROOT/build_apks.sh" menu ;;
-   5) "$ROOT/setup_android.sh" ;;
-   6) need; "$VENV" -m pytest -q ;;
-   7) "$ROOT/scripts/diagnostics/project_health.sh" ;;
-   8) runpy "$ROOT/launcher/main.py" ;;
-   9) exit 0 ;;
+   4) "$ROOT/LAUNCH/WEBSITE.sh" ;;
+   5) "$ROOT/build_apks.sh" menu ;;
+   6) "$ROOT/setup_android.sh" ;;
+   7) need; "$VENV" -m pytest -q ;;
+   8) "$ROOT/scripts/diagnostics/project_health.sh" ;;
+   9) runpy "$ROOT/launcher/main.py" ;;
+  10) exit 0 ;;
    *) echo "Invalid choice"; sleep 1 ;;
   esac
  done
