@@ -394,36 +394,3 @@ private fun StatusChip(text: String, kind: String = "neutral") {
         Text(text, Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = fg, fontWeight = FontWeight.Bold)
     }
 }
-
-@Composable
-private fun TrendCard(title: String, value: String, values: List<Float>, provenance: String) {
-    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.weight(1f))
-                StatusChip(provenance, if (provenance == "MEASURED") "good" else "info")
-            }
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-            MiniTrend(values)
-        }
-    }
-}
-
-@Composable
-private fun MiniTrend(values: List<Float>) {
-    Canvas(Modifier.fillMaxWidth().height(86.dp)) {
-        if (values.size < 2) return@Canvas
-        val min = values.minOrNull() ?: return@Canvas
-        val max = values.maxOrNull() ?: return@Canvas
-        val span = (max - min).coerceAtLeast(.001f)
-        val path = Path()
-        values.forEachIndexed { i, v ->
-            val x = size.width * i / values.lastIndex.coerceAtLeast(1)
-            val y = size.height - (v - min) / span * size.height
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawLine(Color(0xFF353B49), Offset(0f, size.height * .55f), Offset(size.width, size.height * .55f), 1f)
-        drawPath(path, color = Color(0xFF63D8C3), style = Stroke(width = 3f, cap = StrokeCap.Round))
-    }
-}
