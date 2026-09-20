@@ -1,29 +1,70 @@
-# ENDO-TWIN V8.6 — Live Sensor Processing
-
-The canonical workstation live path is `desktop/workstation_runtime.py`.
+# ENDO-TWIN V8.6.1 — Live Sensor Processing
 
 ## Acquisition
-The reader accepts the existing Arduino `$CP` / `$CP2` protocol and requires a valid XOR CRC before emitting a sample to the processing layer.
 
-## Processing
-For each accepted packet:
-1. PPG samples are filtered and pulse peaks are detected.
-2. Beat intervals are cleaned before HRV features are calculated.
-3. SpO2 is computed by the existing dual-channel research estimator and withheld when quality is insufficient.
-4. IMU acceleration and gyro are converted into a motion/activity index.
-5. GSR produces tonic level and phasic event rate.
-6. Temperature is range-checked and a recent slope/stability estimate is calculated.
-7. Firmware status flags and channel metrics contribute to a combined quality gate.
-8. HR/HRV are withheld when the PPG channel is unusable.
+The workstation live path is desktop/workstation_runtime.py.
 
-## Provenance
-- Raw live sensor channels: **MEASURED**.
-- HR/HRV/activity/SpO2/GSR features: **DERIVED**.
-- Disease-module outputs: **MODEL-INFERRED**.
-- Demonstration stream: **DEMO_DATA**.
+Arduino $CP / $CP2 packets are accepted only after the existing parser and XOR CRC check succeed.
 
-## Sampling
-The canonical firmware packet interval is about 50 ms (20 Hz). Desktop PPG/IMU processors therefore operate on the received 20 Hz packet stream. The MAX30102's internal sampling configuration is not treated as the PC acquisition rate.
+The canonical firmware sends approximately one workstation packet every 50 ms (about 20 packets/s). This is the PC transport rate; it is not automatically the same as an internal sensor sampling rate.
 
-## Accuracy boundary
-Quality gates can reject poor or missing measurements, but they cannot make a low-cost sensor clinically validated. Clinical use would require controlled protocols, calibration, reference-device comparison, labelled datasets, patient-level validation and independent clinical research.
+## Processing path
+
+Packet → CRC/decode → channel checks → filtering → artifact rejection → features → quality → provenance → workstation
+
+### PPG
+- DC blocker and exponential smoothing.
+- Robust median-centred peak detection.
+- Physiological refractory interval.
+- IBI range filtering and local-median artifact rejection.
+- HR can be withheld at lower quality.
+- RMSSD/SDNN require a larger clean interval set and a stronger PPG quality gate.
+- PPG-derived variability is labelled as a derived pulse-rate-variability feature, not an ECG measurement.
+
+### SpO2
+The existing red/IR ratio-of-ratios estimator is educational/research-only. It is withheld below its quality gate and is not a clinically calibrated oxygen-saturation measurement.
+
+### IMU
+Acceleration and gyroscope signals feed the activity/motion processor. Motion is also used as a context signal for PPG quality.
+
+### GSR
+GSR is processed at approximately 10 Hz rather than treating a 20 Hz transport packet as new GSR information.
+
+### Temperature
+Temperature is processed at approximately 1 Hz and range/validity-gated before a feature is exposed.
+
+## Quality
+
+Quality and provenance are separate.
+
+Examples:
+- a live PPG sample may be MEASURED but poor quality;
+- HR/HRV may be DERIVED and withheld because the source is unusable;
+- a disease result may be MODEL-INFERRED only after its evidence gate passes.
+
+Firmware status bits are surfaced for absent/saturated/error states.
+
+## Update cadence
+
+The processing layer can receive approximately 20 packets/s, while the feature layer emits at a slower cadence for UI stability. This prevents unnecessary repeated model/UI work and keeps chart histories bounded.
+
+## Performance improvements in V8.6.1
+
+- NumPy vectorized peak candidates instead of scanning the waveform entirely in Python.
+- Bounded deques for signal history and chart data.
+- Slower GSR/temperature channels are not oversampled.
+- Feature processing remains off the GUI thread through the reader/session architecture.
+- Quality gates short-circuit downstream outputs when source evidence is inadequate.
+
+## Scientific accuracy boundary
+
+Engineering improvements can reduce software artefacts and improve reproducibility, but they do not establish clinical accuracy.
+
+A future clinical validation study would need reference-device comparison, pre-specified protocols, participant-level separation, independent validation, calibration, uncertainty reporting, subgroup analysis, and appropriate statistical confidence intervals.
+
+## References
+
+PPG/ECG HRV agreement and uncertainty:
+- https://pubmed.ncbi.nlm.nih.gov/29668452/
+- https://pubmed.ncbi.nlm.nih.gov/39517723/
+- https://pubmed.ncbi.nlm.nih.gov/42655500/
