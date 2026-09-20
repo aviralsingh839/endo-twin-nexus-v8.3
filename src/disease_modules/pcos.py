@@ -1,18 +1,20 @@
-"""PCOS / Reproductive-Metabolic Risk Module - V8.3.
+"""PCOS / Reproductive-Metabolic research module.
 
-Keeps and improves existing V8.1 PCOS pipeline.
-Distinguishes:
-1. clinical-variable prediction
-2. wearable physiological signals
-3. ultrasound-derived features
-4. combined/fused research estimate
-
-Language: 'PCOS-associated physiological and clinical risk signals'
-Never: 'wearable detects PCOS'
+Scientific boundary:
+- Wearable physiology is contextual research evidence, not a standalone PCOS
+  diagnostic criterion.
+- Adult diagnostic context follows the 2023 international guideline structure:
+  two of ovulatory dysfunction, hyperandrogenism, and polycystic ovarian
+  morphology/elevated AMH, with appropriate exclusion of mimicking disorders.
+- In adolescents, diagnosis requires both irregular menstrual cycles (defined
+  by years post-menarche) and clinical/biochemical hyperandrogenism; pelvic
+  ultrasound and AMH are not diagnostic tests in this age group.
+- This module does not diagnose PCOS and does not output a calibrated clinical
+  probability. Any research index is explicitly heuristic and unvalidated.
 """
 from __future__ import annotations
 
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Any
 import numpy as np
 
 from src.disease_modules.base import DiseaseModule
@@ -20,8 +22,8 @@ from src.data_models import SharedPhysiologicalFeatures, DiseaseModuleResult
 from src.config import UserProfile
 from src.utils.math_utils import clamp, sigmoid
 
-
-# Domain weights - research priors, same as V8.1 but documented
+# Research-only heuristic weights. These are NOT trained/calibrated clinical
+# model coefficients and must not be interpreted as odds/probabilities.
 CYCLE_W = 1.20
 METABOLIC_W = 0.90
 AUTONOMIC_W = 0.60
@@ -36,7 +38,7 @@ CYCLE_NEUTRAL = 15.0
 
 
 class PCOSModule(DiseaseModule):
-    """PCOS-associated risk signals."""
+    """PCOS-associated research phenotyping signal."""
 
     @property
     def name(self) -> str:
@@ -44,7 +46,7 @@ class PCOSModule(DiseaseModule):
 
     @property
     def version(self) -> str:
-        return "8.3.0"
+        return "8.6.1"
 
     @property
     def required_features(self) -> List[str]:
@@ -52,54 +54,163 @@ class PCOSModule(DiseaseModule):
 
     @property
     def optional_features(self) -> List[str]:
-        return ["sleep_duration_h", "sleep_regularity", "circadian_stability",
-                "gsr_tonic", "stress_index", "temperature_rhythm_disruption"]
+        return [
+            "sleep_duration_h", "sleep_regularity", "circadian_stability",
+            "gsr_tonic", "stress_index", "temperature_rhythm_disruption"
+        ]
 
     def __init__(self, profile: Optional[UserProfile] = None):
         self.profile = profile
 
+    def _clinical_context(self, clinical: Optional[Dict] = None) -> Dict[str, Any]:
+        c = clinical or {}
+        age = c.get("age_years", c.get("age"))
+        years_post_menarche = c.get("years_post_menarche")
+
+        irregular = c.get("cycle_irregular")
+        if irregular is None:
+            irregular = c.get("cycle_irregularity")
+        cycle_length = c.get("usual_cycle_length_days", c.get("cycle_length"))
+        hyper = bool(
+            c.get("clinical_hyperandrogenism")
+            or c.get("biochemical_hyperandrogenism")
+            or c.get("hirsutism")
+            or c.get("severe_acne")
+            or c.get("androgen_elevated")
+        )
+        biochemical_hyper = bool(c.get("biochemical_hyperandrogenism") or c.get("androgen_elevated"))
+        pcom = bool(
+            c.get("pcom_present")
+            or c.get("polycystic_ovary_morphology")
+            or c.get("ultrasound_pcom")
+            or c.get("amh_elevated")
+        )
+        exclusions = bool(
+            c.get("exclusions_completed")
+            or c.get("mimics_excluded")
+            or c.get("diagnostic_exclusions_completed")
+        )
+
+        # When years-post-menarche is available, use guideline-oriented
+        # adolescent cycle thresholds rather than an adult 28-day heuristic.
+        irregular_guideline = irregular
+        if years_post_menarche is not None and cycle_length is not None:
+            try:
+                ypm = float(years_post_menarche)
+                cl = float(cycle_length)
+                if ypm < 1:
+                    irregular_guideline = None
+                elif ypm < 3:
+                    irregular_guideline = cl < 21 or cl > 45
+                else:
+                    irregular_guideline = cl < 21 or cl > 35
+                if ypm >= 1 and cl > 90:
+                    irregular_guideline = True
+            except (TypeError, ValueError):
+                pass
+
+        if irregular is True:
+            irregular_guideline = True
+
+        adolescent = years_post_menarche is not None and float(years_post_menarche) < 8
+        adult = age is not None and float(age) >= 18
+
+        if adolescent:
+            diagnostic_supported = bool(irregular_guideline is True and hyper and exclusions)
+            status = "adolescent_supported_context" if diagnostic_supported else "adolescent_at_risk_or_insufficient"
+            # Ultrasound/AMH is deliberately excluded from adolescent criteria.
+            criterion_groups = int(irregular_guideline is True) + int(hyper)
+        elif adult:
+            criterion_groups = (
+                int(bool(irregular_guideline))
+                + int(hyper)
+                + int(pcom)
+            )
+            diagnostic_supported = criterion_groups >= 2 and exclusions
+            status = "adult_supported_context" if diagnostic_supported else "adult_insufficient_context"
+        else:
+            criterion_groups = (
+                int(bool(irregular_guideline))
+                + int(hyper)
+                + int(pcom)
+            )
+            diagnostic_supported = criterion_groups >= 2 and exclusions and age is not None
+            status = "age_unknown_insufficient_context"
+
+        return {
+            "age_years": age,
+            "years_post_menarche": years_post_menarche,
+            "adolescent": adolescent,
+            "adult": adult,
+            "irregular_cycles": irregular_guideline,
+            "hyperandrogenism": hyper,
+            "biochemical_hyperandrogenism": biochemical_hyper,
+            "pcom_or_amh": pcom,
+            "exclusions_completed": exclusions,
+            "criterion_groups": criterion_groups,
+            "diagnostic_supported_context": diagnostic_supported,
+            "status": status,
+        }
+
     def _cycle_score(self, profile: Optional[UserProfile], clinical: Optional[Dict] = None) -> float:
-        """Cycle irregularity 0-100 from self-reported info only."""
+        """Cycle-context score from entered menstrual information only."""
         p = profile or self.profile
         if p is None and not clinical:
             return CYCLE_NEUTRAL
-        length = None
-        dslp = None
-        irregular = None
-        if p:
-            length = p.usual_cycle_length_days
-            dslp = p.days_since_last_period
-            irregular = p.cycle_irregular
-        if clinical:
-            length = clinical.get("usual_cycle_length_days", length)
-            dslp = clinical.get("days_since_last_period", dslp)
-            irregular = clinical.get("cycle_irregular", irregular)
 
-        if length is None and dslp is None and irregular is None:
-            return CYCLE_NEUTRAL
+        c = clinical or {}
+        length = c.get("usual_cycle_length_days", c.get("cycle_length", getattr(p, "usual_cycle_length_days", None) if p else None))
+        irregular = c.get("cycle_irregular", c.get("cycle_irregularity", getattr(p, "cycle_irregular", None) if p else None))
+        dslp = c.get("days_since_last_period", getattr(p, "days_since_last_period", None) if p else None)
+        years_post_menarche = c.get("years_post_menarche")
+
         parts: List[float] = []
         if length is not None:
-            parts.append(clamp(abs(float(length) - 28.0) / 20.0 * 100.0, 0.0, 100.0))
+            try:
+                cl = float(length)
+                if years_post_menarche is not None:
+                    ypm = float(years_post_menarche)
+                    if ypm < 1:
+                        return CYCLE_NEUTRAL
+                    abnormal = (cl > 90) or (21 > cl) or (cl > 45 if ypm < 3 else cl > 35)
+                    parts.append(100.0 if abnormal else 10.0)
+                else:
+                    parts.append(clamp(abs(cl - 28.0) / 20.0 * 100.0, 0.0, 100.0))
+            except (TypeError, ValueError):
+                pass
+
         if irregular is True:
             parts.append(60.0)
         elif irregular is False:
             parts.append(10.0)
-        if dslp is not None and dslp > 35:
-            parts.append(clamp((float(dslp) - 35.0) / 25.0 * 100.0, 0.0, 100.0))
-        if not parts:
-            return CYCLE_NEUTRAL
-        return float(np.mean(parts))
 
-    def _domain_scores(self, shared: SharedPhysiologicalFeatures, profile: Optional[UserProfile],
-                       clinical: Optional[Dict], ultrasound: Optional[Dict]) -> Dict[str, float]:
-        # Sleep risk from shared
+        if dslp is not None:
+            try:
+                if float(dslp) > 90:
+                    parts.append(100.0)
+                elif float(dslp) > 35:
+                    parts.append(clamp((float(dslp) - 35.0) / 55.0 * 100.0, 0.0, 100.0))
+            except (TypeError, ValueError):
+                pass
+
+        return float(np.mean(parts)) if parts else CYCLE_NEUTRAL
+
+    def _domain_scores(
+        self,
+        shared: SharedPhysiologicalFeatures,
+        profile: Optional[UserProfile],
+        clinical: Optional[Dict],
+        ultrasound: Optional[Dict],
+    ) -> Dict[str, float]:
+        # These domains describe contextual physiology; they are not PCOS
+        # diagnostic criteria.
         sleep_risk = 50.0
         if shared.sleep_duration_h is not None:
-            # Short sleep <6h or long >10h -> higher risk
-            if shared.sleep_duration_h < 6:
-                sleep_risk = clamp((6 - shared.sleep_duration_h) / 3 * 100.0, 0, 100)
-            elif shared.sleep_duration_h > 10:
-                sleep_risk = clamp((shared.sleep_duration_h - 10) / 2 * 100.0, 0, 100)
+            h = float(shared.sleep_duration_h)
+            if h < 6:
+                sleep_risk = clamp((6 - h) / 3 * 100.0, 0, 100)
+            elif h > 10:
+                sleep_risk = clamp((h - 10) / 2 * 100.0, 0, 100)
             else:
                 sleep_risk = 20.0
         if shared.sleep_regularity:
@@ -107,39 +218,33 @@ class PCOSModule(DiseaseModule):
 
         metabolic = 0.0
         if clinical:
-            # BMI, glucose etc
             bmi = clinical.get("bmi") or (profile.bmi if profile else None)
-            if bmi:
-                if bmi > 25:
-                    metabolic += clamp((bmi - 25) / 10 * 100.0, 0, 100) * 0.5
+            if bmi is not None and float(bmi) > 25:
+                metabolic += clamp((float(bmi) - 25) / 10 * 100.0, 0, 100) * 0.5
             glucose = clinical.get("glucose_mg_dl") or (profile.glucose_mg_dl if profile else None)
-            if glucose and glucose > 100:
-                metabolic += clamp((glucose - 100) / 50 * 100.0, 0, 100) * 0.5
+            if glucose is not None and float(glucose) > 100:
+                metabolic += clamp((float(glucose) - 100) / 50 * 100.0, 0, 100) * 0.5
 
-        # Use shared features for metabolic proxy
-        if shared.hrv_rmssd is not None and shared.hrv_rmssd < 30:
-            metabolic += clamp((30 - shared.hrv_rmssd) / 20 * 100.0, 0, 100) * 0.3
+        if shared.hrv_rmssd is not None and float(shared.hrv_rmssd) < 30:
+            metabolic += clamp((30 - float(shared.hrv_rmssd)) / 20 * 100, 0, 100) * 0.3
 
-        stress_autonomic = clamp(max(shared.stress_index, shared.autonomic_imbalance), 0, 100)
-        circadian = clamp(shared.circadian_disruption, 0, 100)
-        temp_rhythm = clamp(shared.temperature_rhythm_disruption, 0, 100)
-        low_activity = clamp(shared.low_activity_risk, 0, 100)
+        stress_autonomic = clamp(max(float(shared.stress_index), float(shared.autonomic_imbalance)), 0, 100)
+        circadian = clamp(float(shared.circadian_disruption), 0, 100)
+        temp_rhythm = clamp(float(shared.temperature_rhythm_disruption), 0, 100)
+        low_activity = clamp(float(shared.low_activity_risk), 0, 100)
 
-        # Glucose and BP from clinical
         glucose_risk = 0.0
         bp_risk = 0.0
         if clinical:
             g = clinical.get("glucose_mg_dl")
-            if g:
-                glucose_risk = clamp((float(g) - 90) / 60 * 100.0, 0, 100) if g > 90 else 0.0
+            if g is not None:
+                glucose_risk = clamp((float(g) - 90) / 60 * 100, 0, 100) if float(g) > 90 else 0.0
             sys_bp = clinical.get("systolic_bp")
-            if sys_bp and sys_bp > 120:
-                bp_risk = clamp((float(sys_bp) - 120) / 40 * 100.0, 0, 100)
-
-        cycle = self._cycle_score(profile, clinical)
+            if sys_bp is not None and float(sys_bp) > 120:
+                bp_risk = clamp((float(sys_bp) - 120) / 40 * 100, 0, 100)
 
         return {
-            "cycle": cycle,
+            "cycle": self._cycle_score(profile, clinical),
             "metabolic": clamp(metabolic, 0, 100),
             "glucose": glucose_risk,
             "bp": bp_risk,
@@ -150,7 +255,7 @@ class PCOSModule(DiseaseModule):
             "low_activity": low_activity,
         }
 
-    def _risk_from_scores(self, d: Dict[str, float]) -> float:
+    def _research_index_from_context(self, d: Dict[str, float]) -> float:
         c = d["cycle"] / 100.0
         m = d["metabolic"] / 100.0
         a = d["stress_autonomic"] / 100.0
@@ -160,115 +265,128 @@ class PCOSModule(DiseaseModule):
         l = d["low_activity"] / 100.0
         g = d["glucose"] / 100.0
         b = d["bp"] / 100.0
-        z = (INTERCEPT + CYCLE_W * c + METABOLIC_W * m + AUTONOMIC_W * a +
-             SLEEP_W * s + CIRCADIAN_W * ci + TEMPERATURE_W * t +
-             GLUCOSE_W * g + ACTIVITY_W * l + BP_W * b)
+        z = (
+            INTERCEPT
+            + CYCLE_W * c
+            + METABOLIC_W * m
+            + AUTONOMIC_W * a
+            + SLEEP_W * s
+            + CIRCADIAN_W * ci
+            + TEMPERATURE_W * t
+            + GLUCOSE_W * g
+            + ACTIVITY_W * l
+            + BP_W * b
+        )
         return float(clamp(100.0 * sigmoid(z), 0.0, 100.0))
 
-    def predict(self, shared: SharedPhysiologicalFeatures, clinical: Optional[Dict] = None,
-                ultrasound: Optional[Dict] = None, history: Optional[List] = None) -> DiseaseModuleResult:
+    def predict(
+        self,
+        shared: SharedPhysiologicalFeatures,
+        clinical: Optional[Dict] = None,
+        ultrasound: Optional[Dict] = None,
+        history: Optional[List] = None,
+    ) -> DiseaseModuleResult:
         profile = clinical.get("profile") if clinical and "profile" in clinical else self.profile
         if isinstance(profile, dict):
-            # Convert dict to UserProfile-like
-            from src.config import UserProfile
             p = UserProfile()
             for k, v in profile.items():
                 if hasattr(p, k):
                     setattr(p, k, v)
             profile = p
 
+        context = self._clinical_context(clinical)
+
+        # A disease-specific score is not produced when the clinical context
+        # is incomplete. This prevents wearable-only pseudo-diagnosis.
+        if not context["diagnostic_supported_context"]:
+            return DiseaseModuleResult(
+                module=self.name,
+                version=self.version,
+                signal="insufficient_disease_evidence",
+                level="unknown",
+                confidence=0.0,
+                data_quality=self._check_data_quality(shared),
+                clinical_validation="NOT ESTABLISHED",
+                drivers=[],
+                explanation=(
+                    "Insufficient disease-specific evidence for an exploratory "
+                    "PCOS phenotype signal. Wearable physiology alone is not "
+                    "a PCOS diagnostic criterion. Missing evidence remains UNKNOWN."
+                ),
+                provenance={
+                    "clinical_variables": 1.0 if clinical else 0.0,
+                    "wearable_physiology": 1.0 if self._check_data_quality(shared) > 0 else 0.0,
+                    "ultrasound": 1.0 if ultrasound else 0.0,
+                },
+                limitations=self.limitations(),
+                extra={
+                    "score_interpretation": "not produced",
+                    "research_index": None,
+                    "diagnostic_context": context,
+                    "history_observations": len(history or []),
+                },
+            )
+
         domains = self._domain_scores(shared, profile, clinical, ultrasound)
-        risk = self._risk_from_scores(domains)
-
-        # Provenance breakdown
-        provenance = {}
-        clinical_weight = 0.4 if clinical else 0.1
-        wearable_weight = 0.25
-        longitudinal_weight = 0.0
-        ultrasound_weight = 0.0
-        metabolic_weight = 0.15
-
-        if history and len(history) > 10:
-            longitudinal_weight = 0.25
-            wearable_weight = 0.20
-            clinical_weight = 0.35 if clinical else 0.15
-
-        if ultrasound and ultrasound.get("cyst_size_mm") is not None:
-            ultrasound_weight = 0.20
-            # Reduce others proportionally
-            total = clinical_weight + wearable_weight + longitudinal_weight + metabolic_weight + ultrasound_weight
-            if total > 0:
-                clinical_weight = clinical_weight / total
-                wearable_weight = wearable_weight / total
-                longitudinal_weight = longitudinal_weight / total
-                metabolic_weight = metabolic_weight / total
-                ultrasound_weight = ultrasound_weight / total
-
-        provenance = {
-            "clinical_variables": round(clinical_weight, 2),
-            "wearable_physiology": round(wearable_weight, 2),
-            "longitudinal": round(longitudinal_weight, 2),
-            "ultrasound": round(ultrasound_weight, 2),
-            "metabolic": round(metabolic_weight, 2),
-        }
-
-        level = self._level_from_score(risk)
-        confidence = self.confidence(shared)
+        index = self._research_index_from_context(domains)
+        level = self._level_from_score(index)
+        confidence = min(0.60, self.confidence(shared))
         data_quality = self._check_data_quality(shared)
 
-        # Drivers
         sorted_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)
-        drivers = []
-        for name, score in sorted_domains[:3]:
-            drivers.append({
+        drivers = [
+            {
                 "domain": name,
                 "score": round(float(score), 1),
-                "contribution": f"{name} {score:.0f}%",
-                "type": "clinical" if name == "cycle" else "physiological" if name in ("stress_autonomic", "sleep", "circadian") else "metabolic"
-            })
+                "contribution": f"{name} {score:.0f}% context signal",
+                "type": "clinical" if name == "cycle" else "physiological_context",
+            }
+            for name, score in sorted_domains[:3]
+        ]
 
-        # Explanation
         explanation = (
-            f"PCOS-associated physiological and clinical risk signal: {risk:.1f}% ({level}). "
-            f"Main drivers: {', '.join([d['domain'] for d in drivers[:2]])}. "
-            f"This is a research estimate based on {', '.join([k for k,v in provenance.items() if v>0.05])}. "
-            f"Not a diagnosis. Clinical evaluation required."
+            f"Exploratory physiological-context index: {index:.1f}% ({level}). "
+            "This is a heuristic, uncalibrated research index after disease-specific "
+            "clinical context gating; it is not a diagnostic probability. "
+            "Wearable physiology contributes context only."
         )
-
-        # Ultrasound context
-        if ultrasound:
-            if ultrasound.get("source") == "CLINICALLY-ENTERED":
-                explanation += " Includes clinically-entered ultrasound features."
-            elif ultrasound.get("source") == "IMAGE-DERIVED":
-                explanation += " Includes image-derived ultrasound features (quality-gated)."
 
         return DiseaseModuleResult(
             module=self.name,
             version=self.version,
-            signal="pcos_associated_risk" if risk < 50 else "elevated_pcos_associated_risk",
+            signal="pcos_context_signal",
             level=level,
             confidence=confidence,
             data_quality=data_quality,
             clinical_validation="NOT ESTABLISHED",
             drivers=drivers,
             explanation=explanation,
-            provenance=provenance,
-            limitations=self.limitations() + " PCOS diagnosis requires Rotterdam criteria and clinician evaluation.",
+            provenance={
+                "clinical_variables": 0.45,
+                "wearable_physiology": 0.30,
+                "longitudinal": 0.15 if history and len(history) > 10 else 0.0,
+                "ultrasound": 0.10 if ultrasound else 0.0,
+            },
+            limitations=self.limitations(),
             extra={
                 "domain_scores": domains,
-                "risk_percent": risk,
-                "clinical_variables_present": bool(clinical),
-                "ultrasound_present": bool(ultrasound),
-                "baseline_deviations": shared.baseline_deviations,
-            }
+                "research_index": index,
+                "research_index_is_probability": False,
+                "diagnostic_context": context,
+                "history_observations": len(history or []),
+                "output_type": "exploratory_research_signal",
+                "diagnostic_use": False,
+            },
         )
 
     def limitations(self) -> str:
         return (
-            "Research-only PCOS-associated risk signal. Not a diagnostic test. "
-            "PCOS diagnosis requires clinical evaluation using Rotterdam criteria (oligo-anovulation, "
-            "hyperandrogenism, polycystic ovaries) by qualified professional. "
-            "Wearable physiology alone cannot diagnose PCOS. "
-            "Ultrasound features are UNKNOWN by design until validated labelled dataset exists. "
-            "Model not clinically validated."
+            "Research-only PCOS-associated physiological-context module. It is "
+            "not a diagnostic test and does not output a calibrated clinical "
+            "probability. Wearable physiology alone cannot diagnose PCOS. "
+            "Adult diagnostic assessment should use an appropriate evidence-based "
+            "clinical pathway and exclude mimicking disorders. In adolescents, "
+            "diagnostic assessment differs from adults and ultrasound/AMH should "
+            "not be used for PCOS diagnosis. Clinical validation of this software "
+            "module is NOT ESTABLISHED."
         )
