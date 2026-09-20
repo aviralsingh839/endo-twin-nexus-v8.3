@@ -1,14 +1,19 @@
-# ENDO-TWIN V8.5 — Build & Run
+# ENDO-TWIN V8.6 — Build & Run
 
-Start: `./START.sh`
+## Canonical launcher
+```bash
+./START.sh
+```
 
-Workstations:
+## Workstations
 ```bash
 ./START.sh doctor
 ./START.sh patient-pc
 ```
 
-Android:
+At startup, choose **DEMO MODE** or **LIVE SENSOR MODE**. The choice is fixed for the session.
+
+## Android
 ```bash
 ./setup_android.sh
 ./build_apks.sh all
@@ -16,8 +21,11 @@ Android:
 
 Outputs are copied to `DIST/android/`.
 
-Phone connection:
-Doctor Workstation → Mobile Link → address + 6-digit code.
-Patient Android → Connect → Pair → Send latest session.
+## Live USB sensor
+Connect the Arduino and choose LIVE SENSOR MODE. The workstation reads the existing CRC-protected `$CP/$CP2` protocol and processes the received stream. The firmware's internal sensor sampling rate is not confused with the approximately 20 Hz PC packet rate.
 
-The bridge is trusted-LAN research infrastructure, not production clinical security.
+## Mobile bridge
+Doctor Workstation: port **7777**.
+Patient Workstation: port **7778**.
+
+The current phone transport path remains DEMO_DATA and is not a replacement for clinically validated acquisition or secure production health infrastructure.
