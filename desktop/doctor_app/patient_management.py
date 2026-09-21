@@ -171,7 +171,11 @@ class UltrasoundViewer:
         return {
             'result': 'inference requires trained model',
             'confidence': None,  # Do not hard-code fake confidence
-            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established class ReportGenerator:
+            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established',
+        }
+
+
+class ReportGenerator:
     def __init__(self, db=None):
         self.db = db
 
