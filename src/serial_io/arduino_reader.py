@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from typing import Optional
 
 try:
@@ -43,12 +44,31 @@ class ArduinoReader(QObject):
         self._stop = threading.Event()
         self._serial = None
         self.parser = PacketParser(require_crc=require_crc)
+        self._sample_queue = deque(maxlen=20000)
+        self._queue_lock = threading.Lock()
 
     @staticmethod
     def available_ports() -> list[str]:
         if list_ports is None:
             return []
         return [p.device for p in list_ports.comports()]
+
+    def has_sample(self) -> bool:
+        with self._queue_lock:
+            return bool(self._sample_queue)
+
+    def get_samples(self, max_samples: int = 250) -> list[SensorSample]:
+        out = []
+        with self._queue_lock:
+            for _ in range(max(0, int(max_samples))):
+                if not self._sample_queue:
+                    break
+                out.append(self._sample_queue.popleft())
+        return out
+
+    def get_sample(self) -> SensorSample | None:
+        samples = self.get_samples(1)
+        return samples[0] if samples else None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -59,6 +79,8 @@ class ArduinoReader(QObject):
 
     def stop(self) -> None:
         self._stop.set()
+        with self._queue_lock:
+            self._sample_queue.clear()
         if self._serial is not None:
             try:
                 self._serial.close()
@@ -119,6 +141,8 @@ class ArduinoReader(QObject):
                     continue
                 sample: SensorSample = self.parser.parse(line)
                 last_data = time.time()
+                with self._queue_lock:
+                    self._sample_queue.append(sample)
                 self.sample_received.emit(sample)
             except PacketParseError as exc:
                 self.error_received.emit(f"Packet parse error: {exc}")
