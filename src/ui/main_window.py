@@ -1461,21 +1461,25 @@ class MainWindow(QMainWindow):
             self.mode_label.setText(f"Failed to load scenario: {e}")
 
     def _update_features(self):
-        sample = None
+        # Readers queue samples at their acquisition cadence. Drain the pending
+        # queue each UI tick so a 50 Hz stream is not reduced to 1 sample/sec.
+        samples = []
         if self.arduino_reader and self.arduino_reader.has_sample():
-            sample = self.arduino_reader.get_sample()
+            samples = self.arduino_reader.get_samples(250)
         elif self.network_reader and self.network_reader.has_sample():
-            sample = self.network_reader.get_sample()
+            samples = self.network_reader.get_samples(250)
         elif self.demo_stream and self.demo_stream.has_sample():
-            sample = self.demo_stream.get_sample()
+            samples = self.demo_stream.get_samples(250)
 
-        if sample:
-            # Convert to SensorSample if needed
+        if not samples:
+            return
+
+        latest_fv = None
+        latest_shared = None
+
+        for sample in samples:
             if isinstance(sample, dict):
-                # demo stream dict
-                from src.data_models import SensorSample
-                import time
-                s = SensorSample(
+                sample = SensorSample(
                     timestamp_s=time.time(),
                     ms=int(sample.get("ms", 0)),
                     ir=int(sample.get("ir", 5000)),
@@ -1489,18 +1493,16 @@ class MainWindow(QMainWindow):
                     temp_c=float(sample.get("temp_c", 32.5)),
                     gsr_raw=int(sample.get("gsr", 450)),
                     lux=float(sample.get("lux", 100)),
-                    source="demo" if self.demo_stream else "serial"
+                    source="demo" if self.demo_stream else "serial",
                 )
-                sample = s
 
             self.extractor.add_sample(sample)
             fv = self.extractor.compute()
+            latest_fv = fv
             self.feature_history.append(fv)
             if len(self.feature_history) > 5000:
                 self.feature_history = self.feature_history[-5000:]
 
-            # Persist only real transport data inside an explicitly active wear session.
-            # DEMO streams remain presentation-only and cannot contaminate research records.
             if (
                 self.active_patient_id
                 and self.active_session_id
@@ -1514,28 +1516,27 @@ class MainWindow(QMainWindow):
                         feature_vector=fv,
                         label="REAL",
                     )
-                    self.local_db.set_wearable_state(
-                        self.active_patient_id,
-                        self.active_device_id or "WEARABLE-01",
-                        "WORN",
-                        "live sample received",
-                    )
                 except Exception as exc:
                     self.sync_status_label.setText(f"Local database write error: {exc}")
 
-            # Update UI vitals
-            self._update_vital_cards(fv)
-
-            # Update shared
             try:
-                shared = self.shared_extractor.extract(fv, self.feature_history[-50:])
-                self.current_shared = shared
-                self.shared_history.append(shared)
+                latest_shared = self.shared_extractor.extract(
+                    fv,
+                    self.feature_history[-50:],
+                )
+                self.current_shared = latest_shared
+                self.shared_history.append(latest_shared)
                 if len(self.shared_history) > 500:
                     self.shared_history = self.shared_history[-500:]
-                self.shared_text.setText(self.explanation_engine.explain_shared_features(shared))
-            except Exception as e:
-                pass
+            except Exception:
+                latest_shared = None
+
+        if latest_fv is not None:
+            self._update_vital_cards(latest_fv)
+        if latest_shared is not None:
+            self.shared_text.setText(
+                self.explanation_engine.explain_shared_features(latest_shared)
+            )
 
     def _update_vital_cards(self, fv: FeatureVector):
         def set_card(key, value, fmt="{:.0f}"):
