@@ -89,15 +89,15 @@ private fun LazyContent(patientId: String) {
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard("Heart rate", "72 bpm", "Illustrative only", "DEMO")
-                MetricCard("HRV", "48 ms", "Pulse-derived example", "DERIVED")
+                MetricCard(Modifier.weight(1f), "Heart rate", "72 bpm", "Illustrative only", "DEMO")
+                MetricCard(Modifier.weight(1f), "HRV", "48 ms", "Pulse-derived example", "DERIVED")
             }
         }
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard("Skin temp", "32.5 °C", "Illustrative only", "DEMO")
-                MetricCard("Activity", "35%", "Motion-index example", "DEMO")
+                MetricCard(Modifier.weight(1f), "Skin temp", "32.5 °C", "Illustrative only", "DEMO")
+                MetricCard(Modifier.weight(1f), "Activity", "35%", "Motion-index example", "DEMO")
             }
         }
 
@@ -215,13 +215,14 @@ private fun SectionTitle(title: String, subtitle: String) {
 
 @Composable
 private fun MetricCard(
+    modifier: Modifier,
     title: String,
     value: String,
     detail: String,
     provenance: String
 ) {
     Card(
-        modifier = Modifier.weight(1f),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -257,7 +258,7 @@ private fun QualityLine(label: String, value: String, tint: Color) {
             Text(value, color = tint, style = MaterialTheme.typography.labelLarge)
         }
         LinearProgressIndicator(
-            progress = { value.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f },
+            progress = value.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f,
             modifier = Modifier.fillMaxWidth()
         )
     }
