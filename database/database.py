@@ -1170,14 +1170,25 @@ class LocalDatabase:
             )
 
         merge_tables = [
-            ('research_studies','study_id'), ('research_labels','label_id'),
-            ('profiles','profile_id'), ('symptoms','symptom_id'), ('cycles','cycle_id'),
-            ('sessions','session_id'), ('wearable_devices','device_id'), ('wearable_events','event_id'),
-            ('feature_vectors','feature_id'), ('raw_wearable_packets','packet_id'), ('reports','report_id'), ('doctor_notes','note_id'),
-            ('personal_baselines','baseline_id'), ('learning_runs','run_id'),
-            ('model_results','result_id'), ('analysis_results','analysis_id'),
+            ('research_studies','research_studies','study_id'),
+            ('research_labels','research_labels','label_id'),
+            ('profiles','profiles','profile_id'),
+            ('symptoms','symptoms','symptom_id'),
+            ('cycles','cycles','cycle_id'),
+            # Package key "sessions" maps to the physical sensor_sessions table.
+            ('sessions','sensor_sessions','session_id'),
+            ('wearable_devices','wearable_devices','device_id'),
+            ('wearable_events','wearable_events','event_id'),
+            ('feature_vectors','feature_vectors','feature_id'),
+            ('raw_wearable_packets','raw_wearable_packets','packet_id'),
+            ('reports','reports','report_id'),
+            ('doctor_notes','doctor_notes','note_id'),
+            ('personal_baselines','personal_baselines','baseline_id'),
+            ('learning_runs','learning_runs','run_id'),
+            ('model_results','model_results','result_id'),
+            ('analysis_results','analysis_results','analysis_id'),
         ]
-        for key, pk in merge_tables:
+        for key, table_name, pk in merge_tables:
             rows = data.get(key) or []
             if not rows:
                 continue
@@ -1187,7 +1198,7 @@ class LocalDatabase:
                 columns = list(row.keys())
                 values = [row[col] for col in columns]
                 qs = ','.join('?' for _ in columns)
-                self.conn.execute(f'INSERT OR IGNORE INTO {self._validate_identifier(key)} ({",".join(columns)}) VALUES ({qs})', values)
+                self.conn.execute(f'INSERT OR IGNORE INTO {self._validate_identifier(table_name)} ({",".join(columns)}) VALUES ({qs})', values)
 
         for key in ('ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality'):
             for row in data.get(key) or []:
@@ -1202,7 +1213,7 @@ class LocalDatabase:
 
     @staticmethod
     def _validate_identifier(identifier: str) -> str:
-        allowed = {'profiles','symptoms','cycles','sensor_sessions','wearable_devices','wearable_events','feature_vectors','reports','doctor_notes','personal_baselines','learning_runs','model_results','analysis_results','ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality','raw_wearable_packets'}
+        allowed = {'research_studies','research_labels','profiles','symptoms','cycles','sensor_sessions','wearable_devices','wearable_events','feature_vectors','reports','doctor_notes','personal_baselines','learning_runs','model_results','analysis_results','ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality','raw_wearable_packets'}
         if identifier not in allowed:
             raise ValueError(f'Unsupported table: {identifier}')
         return identifier
