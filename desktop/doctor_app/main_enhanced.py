@@ -9,10 +9,11 @@ from datetime import datetime, timedelta
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QComboBox, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton, QScrollArea,
-    QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem, QTextEdit,
-    QVBoxLayout, QWidget
+    QApplication, QFileDialog, QComboBox, QDialog, QDialogButtonBox, QFrame,
+    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QPushButton, QScrollArea, QDoubleSpinBox, QSplitter,
+    QStackedWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
+    QWidget
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,7 @@ from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
+from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
 
 DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
@@ -48,7 +50,7 @@ class DoctorWindow(QMainWindow):
         self.metric_cards = {}
         self.trend_charts = {}
         self.tab_pages = {}
-        self.page_keys = ["dashboard", "patients", "patient", "mobile", "settings"]
+        self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7777)
         self.bridge.start()
@@ -107,6 +109,7 @@ class DoctorWindow(QMainWindow):
         for key, text in [
             ("dashboard", "▦  Dashboard"),
             ("patients", "♙  Patients"),
+            ("lab", "⌁  Prototype Lab"),
         ]:
             b = QPushButton(text)
             b.setObjectName("nav")
@@ -195,6 +198,7 @@ class DoctorWindow(QMainWindow):
         self.pages = {
             "dashboard": self._dashboard_page(),
             "patients": self._patients_page(),
+            "lab": PrototypeLabWidget(self.session, self.mode, ROOT),
             "patient": self._patient_page(),
             "mobile": self._mobile_page(),
             "settings": self._settings_page(),
@@ -510,6 +514,70 @@ class DoctorWindow(QMainWindow):
         pid = self.dash_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         self._open_case(pid)
 
+    # ---------- patient creation ----------
+    def _create_patient(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Add Patient")
+        dlg.setModal(True)
+        dlg.setMinimumWidth(520)
+        form = QFormLayout(dlg)
+        form.setContentsMargins(22, 22, 22, 18)
+        form.setSpacing(10)
+
+        name = QLineEdit()
+        name.setPlaceholderText("Optional display name / alias")
+        anon = QLineEdit()
+        anon.setPlaceholderText("Optional anonymous ID; generated if blank")
+
+        age = QDoubleSpinBox()
+        age.setRange(0, 120)
+        age.setDecimals(1)
+        age.setSpecialValueText("Not supplied")
+
+        bmi = QDoubleSpinBox()
+        bmi.setRange(0, 100)
+        bmi.setDecimals(1)
+        bmi.setSpecialValueText("Not supplied")
+
+        form.addRow("Display name", name)
+        form.addRow("Anonymous ID", anon)
+        form.addRow("Age", age)
+        form.addRow("BMI", bmi)
+
+        note = QLabel(
+            "Creates a local patient record for engineering/research testing. "
+            "No disease model is run automatically."
+        )
+        note.setObjectName("muted")
+        note.setWordWrap(True)
+        form.addRow(note)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel |
+            QDialogButtonBox.StandardButton.Ok
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        try:
+            patient_id = self.db.create_patient(
+                display_name=name.text().strip() or None,
+                anonymous_id=anon.text().strip() or None,
+                age_years=float(age.value()) if age.value() else None,
+                bmi=float(bmi.value()) if bmi.value() else None,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Add Patient", f"Could not create patient:\n{exc}")
+            return
+
+        self._log_event("Patient created", patient_id)
+        self._refresh_roster()
+        self._open_case("LOCAL::" + patient_id)
+
     # ---------- patients ----------
     def _patients_page(self):
         w = QWidget()
@@ -538,6 +606,11 @@ class DoctorWindow(QMainWindow):
         self.sorter.addItems(["Priority", "Risk", "Condition"])
         self.sorter.currentTextChanged.connect(self._refresh_roster)
         bar.addWidget(self.sorter)
+
+        add = QPushButton("+ Add Patient")
+        add.setObjectName("primary")
+        add.clicked.connect(self._create_patient)
+        bar.addWidget(add)
         o.addLayout(bar)
 
         note = QLabel("DEMO MODE values are synthetic UI examples only — not diagnoses, not clinical severity scores, and not validation metrics.")
@@ -565,10 +638,11 @@ class DoctorWindow(QMainWindow):
             return
         demo = self.mode.mode == "demo"
         self.table.setRowCount(0)
+        q = self.search.text().lower()
+        cond = self.cond.currentText() if demo else "All"
+        sk = self.sorter.currentText().lower() if demo else "priority"
+
         if demo:
-            cond = self.cond.currentText()
-            sk = self.sorter.currentText().lower()
-            q = self.search.text().lower()
             rows = sorted_cases(
                 cond,
                 "risk" if sk == "risk" else "condition" if sk == "condition" else "priority",
@@ -587,28 +661,32 @@ class DoctorWindow(QMainWindow):
                     if col == 0:
                         it.setData(Qt.ItemDataRole.UserRole, c.patient)
                     self.table.setItem(r, col, it)
-        else:
-            try:
-                local = self.db.list_patients()
-            except Exception:
-                local = []
-            q = self.search.text().lower()
-            for p in local:
-                pid = str(p.get("patient_id", ""))
-                alias = str(p.get("display_name") or p.get("anonymous_id") or pid)
-                if q and q not in f"{pid} {alias}".lower():
-                    continue
-                r = self.table.rowCount()
-                self.table.insertRow(r)
-                vals = [
-                    p.get("anonymous_id", pid), alias, "No model run", "Unknown",
-                    "UNKNOWN", "UNKNOWN", p.get("updated_at", "—")
-                ]
-                for col, val in enumerate(vals):
-                    it = QTableWidgetItem(str(val))
-                    if col == 0:
-                        it.setData(Qt.ItemDataRole.UserRole, pid)
-                    self.table.setItem(r, col, it)
+
+        try:
+            local = self.db.list_patients()
+        except Exception:
+            local = []
+        for p in local:
+            pid = str(p.get("patient_id", ""))
+            anon = str(p.get("anonymous_id") or pid)
+            alias = str(p.get("display_name") or anon)
+            searchable = f"{pid} {anon} {alias}"
+            if q and q not in searchable.lower():
+                continue
+            if demo and cond != "All":
+                continue
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            vals = [
+                anon, alias, "Local patient", "Unknown",
+                "UNKNOWN", "UNKNOWN", p.get("updated_at", "—")
+            ]
+            for col, val in enumerate(vals):
+                it = QTableWidgetItem(str(val))
+                if col == 0:
+                    it.setData(Qt.ItemDataRole.UserRole, "LOCAL::" + pid)
+                self.table.setItem(r, col, it)
+
         self._refresh_dashboard()
 
     def _select_row(self, row, _col):
@@ -1304,13 +1382,26 @@ class DoctorWindow(QMainWindow):
     def _open_case(self, pid: str):
         self.current_case = None
         self.live_patient = None
-        if self.mode.mode == "demo":
+
+        if isinstance(pid, str) and pid.startswith("LOCAL::"):
+            local_id = pid.split("::", 1)[1]
+            try:
+                self.live_patient = self.db.get_patient(local_id)
+            except Exception:
+                self.live_patient = None
+        elif self.mode.mode == "demo":
             self.current_case = next((x for x in sorted_cases() if x.patient == pid), None)
+            if self.current_case is None:
+                try:
+                    self.live_patient = self.db.get_patient(pid)
+                except Exception:
+                    self.live_patient = None
         else:
             try:
                 self.live_patient = self.db.get_patient(pid)
             except Exception:
                 self.live_patient = None
+
         if not self.current_case and not self.live_patient:
             return
         self._log_event("Patient opened", pid)
