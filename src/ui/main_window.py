@@ -272,80 +272,163 @@ class MainWindow(QMainWindow):
     def _build_overview_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(2, 2, 2, 2)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+
         content = QWidget()
         root = QVBoxLayout(content)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(15)
 
-        # Headline
-        head = QHBoxLayout()
-        self.risk_gauge = GaugeWidget("Overall Research Signal")
-        head.addWidget(self.risk_gauge, 2)
+        hero = QFrame()
+        hero.setObjectName("PremiumCard")
+        hero_layout = QHBoxLayout(hero)
+        hero_layout.setContentsMargins(16, 14, 16, 14)
 
-        meta_box = QGroupBox("Status")
-        mb = QVBoxLayout(meta_box)
-        self.confidence_label = QLabel("Model Confidence: -")
-        self.quality_label = QLabel("Data Quality: -")
-        self.coverage_label = QLabel("Coverage: -")
-        self.baseline_label = QLabel("Baseline: No baseline")
-        self.mode_label = QLabel("Mode: NO STREAM")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
-        for w in [self.confidence_label, self.quality_label, self.coverage_label, self.baseline_label, self.mode_label]:
-            w.setObjectName("BigValue")
-            mb.addWidget(w)
-        head.addWidget(meta_box, 1)
-        root.addLayout(head)
+        hero_copy = QVBoxLayout()
+        eyebrow = QLabel("ENDO-TWIN / OVERVIEW")
+        eyebrow.setObjectName("SectionEyebrow")
+        hero_copy.addWidget(eyebrow)
+        hero_title = QLabel("Physiological command center")
+        hero_title.setObjectName("HeroTitle")
+        hero_copy.addWidget(hero_title)
+        hero_sub = QLabel(
+            "Observe signals → establish a personal baseline → evaluate persistent change → "
+            "apply research modules with provenance and uncertainty."
+        )
+        hero_sub.setObjectName("HeroSubtitle")
+        hero_sub.setWordWrap(True)
+        hero_copy.addWidget(hero_sub)
+        hero_layout.addLayout(hero_copy, 1)
 
-        # Vitals
-        key_box = QGroupBox("Key Vitals (Live)")
-        vg = QGridLayout(key_box)
+        scope = QLabel("ENDO-TWIN core\n↳ CHRONO-PCOS\n↳ VoxVasc (experimental)")
+        scope.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        scope.setStyleSheet("font-weight: 750; color: #B38CFF;")
+        hero_layout.addWidget(scope)
+        root.addWidget(hero)
+
+        top = QHBoxLayout()
+        top.setSpacing(14)
+
+        gauge_card = QFrame()
+        gauge_card.setObjectName("ScientificCard")
+        gauge_layout = QVBoxLayout(gauge_card)
+        gauge_layout.addWidget(QLabel("RESEARCH INDEX"))
+        self.risk_gauge = GaugeWidget("Quality-gated research signal")
+        gauge_layout.addWidget(self.risk_gauge, 1)
+        top.addWidget(gauge_card, 2)
+
+        status_box = QGroupBox("Live system state")
+        status_layout = QVBoxLayout(status_box)
+        self.confidence_label = QLabel("Model confidence: —")
+        self.quality_label = QLabel("Data quality: —")
+        self.coverage_label = QLabel("Fusion coverage: —")
+        self.baseline_label = QLabel("Personal baseline: not established")
+        self.mode_label = QLabel("NO STREAM")
+        self.mode_label.setObjectName("Warn")
+        for label in (
+            self.confidence_label,
+            self.quality_label,
+            self.coverage_label,
+            self.baseline_label,
+            self.mode_label,
+        ):
+            label.setObjectName("BigValue")
+            status_layout.addWidget(label)
+
+        note = QLabel(
+            "Numbers appear only after acquisition / validated computation. "
+            "Unavailable inputs stay unavailable."
+        )
+        note.setWordWrap(True)
+        note.setObjectName("SmallMuted")
+        status_layout.addWidget(note)
+        top.addWidget(status_box, 3)
+        root.addLayout(top)
+
+        key_box = QGroupBox("Live physiology")
+        key_layout = QGridLayout(key_box)
+        key_layout.setHorizontalSpacing(12)
+        key_layout.setVerticalSpacing(12)
         self.cards = {}
-        for i, (key, title, unit) in enumerate([
-            ("hr", "Heart Rate", "bpm"),
-            ("hrv", "HRV RMSSD", "ms"),
-            ("temp", "Skin Temp", "°C"),
-            ("activity", "Activity", "%"),
+
+        vital_specs = [
+            ("hr", "Heart rate", "bpm"),
+            ("hrv", "HRV · RMSSD", "ms"),
+            ("temp", "Skin temperature", "°C"),
+            ("activity", "Activity index", "%"),
             ("gsr", "GSR", "raw"),
-            ("stress", "Stress", "%"),
-            ("sleep", "Sleep", ""),
-            ("quality", "Signal Quality", "%"),
-            ("recovery", "Recovery", "%"),
-        ]):
+            ("stress", "Stress index", ""),
+            ("sleep", "Sleep probability", ""),
+            ("quality", "Signal quality", "%"),
+            ("recovery", "Recovery score", ""),
+        ]
+        for i, (key, title, unit) in enumerate(vital_specs):
             card = VitalCard(title, unit)
+            card.setMinimumHeight(92)
             self.cards[key] = card
-            vg.addWidget(card, i // 3, i % 3)
+            key_layout.addWidget(card, i // 3, i % 3)
+
         root.addWidget(key_box)
 
-        # Shared features summary
-        shared_box = QGroupBox("Shared Physiological Representation (Core Engine)")
-        sb = QVBoxLayout(shared_box)
+        rep_box = QGroupBox("Shared physiological representation")
+        rep_layout = QVBoxLayout(rep_box)
+        rep_head = QHBoxLayout()
+        rep_label = QLabel("CORE ENGINE")
+        rep_label.setObjectName("SectionEyebrow")
+        rep_head.addWidget(rep_label)
+        rep_head.addStretch()
+        provenance = QLabel("MEASURED → DERIVED → BASELINE → LONGITUDINAL → FUSION")
+        provenance.setObjectName("SmallMuted")
+        rep_head.addWidget(provenance)
+        rep_layout.addLayout(rep_head)
+
         self.shared_text = QTextEdit()
         self.shared_text.setReadOnly(True)
-        self.shared_text.setMaximumHeight(200)
-        self.shared_text.setPlaceholderText("Shared features appear here...")
-        sb.addWidget(self.shared_text)
-        root.addWidget(shared_box)
+        self.shared_text.setMinimumHeight(155)
+        self.shared_text.setPlaceholderText(
+            "No shared feature vector yet. Start a real wearable stream or run a clearly labelled synthetic scenario."
+        )
+        rep_layout.addWidget(self.shared_text)
+        root.addWidget(rep_box)
 
-        # Quick signals
-        signals_box = QGroupBox("Health Signals Summary")
-        sig_layout = QHBoxLayout(signals_box)
+        signal_box = QGroupBox("Research modules")
+        signal_layout = QGridLayout(signal_box)
+        signal_layout.setHorizontalSpacing(12)
+        signal_layout.setVerticalSpacing(12)
         self.signal_labels = {}
-        for mod in ["pcos", "sleep", "cardiometabolic", "autonomic"]:
-            g = QGroupBox(mod.upper())
-            vl = QVBoxLayout(g)
-            lbl = QLabel("No data")
-            lbl.setWordWrap(True)
-            vl.addWidget(lbl)
-            self.signal_labels[mod] = lbl
-            sig_layout.addWidget(g)
-        root.addWidget(signals_box)
+        for i, mod in enumerate(["pcos", "sleep", "cardiometabolic", "autonomic"]):
+            card = QFrame()
+            card.setObjectName("MetricCard")
+            ml = QVBoxLayout(card)
+            title = QLabel(mod.replace("_", " ").title())
+            title.setObjectName("MetricLabel")
+            value = QLabel("Awaiting data")
+            value.setObjectName("MetricValue")
+            value.setWordWrap(True)
+            detail = QLabel("Model state: unavailable until required inputs pass quality gates.")
+            detail.setObjectName("MetricDetail")
+            detail.setWordWrap(True)
+            ml.addWidget(title)
+            ml.addWidget(value)
+            ml.addWidget(detail)
+            self.signal_labels[mod] = value
+            signal_layout.addWidget(card, 0, i)
 
-        # Disclaimer
-        disc = QLabel(DISCLAIMER + " This system learns what is normal for an individual first, then looks for persistent deviations.")
-        disc.setWordWrap(True)
-        disc.setObjectName("SmallMuted")
-        root.addWidget(disc)
+        root.addWidget(signal_box)
+
+        safety = QFrame()
+        safety.setObjectName("WarningCard")
+        safety_layout = QVBoxLayout(safety)
+        safety_layout.addWidget(QLabel(
+            "RESEARCH BOUNDARY  •  Observed, derived, image-derived, model-inferred, clinically-entered "
+            "and demo data stay explicitly separated. Missing or low-quality data never becomes a fabricated result."
+        ))
+        root.addWidget(safety)
+        root.addStretch(1)
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
