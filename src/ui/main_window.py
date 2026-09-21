@@ -714,8 +714,12 @@ class MainWindow(QMainWindow):
         b2 = QPushButton("Check disease-model training gate")
         b2.setObjectName("Secondary")
         b2.clicked.connect(self._show_training_gate)
+        b3 = QPushButton("Train research candidate")
+        b3.setObjectName("Secondary")
+        b3.clicked.connect(self._train_candidate)
         actions.addWidget(b1)
         actions.addWidget(b2)
+        actions.addWidget(b3)
         root.addLayout(actions)
 
         self.learning_details = QTextEdit()
@@ -743,6 +747,27 @@ class MainWindow(QMainWindow):
             self.learning_details.setText("\n".join(result.notes))
         except Exception as exc:
             self.learning_status.setText(f"ERROR • {exc}")
+
+    def _train_candidate(self):
+        gate = self.self_learning.candidate_training_gate(self.local_db)
+        if gate["status"] != "READY_FOR_CANDIDATE_TRAINING":
+            self.learning_status.setText(
+                f"{gate['status']} • {gate['distinct_participants']} participant(s)"
+            )
+            self.learning_details.setText(
+                gate["note"] + "\n\nAdd explicit research labels from independent participants before candidate training."
+            )
+            return
+        try:
+            result = self.self_learning.train_candidate(self.local_db)
+            self.learning_status.setText(
+                f"{result['status']} • {result.get('usable_participants', result.get('distinct_participants', 0))} participant(s)"
+            )
+            self.learning_details.setText(
+                json.dumps(result, indent=2, default=str)
+            )
+        except Exception as exc:
+            self.learning_status.setText(f"TRAINING ERROR • {exc}")
 
     def _show_training_gate(self):
         gate = self.self_learning.candidate_training_gate(self.local_db)
