@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
 )
 
 from src.config import APP_VERSION, APP_VERSION_LABEL, APP_NAME, APP_TAGLINE, UserProfile, DATA_DIR
+from database.database import LocalDatabase
+from src.ml.self_learning import SelfLearningEngine
 from src.data_models import FeatureVector, SensorSample, SharedPhysiologicalFeatures
 from src.core.personal_baseline import PersonalBaselineEngine
 from src.core.longitudinal_engine import LongitudinalEngine
@@ -81,6 +83,12 @@ class MainWindow(QMainWindow):
         self.arduino_reader: ArduinoReader | None = None
         self.network_reader: NetworkReader | None = None
         self.history_store = HistoryStore(db_path) if db_path else HistoryStore()
+        self.local_db = LocalDatabase(db_path)
+        self.self_learning = SelfLearningEngine()
+        self.active_patient_id: str | None = None
+        self.active_study_id: str | None = None
+        self.active_session_id: str | None = None
+        self.active_device_id: str | None = None
 
         # Timers
         self.feature_timer = QTimer()
@@ -121,10 +129,13 @@ class MainWindow(QMainWindow):
 
         pages = [
             ("⌂  Overview", self._build_overview_tab()),
+            ("♙  Patients", self._build_patients_tab()),
+            ("◉  Wearable & Sync", self._build_wearable_tab()),
             ("◌  Personal Baseline", self._build_baseline_tab()),
             ("⌁  Longitudinal Trends", self._build_trends_tab()),
             ("◈  Health Signals", self._build_health_signals_tab()),
             ("◉  VoxVasc", VoiceVascTab()),
+            ("✦  Self-Learning", self._build_self_learning_tab()),
             ("◇  Data Quality", self._build_data_quality_tab()),
             ("▦  Clinical Inputs", self._build_clinical_tab()),
             ("◉  Ultrasound", self._build_ultrasound_tab()),
@@ -153,9 +164,9 @@ class MainWindow(QMainWindow):
         context_layout = QVBoxLayout(context)
         context_layout.setContentsMargins(10, 9, 10, 9)
         context_layout.addWidget(QLabel("ACTIVE CONTEXT"))
-        context_label = QLabel("ENDO-TWIN core → CHRONO-PCOS")
-        context_label.setStyleSheet("font-weight: 750;")
-        context_layout.addWidget(context_label)
+        self.context_label = QLabel("ENDO-TWIN core → CHRONO-PCOS")
+        self.context_label.setStyleSheet("font-weight: 750;")
+        context_layout.addWidget(self.context_label)
         context_layout.addWidget(QLabel("Local-first • provenance-aware"))
         side_layout.addWidget(context)
 
@@ -268,6 +279,410 @@ class MainWindow(QMainWindow):
         layout.addWidget(scenario_btn)
 
         return header
+
+    def _set_active_patient(self, patient_id: str | None) -> None:
+        self.active_patient_id = patient_id
+        patient = self.local_db.get_patient(patient_id) if patient_id else None
+        alias = patient.get("anonymous_id") if patient else "none"
+        study = self.local_db.get_active_study(patient_id) if patient_id else None
+        self.active_study_id = study.get("study_id") if study else None
+        if hasattr(self, "context_label"):
+            self.context_label.setText(
+                f"ENDO-TWIN core → CHRONO-PCOS  •  Patient {alias}"
+                if patient else "ENDO-TWIN core → CHRONO-PCOS  •  No patient selected"
+            )
+        if hasattr(self, "patient_context_label"):
+            self.patient_context_label.setText(
+                f"Active patient: {alias}  •  study: {'ACTIVE' if study else 'none'}"
+            )
+
+    def _selected_patient_id(self) -> str | None:
+        if not hasattr(self, "patient_table"):
+            return self.active_patient_id
+        row = self.patient_table.currentRow()
+        if row < 0:
+            return self.active_patient_id
+        item = self.patient_table.item(row, 0)
+        return str(item.data(Qt.ItemDataRole.UserRole)) if item else self.active_patient_id
+
+    def _refresh_patient_table(self) -> None:
+        if not hasattr(self, "patient_table"):
+            return
+        patients = self.local_db.list_patients()
+        self.patient_table.setRowCount(0)
+        for patient in patients:
+            row = self.patient_table.rowCount()
+            self.patient_table.insertRow(row)
+            cells = [
+                patient.get("anonymous_id", ""),
+                patient.get("display_name") or "Research participant",
+                patient.get("age_years") if patient.get("age_years") is not None else "—",
+                patient.get("bmi") if patient.get("bmi") is not None else "—",
+                "ARCHIVED" if patient.get("is_archived") else "ACTIVE",
+            ]
+            for col, value in enumerate(cells):
+                item = QTableWidgetItem(str(value))
+                if col == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, patient["patient_id"])
+                self.patient_table.setItem(row, col, item)
+        self.patient_status.setText(
+            f"{len(patients)} active local patient record(s). Real observations and DEMO_DATA remain explicitly separated."
+        )
+
+    def _create_patient_dialog(self) -> None:
+        alias, ok = QInputDialog.getText(self, "Create research participant", "Anonymous participant ID:")
+        if not ok:
+            return
+        alias = alias.strip()
+        if not alias:
+            QMessageBox.warning(self, "Missing participant ID", "Enter an anonymous participant ID.")
+            return
+        age, ok = QInputDialog.getDouble(self, "Participant age", "Age (years):", 18.0, 10.0, 100.0, 1)
+        if not ok:
+            return
+        bmi, ok = QInputDialog.getDouble(self, "Participant BMI", "BMI (0 = unknown):", 0.0, 0.0, 80.0, 1)
+        if not ok:
+            return
+        try:
+            pid = self.local_db.create_patient(
+                anonymous_id=alias,
+                display_name="Research participant",
+                age_years=age,
+                bmi=bmi if bmi > 0 else None,
+            )
+            self._set_active_patient(pid)
+            self._refresh_patient_table()
+            self.patient_status.setText(f"Created {alias}. Start a 48-hour research study when ready.")
+        except Exception as exc:
+            QMessageBox.critical(self, "Patient creation failed", str(exc))
+
+    def _open_selected_patient(self) -> None:
+        pid = self._selected_patient_id()
+        if not pid:
+            QMessageBox.information(self, "Select a patient", "Select a patient row first.")
+            return
+        self._set_active_patient(pid)
+        patient = self.local_db.get_patient(pid) or {}
+        sessions = self.local_db.list_sessions(pid)
+        self.patient_status.setText(
+            f"Active patient {patient.get('anonymous_id', pid)} • {len(sessions)} stored wear session(s) • "
+            f"study {'ACTIVE' if self.local_db.get_active_study(pid) else 'none'}"
+        )
+        self._switch_workspace(2)
+
+    def _start_48h_study(self) -> None:
+        pid = self._selected_patient_id() or self.active_patient_id
+        if not pid:
+            QMessageBox.information(self, "Select a patient", "Create/select a participant first.")
+            return
+        self._set_active_patient(pid)
+        if self.local_db.get_active_study(pid):
+            QMessageBox.information(self, "Study already active", "This participant already has an active study.")
+            return
+        self.active_study_id = self.local_db.start_study(
+            pid,
+            duration_hours=48.0,
+            protocol={
+                "purpose": "two_day_observation",
+                "wear_policy": "remove_before_bathing; reconnect_after_bathing",
+                "missing_data_policy": "preserve_gap",
+                "model_mode": "research_screening_only",
+            },
+            label="REAL",
+        )
+        self.patient_status.setText(
+            "48-hour study active. Start a wear session; remove before bathing and reconnect afterward."
+        )
+        self._set_active_patient(pid)
+
+    def _start_wear_session(self) -> None:
+        pid = self.active_patient_id
+        if not pid:
+            QMessageBox.information(self, "No active patient", "Select a patient first.")
+            return
+        study = self.local_db.get_active_study(pid)
+        if not study:
+            self._start_48h_study()
+            study = self.local_db.get_active_study(pid)
+        if not study:
+            return
+        device_id = self.device_id_edit.text().strip() or "WEARABLE-01"
+        self.active_device_id = device_id
+        self.local_db.register_wearable(pid, device_id, "ENDO-TWIN prototype wearable", "serial_or_mobile_ble")
+        self.local_db.set_wearable_state(pid, device_id, "WORN", "wear session started")
+        self.active_session_id = self.local_db.create_session(
+            pid,
+            source="WEARABLE_SERIAL_OR_MOBILE",
+            label="REAL",
+            notes="Wear episode. A removal event closes the episode and preserves the gap.",
+            study_id=study["study_id"],
+        )
+        self.wearable_state_label.setText("WORN • active wear episode")
+        self.sync_status_label.setText("Session active. Connect the wearable transport and begin acquisition.")
+        self._set_active_patient(pid)
+
+    def _remove_for_bathing(self) -> None:
+        pid = self.active_patient_id
+        if not pid:
+            return
+        if self.active_session_id:
+            self.local_db.close_sensor_session(pid, self.active_session_id, "Wearable removed before bathing.")
+            self.local_db.record_wearable_event(
+                pid, self.active_session_id, "WEARABLE_REMOVED_BATHING",
+                {"gap_is_missing_data": True},
+            )
+            self.active_session_id = None
+        if self.active_device_id:
+            self.local_db.set_wearable_state(pid, self.active_device_id, "REMOVED", "removed before bathing")
+        self.stop_stream()
+        self.wearable_state_label.setText("REMOVED • bathing gap recorded")
+        self.sync_status_label.setText("No data will be generated during the removal interval.")
+
+    def _reconnect_wearable(self) -> None:
+        pid = self.active_patient_id
+        study = self.local_db.get_active_study(pid) if pid else None
+        if not pid or not study:
+            QMessageBox.information(self, "No active study", "Select a participant and start the 48-hour study first.")
+            return
+        device_id = self.active_device_id or self.device_id_edit.text().strip() or "WEARABLE-01"
+        self.active_device_id = device_id
+        self.local_db.register_wearable(pid, device_id, "ENDO-TWIN prototype wearable", "serial_or_mobile_ble")
+        self.local_db.set_wearable_state(pid, device_id, "WORN", "reconnected after removal")
+        self.active_session_id = self.local_db.create_session(
+            pid,
+            source="WEARABLE_SERIAL_OR_MOBILE",
+            label="REAL",
+            notes="Wear episode after explicit removal/reconnection.",
+            study_id=study["study_id"],
+        )
+        self.local_db.record_wearable_event(pid, self.active_session_id, "WEARABLE_RECONNECTED", {"previous_gap": True})
+        self.wearable_state_label.setText("RECONNECTED • WORN")
+        self.sync_status_label.setText("New wear episode active. Connect the wearable transport now.")
+
+    def _end_study(self) -> None:
+        pid = self.active_patient_id
+        if not pid:
+            return
+        if self.active_session_id:
+            self.local_db.close_sensor_session(pid, self.active_session_id, "Study ended.")
+            self.active_session_id = None
+        if self.active_device_id:
+            self.local_db.set_wearable_state(pid, self.active_device_id, "NOT_CONNECTED", "study ended")
+        study = self.local_db.get_active_study(pid)
+        if study:
+            self.local_db.end_study(pid, study["study_id"], "COMPLETED")
+        self.active_study_id = None
+        self.wearable_state_label.setText("STUDY ENDED")
+        self.sync_status_label.setText("Study ended. Export the complete patient package for doctor review.")
+
+    def _export_patient_package(self) -> None:
+        pid = self.active_patient_id or self._selected_patient_id()
+        if not pid:
+            QMessageBox.information(self, "Select a patient", "Select a patient first.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export complete patient package",
+            str(DATA_DIR / "exports" / f"endo_twin_{pid[:8]}.json"),
+            "JSON files (*.json)"
+        )
+        if not path:
+            return
+        try:
+            package = self.local_db.export_patient_data(pid)
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(json.dumps(package, indent=2, default=str), encoding="utf-8")
+            if hasattr(self, "sync_status_label"):
+                self.sync_status_label.setText(f"Complete patient package exported → {path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Export failed", str(exc))
+
+    def _import_patient_package(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Import mobile patient package", "", "JSON files (*.json)")
+        if not path:
+            return
+        try:
+            package = json.loads(Path(path).read_text(encoding="utf-8"))
+            pid = self.local_db.import_patient_data(package)
+            self._set_active_patient(pid)
+            self._refresh_patient_table()
+            self.sync_status_label.setText(
+                f"Imported patient {pid}: sessions, raw sensor channels, features, events and research metadata merged."
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Import failed", str(exc))
+
+    def _build_patients_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+
+        title = QLabel("Patients")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        sub = QLabel("Real patient-scoped workspaces. A participant's 48-hour study may contain multiple wear episodes and explicit removal gaps.")
+        sub.setObjectName("HeroSubtitle")
+        sub.setWordWrap(True)
+        root.addWidget(sub)
+
+        actions = QHBoxLayout()
+        for label, slot, obj in [
+            ("Create participant", self._create_patient_dialog, "Primary"),
+            ("Open selected", self._open_selected_patient, "Secondary"),
+            ("Start 48-hour study", self._start_48h_study, "Primary"),
+            ("Export package", self._export_patient_package, "Secondary"),
+            ("Import mobile package", self._import_patient_package, "Secondary"),
+        ]:
+            b = QPushButton(label)
+            b.setObjectName(obj)
+            b.clicked.connect(slot)
+            actions.addWidget(b)
+        root.addLayout(actions)
+
+        self.patient_table = QTableWidget(0, 5)
+        self.patient_table.setHorizontalHeaderLabels(["Participant", "Display", "Age", "BMI", "Status"])
+        self.patient_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.patient_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.patient_table.horizontalHeader().setStretchLastSection(True)
+        self.patient_table.horizontalHeader().setSectionResizeMode(0, QTableWidget.ResizeMode.Stretch)
+        self.patient_table.itemSelectionChanged.connect(self._open_selected_patient)
+        root.addWidget(self.patient_table, 1)
+
+        self.patient_status = QLabel("Loading…")
+        self.patient_status.setObjectName("SmallMuted")
+        root.addWidget(self.patient_status)
+        self._refresh_patient_table()
+        return tab
+
+    def _build_wearable_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+
+        title = QLabel("Wearable • Mobile • Sync")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        sub = QLabel("The wearable is a removable device. Wear episodes, bathing removals and reconnections are first-class data events.")
+        sub.setObjectName("HeroSubtitle")
+        sub.setWordWrap(True)
+        root.addWidget(sub)
+
+        self.patient_context_label = QLabel("Active patient: none • study: none")
+        self.patient_context_label.setObjectName("BigValue")
+        root.addWidget(self.patient_context_label)
+
+        card = QFrame()
+        card.setObjectName("ScientificCard")
+        grid = QGridLayout(card)
+        grid.addWidget(QLabel("Wearable ID"), 0, 0)
+        self.device_id_edit = QLineEdit("WEARABLE-01")
+        grid.addWidget(self.device_id_edit, 0, 1)
+        grid.addWidget(QLabel("Transport"), 1, 0)
+        transport = QLabel("USB serial • Android BLE/USB-OTG/Wi-Fi bridge transport boundary • hardware-specific packet configuration remains documented separately")
+        transport.setWordWrap(True)
+        grid.addWidget(transport, 1, 1)
+        grid.addWidget(QLabel("State"), 2, 0)
+        self.wearable_state_label = QLabel("NOT_CONNECTED")
+        self.wearable_state_label.setObjectName("Warn")
+        grid.addWidget(self.wearable_state_label, 2, 1)
+        root.addWidget(card)
+
+        actions = QGridLayout()
+        for row, specs in enumerate([
+            ("Start wear session", self._start_wear_session, "Primary"),
+            ("Remove for bathing", self._remove_for_bathing, "Danger"),
+            ("Reconnect", self._reconnect_wearable, "Primary"),
+            ("End 48-hour study", self._end_study, "Secondary"),
+            ("Export to doctor", self._export_patient_package, "Secondary"),
+            ("Import from mobile", self._import_patient_package, "Secondary"),
+        ]):
+            b = QPushButton(specs[0])
+            b.setObjectName(specs[2])
+            b.clicked.connect(specs[1])
+            actions.addWidget(b, row // 2, row % 2)
+        root.addLayout(actions)
+
+        self.sync_status_label = QLabel("No active patient/session. Local database is waiting for patient-scoped data.")
+        self.sync_status_label.setObjectName("SmallMuted")
+        self.sync_status_label.setWordWrap(True)
+        root.addWidget(self.sync_status_label)
+
+        protocol = QFrame()
+        protocol.setObjectName("WarningCard")
+        pl = QVBoxLayout(protocol)
+        pl.addWidget(QLabel(
+            "48-hour protocol: participant → study → wear episode → acquisition → remove before bathing → "
+            "session closes → reconnect → new episode → final export. Missing intervals remain missing."
+        ))
+        root.addWidget(protocol)
+        root.addStretch(1)
+        return tab
+
+    def _build_self_learning_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+        title = QLabel("Self-learning • Personal Twin")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        sub = QLabel(
+            "The automatic layer learns this participant's baseline and short-term drift. "
+            "It does not silently rewrite the CHRONO-PCOS model."
+        )
+        sub.setWordWrap(True)
+        sub.setObjectName("HeroSubtitle")
+        root.addWidget(sub)
+        self.learning_status = QLabel("No personalization run yet.")
+        self.learning_status.setObjectName("BigValue")
+        root.addWidget(self.learning_status)
+
+        actions = QHBoxLayout()
+        b1 = QPushButton("Update personal twin")
+        b1.setObjectName("Primary")
+        b1.clicked.connect(self._run_personalization)
+        b2 = QPushButton("Check disease-model training gate")
+        b2.setObjectName("Secondary")
+        b2.clicked.connect(self._show_training_gate)
+        actions.addWidget(b1)
+        actions.addWidget(b2)
+        root.addLayout(actions)
+
+        self.learning_details = QTextEdit()
+        self.learning_details.setReadOnly(True)
+        root.addWidget(self.learning_details, 1)
+
+        safety = QFrame()
+        safety.setObjectName("WarningCard")
+        sl = QVBoxLayout(safety)
+        sl.addWidget(QLabel(
+            "A 48-hour observation can adapt the personal twin. It cannot by itself establish clinical accuracy for PCOS or another disease."
+        ))
+        root.addWidget(safety)
+        return tab
+
+    def _run_personalization(self):
+        if not self.active_patient_id:
+            self.learning_status.setText("Select a patient first.")
+            return
+        try:
+            result = self.self_learning.personalize(self.local_db, self.active_patient_id)
+            self.learning_status.setText(
+                f"{result.status} • {result.observations} observations • {result.features_updated} baseline features updated"
+            )
+            self.learning_details.setText("\n".join(result.notes))
+        except Exception as exc:
+            self.learning_status.setText(f"ERROR • {exc}")
+
+    def _show_training_gate(self):
+        gate = self.self_learning.candidate_training_gate(self.local_db)
+        self.learning_status.setText(
+            f"{gate['status']} • {gate['distinct_participants']} participant(s) • {gate['label_rows']} label row(s)"
+        )
+        self.learning_details.setText(
+            gate['note'] + "\n\nNo disease-model weights are changed by this gate."
+        )
 
     def _build_overview_tab(self):
         tab = QWidget()
