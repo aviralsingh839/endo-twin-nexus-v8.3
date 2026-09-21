@@ -545,6 +545,20 @@ class LocalDatabase:
 
         # Wearable lifecycle, synchronization and personalized-learning metadata.
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS research_studies (
+            study_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            started_at REAL NOT NULL,
+            target_end_at REAL NOT NULL,
+            ended_at REAL,
+            status TEXT NOT NULL DEFAULT 'ACTIVE',
+            protocol_json TEXT,
+            label TEXT NOT NULL DEFAULT 'REAL',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_research_studies_patient ON research_studies(patient_id, started_at)""")
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS wearable_devices (
             device_id TEXT PRIMARY KEY,
             patient_id TEXT NOT NULL,
@@ -619,6 +633,8 @@ class LocalDatabase:
             FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
         )
         """)
+        self._ensure_column(cur.connection, "sensor_sessions", "study_id", "TEXT")
+
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_feature_vectors_patient_ts ON feature_vectors(patient_id, timestamp_s)""")
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_wearable_events_patient_ts ON wearable_events(patient_id, timestamp)""")
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_learning_runs_patient_ts ON learning_runs(patient_id, started_at)""")
@@ -883,14 +899,46 @@ class LocalDatabase:
         return cycle_id
 
     # Sensor sessions
-    def create_session(self, patient_id: str, source: str, label: str, notes: Optional[str] = None) -> str:
+    def start_study(self, patient_id: str, duration_hours: float = 48.0, protocol: Optional[Dict[str, Any]] = None, label: str = "REAL") -> str:
+        study_id = str(uuid.uuid4())
+        now = time.time()
+        self.conn.execute(
+            'INSERT INTO research_studies(study_id, patient_id, started_at, target_end_at, protocol_json, label) VALUES (?, ?, ?, ?, ?, ?)',
+            (study_id, patient_id, now, now + float(duration_hours) * 3600.0, json.dumps(protocol or {}, sort_keys=True), label),
+        )
+        self.conn.commit()
+        self.record_wearable_event(patient_id, None, 'STUDY_STARTED', {'study_id': study_id, 'duration_hours': duration_hours}, label=label)
+        return study_id
+
+    def get_active_study(self, patient_id: str) -> Optional[Dict]:
+        row = self.conn.execute(
+            "SELECT * FROM research_studies WHERE patient_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",
+            (patient_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def end_study(self, patient_id: str, study_id: str, status: str = "COMPLETED") -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE research_studies SET ended_at=?, status=? WHERE study_id=? AND patient_id=?',
+            (time.time(), status, study_id, patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self.record_wearable_event(patient_id, None, 'STUDY_ENDED', {'study_id': study_id, 'status': status})
+        return changed
+
+    def create_session(self, patient_id: str, source: str, label: str, notes: Optional[str] = None, study_id: Optional[str] = None) -> str:
         session_id = str(uuid.uuid4())
         cur = self.conn.cursor()
         cur.execute("""
-        INSERT INTO sensor_sessions (session_id, patient_id, source, start_at, label, notes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (session_id, patient_id, source, time.time(), label, notes, time.time()))
+        INSERT INTO sensor_sessions (session_id, patient_id, study_id, source, start_at, label, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session_id, patient_id, study_id, source, time.time(), label, notes, time.time()))
         self.conn.commit()
+        if study_id:
+            self.record_wearable_event(patient_id, session_id, 'SESSION_STARTED', {'study_id': study_id, 'label': label}, label=label)
         return session_id
 
     # Providers - care discovery
