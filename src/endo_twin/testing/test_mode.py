@@ -11,6 +11,8 @@ from typing import Any, Dict, Optional
 
 
 class TestStatus(str, Enum):
+    # Prevent pytest from treating this runtime contract enum as a test class.
+    __test__ = False
     PASS = "PASS"
     WARN = "WARN"
     FAIL = "FAIL"
