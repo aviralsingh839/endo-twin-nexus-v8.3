@@ -27,12 +27,13 @@ class GaugeWidget(QWidget):
         super().__init__(parent)
         self.title = title
         self.value = 0.0
-        self.ci = (0.0, 0.0)
-        self.withheld: str | None = None
+        self.ci = (None, None)
+        self.withheld: str | None = "Waiting for live data / quality-gated model input"
         self.setMinimumSize(190, 156)
 
     def set_value(self, value: float, ci_low: float | None = None, ci_high: float | None = None):
         self.value = max(0.0, min(100.0, float(value)))
+        self.withheld = None
         if ci_low is not None and ci_high is not None:
             self.ci = (float(ci_low), float(ci_high))
         self.update()
