@@ -101,48 +101,51 @@ class PhysiologicalDataViewer:
         return out
 
 class AdvancedAnalysisViewer:
-    """
-    Circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML outputs
-    Distinguish established/derived/experimental/ML/clinical, explainability
-    """
+    """Patient-scoped analysis facade with explicit unavailable states."""
     def __init__(self, db: LocalDatabase):
         self.db = db
         self.fingerprint_engine = ChronoMetabolicFingerprint()
 
+    @staticmethod
+    def _insufficient(patient_id, session_id=None, reason="Insufficient data"):
+        return {
+            'status': 'INSUFFICIENT_DATA',
+            'patient_id': patient_id,
+            'session_id': session_id,
+            'reason': reason,
+            'provenance': 'UNKNOWN',
+            'circadian': {'status': 'INSUFFICIENT_DATA'},
+            'autonomic': {'status': 'INSUFFICIENT_DATA'},
+            'metabolic': {'status': 'INSUFFICIENT_DATA'},
+            'fingerprint': {'status': 'INSUFFICIENT_DATA', 'components': []},
+            'multimodal': {'status': 'INSUFFICIENT_DATA'},
+            'ai_outputs': [],
+        }
+
     def analyze(self, patient_id, session_id=None):
         if session_id is None:
-            return {
-                'status': 'INSUFFICIENT_DATA',
-                'patient_id': patient_id,
-                'reason': 'Select a stored sensor session before analysis',
-                'provenance': 'UNKNOWN',
-            }
+            return self._insufficient(patient_id, reason='Select a stored sensor session before analysis')
         data = PhysiologicalDataViewer(self.db).get_session_data(session_id, patient_id=patient_id)
         if data.get('status') != 'OK':
-            return {
-                'status': 'INSUFFICIENT_DATA',
-                'patient_id': patient_id,
-                'session_id': session_id,
-                'reason': 'Session not found or not patient-scoped',
-                'provenance': 'UNKNOWN',
-            }
+            return self._insufficient(patient_id, session_id, 'Session not found or not patient-scoped')
         counts = {k: len(data.get(k, [])) for k in ('ppg', 'hrv', 'gsr', 'motion', 'temperature')}
         if sum(counts.values()) == 0:
-            return {
-                'status': 'INSUFFICIENT_DATA',
-                'patient_id': patient_id,
-                'session_id': session_id,
-                'reason': 'No sensor observations are stored for this session',
-                'provenance': 'UNKNOWN',
-            }
+            return self._insufficient(patient_id, session_id, 'No sensor observations are stored for this session')
         return {
             'status': 'DATA_AVAILABLE',
             'patient_id': patient_id,
             'session_id': session_id,
             'sensor_counts': counts,
             'provenance': 'STORED_OBSERVATION',
-            'note': 'Disease-model inference is not fabricated in this viewer; route real features through the model registry.',
+            'circadian': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'autonomic': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'metabolic': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'fingerprint': {'status': 'PENDING_FEATURE_EXTRACTION', 'components': []},
+            'multimodal': {'status': 'PENDING_FUSION'},
+            'ai_outputs': [],
+            'note': 'Route stored observations through the real feature/fusion/model pipeline; no hard-coded prediction is emitted.',
         }
+
 
 class UltrasoundViewer:
     """
@@ -168,40 +171,30 @@ class UltrasoundViewer:
         return {
             'result': 'inference requires trained model',
             'confidence': None,  # Do not hard-code fake confidence
-            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established without validation dataset',
-            'provenance': 'If insufficient training data, state insufficient'
-        }
-
-class LongitudinalViewer:
-    def compare(self, patient_id, session_ids):
-        return {
-            'patient_id': patient_id,
-            'sessions': session_ids,
-            'trends': 'Longitudinal comparison - HR trend, HRV trend, activity trend, temp trend',
-            'baseline_deviation': 'Deviation from personal baseline'
-        }
-
-class ReportGenerator:
+            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established class ReportGenerator:
     def __init__(self, db=None):
         self.db = db
 
     def generate(self, patient_id, analysis, include_disclaimer=True):
-        # EXAMPLE report - real report uses real model confidence from adapter
+        status = analysis.get('status', 'UNKNOWN')
         report = {
             'patient_id': patient_id,
             'analysis': analysis,
             'generated_at': 'now',
-            'provenance': 'EXAMPLE_DATA - real report uses real model calibrated confidence',
-            'label': 'EXAMPLE report for UI demo',
+            'provenance': analysis.get('provenance', 'UNKNOWN'),
+            'label': 'REAL' if status == 'DATA_AVAILABLE' else 'INSUFFICIENT_DATA',
             'disclaimer': 'Research / risk-screening output — not a medical diagnosis.' if include_disclaimer else '',
             'model_transparency': {
-                'models_used': ['PCOSModule v8.3.0', 'SleepModule v8.3.0'],
-                'input_data': 'PPG, HRV, activity, temp',
-                'data_quality': '0.85 overall',
-                'confidence': '0.75 (model output, not clinical certainty) - EXAMPLE, real path uses calibrated probability from real_pcos_model_adapter',
-                'features': 'HRV RMSSD, activity level, skin temp',
-                'limitations': 'Engineering validation only, clinical validation NOT ESTABLISHED, not replacement for professional evaluation',
-                'note': 'EXAMPLE confidence - real report uses real model adapter confidence'
-            }
+                'models_used': [],
+                'input_data': analysis.get('sensor_counts', {}),
+                'data_quality': 'Not computed' if status != 'DATA_AVAILABLE' else 'See stored channel quality',
+                'confidence': None,
+                'features': [],
+                'limitations': 'Model inference is not performed when required inputs are unavailable.',
+                'status': status,
+                'note': 'No confidence value is invented by the Doctor workstation.',
+            },
         }
         return report
+
+
