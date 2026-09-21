@@ -131,5 +131,9 @@ class GaugeWidget(QWidget):
         # 7) Confidence interval.
         p.setPen(QColor("#94a6c2"))
         p.setFont(painter_font(9))
-        p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter,
-                   f"90% CI {self.ci[0]:.0f}–{self.ci[1]:.0f}%")
+        ci_text = (
+            "90% CI not computed"
+            if self.ci[0] is None or self.ci[1] is None
+            else f"90% CI {self.ci[0]:.0f}–{self.ci[1]:.0f}%"
+        )
+        p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter, ci_text)
