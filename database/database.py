@@ -513,7 +513,6 @@ class LocalDatabase:
             FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
         )
         """)
-        self._ensure_column(self.conn, "features", "extra_json", "TEXT")
         self._ensure_column(self.conn, "sensor_sessions", "participant_id", "TEXT")
         self._ensure_column(self.conn, "sensor_sessions", "study_id", "TEXT")
 
