@@ -23,9 +23,10 @@ ZONES = [
 
 
 class GaugeWidget(QWidget):
-    def __init__(self, title: str = "Risk", parent=None):
+    def __init__(self, title: str = "Risk", higher_is_better: bool = False, parent=None):
         super().__init__(parent)
         self.title = title
+        self.higher_is_better = higher_is_better
         self.value = 0.0
         self.ci = (None, None)
         self.withheld: str | None = "Waiting for live data / quality-gated model input"
@@ -44,8 +45,9 @@ class GaugeWidget(QWidget):
         self.update()
 
     def _color(self):
+        display_value = 100.0 - self.value if self.higher_is_better else self.value
         for lo, hi, col in ZONES:
-            if self.value < hi:
+            if display_value < hi * 100.0:
                 return QColor(col)
         return QColor(ZONES[-1][2])
 
