@@ -31,3 +31,24 @@ This file maps the uploaded ENDO-TWIN Master GitHub Upgrade Catalogue to the exi
 6. Review licenses before redistributing third-party components.
 
 The branch is an incremental V8.4 foundation, not a claim that every catalogue item is already implemented.
+
+
+## UI / Visual System Pass
+
+The active desktop UI now uses a unified ENDO-TWIN visual system:
+- modern left-side workspace navigation instead of a crowded top tab strip
+- persistent ENDO-TWIN platform branding with CHRONO-PCOS module context
+- layered cards, semantic accent states, clearer typography and spacing
+- explicit local/research context and provenance messaging
+- empty-state handling that displays unavailable values rather than fake zeroes
+- data-quality gauge semantics where higher quality is visually positive
+
+The native Android patient and doctor themes were aligned to the same visual language.
+
+## VoxVasc Integration
+
+The previously orphaned experimental VoxVasc files under chrono_pcos_project V8/ have been moved into the active src/ namespace:
+- src/models/voice_vasc_model.py
+- src/ui/voice_vasc_tab.py
+
+VoxVasc is surfaced as an optional CHRONO-PCOS research modality. It extracts acoustic features from a sustained-vowel WAV recording and exposes an experimental feature index. It does not measure hormones, does not diagnose PCOS, and is not treated as a validated clinical input.
