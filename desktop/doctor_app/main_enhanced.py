@@ -62,7 +62,7 @@ class EnhancedDoctorApp:
         self.physio_viewer = PhysiologicalDataViewer(self.db)
         self.advanced_viewer = AdvancedAnalysisViewer(self.db)
         self.ultrasound_viewer = UltrasoundViewer(self.db)
-        self.longitudinal_viewer = LongitudinalViewer()
+        self.longitudinal_viewer = LongitudinalViewer(db=self.db)
         self.report_gen = ReportGenerator(db=self.db)
 
     def run_console_demo(self):
