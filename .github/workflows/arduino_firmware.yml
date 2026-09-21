@@ -1,0 +1,42 @@
+name: Arduino firmware quality gate
+
+on:
+  push:
+    paths:
+      - 'chrono_pcos_project V8/arduino/**'
+      - 'scripts/build/build_firmware.sh'
+      - '.github/workflows/arduino_firmware.yml'
+  pull_request:
+    paths:
+      - 'chrono_pcos_project V8/arduino/**'
+      - 'scripts/build/build_firmware.sh'
+      - '.github/workflows/arduino_firmware.yml'
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core install esp8266:esp8266
+      - name: Install libraries
+        run: |
+          arduino-cli lib install 'SparkFun MAX3010x Pulse and Proximity Sensor Library'
+          arduino-cli lib install 'Adafruit MPU6050'
+          arduino-cli lib install 'Adafruit Unified Sensor'
+          arduino-cli lib install 'OneWire'
+          arduino-cli lib install 'DallasTemperature'
+          arduino-cli lib install 'BH1750'
+          arduino-cli lib install 'Adafruit BME280 Library'
+          arduino-cli lib install 'Adafruit GFX Library'
+          arduino-cli lib install 'Adafruit SSD1306'
+      - name: Compile Mega 2560
+        run: arduino-cli compile --fqbn arduino:avr:mega --export-binaries 'chrono_pcos_project V8/arduino/chrono_pcos_mega_firmware'
+      - name: Compile ESP8266 NodeMCU
+        run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --export-binaries 'chrono_pcos_project V8/arduino/chrono_pcos_esp8266_bridge'
