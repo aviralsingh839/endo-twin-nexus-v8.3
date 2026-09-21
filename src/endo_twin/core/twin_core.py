@@ -94,6 +94,8 @@ class EndoTwinCore:
         self.provenance_tracker = GeneralProvenanceTracker()
         self.uncertainty_model = GeneralUncertaintyModel()
         self.model_registry = get_global_registry()
+        # Discover packaged disease modules in addition to the built-in compatibility path.
+        self.model_registry.discover_external_disease_models()
         
         # Disease models are plugins - not hardcoded in core
         # They register themselves via model_registry
