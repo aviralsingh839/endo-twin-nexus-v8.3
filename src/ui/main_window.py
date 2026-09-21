@@ -55,7 +55,7 @@ DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required.
 class MainWindow(QMainWindow):
     def __init__(self, start_demo: bool = False, port: str | None = None, net: str | None = None, db_path=None):
         super().__init__()
-        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} - {APP_VERSION_LABEL}")
+        self.setWindowTitle(f"ENDO-TWIN NEXUS {APP_VERSION} • Research Workstation • {APP_VERSION_LABEL}")
         self.resize(1600, 1000)
         self.setStyleSheet(DARK_QSS)
 
