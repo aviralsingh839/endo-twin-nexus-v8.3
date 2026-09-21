@@ -40,3 +40,10 @@ The existing Android transport remains DEMO_DATA until a validated real-device i
 
 ## Research boundary
 Live processing is actual signal-processing code, but it is not clinical validation. Sensor placement, calibration, hardware differences, motion artifacts and independent reference comparison all affect measurement validity. CHRONO-PCOS remains a research model and must not be presented as a diagnosis.
+
+
+## Prototype hardware validation
+
+Use Doctor → **Prototype Lab** after selecting LIVE SENSOR MODE to bench-test the hardware. The lab reports channel state, quality, packet rate and firmware flags and can run a 15-second acceptance test. Use it to validate wiring and acquisition before feeding data into the main ENDO-TWIN modelling pipeline.
+
+Add and select a local patient from Doctor → Patients → **+ Add Patient** when you need patient-scoped storage for prototype sessions. Disease-model output is not created automatically.
