@@ -430,6 +430,15 @@ class LocalDatabase:
             self.record_wearable_event(patient_id, session_id, 'SESSION_ENDED', {'notes': notes or ''})
         return changed
 
+    def save_raw_wearable_packet(self, patient_id: str, session_id: Optional[str], payload_base64: str, transport: str = 'BLE', quality: Optional[float] = None, label: str = 'REAL') -> str:
+        packet_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO raw_wearable_packets(packet_id, patient_id, session_id, timestamp, payload_base64, transport, quality, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (packet_id, patient_id, session_id, time.time(), payload_base64, transport, quality, label),
+        )
+        self.conn.commit()
+        return packet_id
+
     def save_feature_vector(self, patient_id: str, session_id: Optional[str], feature_vector: Any, source: str = 'wearable', algorithm_version: Optional[str] = None, label: str = 'REAL') -> str:
         data = feature_vector.as_dict() if hasattr(feature_vector, 'as_dict') else dict(feature_vector)
         feature_id = str(uuid.uuid4())
@@ -601,6 +610,21 @@ class LocalDatabase:
             FOREIGN KEY(session_id) REFERENCES sensor_sessions(session_id)
         )
         """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS raw_wearable_packets (
+            packet_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            session_id TEXT,
+            timestamp REAL NOT NULL,
+            payload_base64 TEXT NOT NULL,
+            transport TEXT NOT NULL,
+            quality REAL,
+            label TEXT NOT NULL DEFAULT 'REAL',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id),
+            FOREIGN KEY(session_id) REFERENCES sensor_sessions(session_id)
+        )
+        """)
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_raw_wearable_packets_patient_ts ON raw_wearable_packets(patient_id, timestamp)""")
         cur.execute("""
         CREATE TABLE IF NOT EXISTS feature_vectors (
             feature_id TEXT PRIMARY KEY,
@@ -1091,6 +1115,7 @@ class LocalDatabase:
             ('wearable_devices', 'wearable_devices', 'patient_id=?', (patient_id,)),
             ('wearable_events', 'wearable_events', 'patient_id=?', (patient_id,)),
             ('feature_vectors', 'feature_vectors', 'patient_id=?', (patient_id,)),
+            ('raw_wearable_packets', 'raw_wearable_packets', 'patient_id=?', (patient_id,)),
             ('reports', 'reports', 'patient_id=?', (patient_id,)),
             ('doctor_notes', 'doctor_notes', 'patient_id=?', (patient_id,)),
             ('personal_baselines', 'personal_baselines', 'patient_id=?', (patient_id,)),
@@ -1137,7 +1162,7 @@ class LocalDatabase:
             ('research_studies','study_id'), ('research_labels','label_id'),
             ('profiles','profile_id'), ('symptoms','symptom_id'), ('cycles','cycle_id'),
             ('sessions','session_id'), ('wearable_devices','device_id'), ('wearable_events','event_id'),
-            ('feature_vectors','feature_id'), ('reports','report_id'), ('doctor_notes','note_id'),
+            ('feature_vectors','feature_id'), ('raw_wearable_packets','packet_id'), ('reports','report_id'), ('doctor_notes','note_id'),
             ('personal_baselines','baseline_id'), ('learning_runs','run_id'),
             ('model_results','result_id'), ('analysis_results','analysis_id'),
         ]
@@ -1166,7 +1191,7 @@ class LocalDatabase:
 
     @staticmethod
     def _validate_identifier(identifier: str) -> str:
-        allowed = {'profiles','symptoms','cycles','sensor_sessions','wearable_devices','wearable_events','feature_vectors','reports','doctor_notes','personal_baselines','learning_runs','model_results','analysis_results','ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality'}
+        allowed = {'profiles','symptoms','cycles','sensor_sessions','wearable_devices','wearable_events','feature_vectors','reports','doctor_notes','personal_baselines','learning_runs','model_results','analysis_results','ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality','raw_wearable_packets'}
         if identifier not in allowed:
             raise ValueError(f'Unsupported table: {identifier}')
         return identifier
