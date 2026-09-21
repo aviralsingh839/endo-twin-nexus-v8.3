@@ -147,6 +147,77 @@ class AdvancedAnalysisViewer:
         }
 
 
+class LongitudinalViewer:
+    """Patient-scoped longitudinal comparison facade.
+
+    This component reports stored observations and explicit unavailable states.
+    It does not invent trends, baseline statistics, or model-inferred findings.
+    """
+
+    def compare(self, patient_id, session_ids):
+        if not patient_id:
+            return {
+                'status': 'INVALID_PATIENT',
+                'patient_id': patient_id,
+                'session_ids': session_ids or [],
+                'trends': [],
+                'baseline_deviation': None,
+            }
+
+        session_ids = list(session_ids or [])
+        if not session_ids:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': [],
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'No sessions supplied for longitudinal comparison',
+            }
+
+        viewer = PhysiologicalDataViewer(self.db) if getattr(self, 'db', None) else None
+        # Keep the constructor optional for compatibility with the existing
+        # EnhancedDoctorApp, while allowing a database-backed implementation.
+        if viewer is None:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': session_ids,
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'Longitudinal database context is unavailable',
+            }
+
+        stored = []
+        for session_id in session_ids:
+            data = viewer.get_session_data(session_id, patient_id=patient_id)
+            if data.get('status') == 'OK':
+                stored.append({
+                    'session_id': session_id,
+                    'counts': {k: len(data.get(k, [])) for k in ('ppg', 'hrv', 'gsr', 'motion', 'temperature')},
+                })
+
+        if not stored:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': session_ids,
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'No patient-scoped stored observations were found',
+            }
+
+        return {
+            'status': 'DATA_AVAILABLE',
+            'patient_id': patient_id,
+            'session_ids': session_ids,
+            'stored_sessions': stored,
+            'trends': [],
+            'baseline_deviation': None,
+            'note': 'Trend and personal-baseline calculations require the real longitudinal feature pipeline; no synthetic values are emitted.',
+        }
+
+
 class UltrasoundViewer:
     """
     Ultrasound: loading, preprocessing, quality checks, segmentation, inference, visualization, confidence, training, evaluation, storage
