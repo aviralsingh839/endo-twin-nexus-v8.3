@@ -100,6 +100,6 @@ class VoiceVascEstimator:
             (
                 f"Acoustic pitch feature ≈ {pitch_hz:.1f} Hz. "
                 "This weak proxy is not a hormone measurement and is not "
-                "PCOS-specific or clinically validated."
+                "PCOS-specific; not clinically validated."
             ),
         )
