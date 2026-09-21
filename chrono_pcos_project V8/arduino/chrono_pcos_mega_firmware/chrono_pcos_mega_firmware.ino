@@ -177,6 +177,19 @@ void readIMU(){ if(!mpuOK)return; sensors_event_t a,g,t; mpu.getEvent(&a,&g,&t);
 void readAnalogSensors(){ gsrRaw=analogRead(GSR_PIN); ecgRaw=analogRead(ECG_PIN); fsrRaw=analogRead(FSR_PIN); buttonMask=0;
   if(digitalRead(BTN_MODE)==LOW)buttonMask|=1; if(digitalRead(BTN_BASE)==LOW)buttonMask|=2; if(digitalRead(BTN_POST)==LOW)buttonMask|=4; }
 
+void readEnvironment(){
+#if USE_BH1750
+  if(lightOK) luxValue=lightMeter.readLightLevel();
+#endif
+#if USE_BME280
+  if(bmeOK){
+    roomT=bme.readTemperature();
+    humidity=bme.readHumidity();
+    pressure=bme.readPressure()/100.0F;
+  }
+#endif
+}
+
 void temperatureTick(unsigned long now){
   if(!tempOK)return;
   if(!tempPending && now-lastTempRequest>=TEMP_REQUEST_PERIOD_MS){ tempSensor.requestTemperatures(); tempPending=true; lastTempRequest=now; lastTempReady=now+TEMP_CONVERSION_MS; }
