@@ -129,6 +129,110 @@ fun PatientApp(currentPatientId: String) {
     }
 }
 
+
+private suspend fun buildPatientSyncPackage(db: PatientDatabase, patientId: String): String {
+    val patient = db.patientDao().getPatient(patientId)
+    val root = JSONObject()
+        .put("schema_version", "android-room-2")
+        .put("label", if (patient?.isDemo == true) "DEMO_DATA" else "EXPORTED_PACKAGE")
+        .put("exported_at", System.currentTimeMillis() / 1000.0)
+
+    if (patient != null) {
+        root.put("patient", JSONObject()
+            .put("patient_id", patient.patientId)
+            .put("anonymous_id", patient.anonymousId)
+            .put("display_name", patient.displayName)
+            .put("age_years", patient.ageYears)
+            .put("bmi", patient.bmi)
+        )
+    }
+
+    val sessions = JSONArray()
+    db.wearableDao().getSessions(patientId).forEach { s ->
+        sessions.put(JSONObject()
+            .put("session_id", s.sessionId)
+            .put("patient_id", s.patientId)
+            .put("source", "ANDROID_BLE")
+            .put("start_at", s.startedAt / 1000.0)
+            .put("end_at", s.endedAt?.div(1000.0))
+            .put("sample_count", 0)
+            .put("data_quality", JSONObject.NULL)
+            .put("notes", "Android local wearable session")
+            .put("label", if (s.isDemo) "DEMO_DATA" else "REAL")
+            .put("created_at", s.startedAt / 1000.0)
+            .put("study_id", JSONObject.NULL)
+        )
+    }
+    root.put("sessions", sessions)
+
+    val events = JSONArray()
+    db.wearableDao().getEvents(patientId).forEach { e ->
+        events.put(JSONObject()
+            .put("event_id", e.eventId)
+            .put("patient_id", e.patientId)
+            .put("session_id", e.sessionId ?: JSONObject.NULL)
+            .put("timestamp", e.timestamp / 1000.0)
+            .put("event_type", e.eventType)
+            .put("detail_json", e.detail)
+            .put("label", if (e.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("wearable_events", events)
+
+    val packets = JSONArray()
+    db.wearableDao().getPackets(patientId).forEach { p ->
+        packets.put(JSONObject()
+            .put("packet_id", p.packetId)
+            .put("patient_id", p.patientId)
+            .put("session_id", p.sessionId ?: JSONObject.NULL)
+            .put("timestamp", p.timestamp / 1000.0)
+            .put("payload_base64", p.payloadBase64)
+            .put("transport", p.transport)
+            .put("quality", p.quality ?: JSONObject.NULL)
+            .put("label", if (p.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("raw_wearable_packets", packets)
+
+    val featureVectors = JSONArray()
+    db.patientDao().getMeasurements(patientId).forEach { m ->
+        featureVectors.put(JSONObject()
+            .put("feature_id", m.measurementId)
+            .put("patient_id", m.patientId)
+            .put("session_id", JSONObject.NULL)
+            .put("timestamp_s", m.timestamp / 1000.0)
+            .put("data_json", JSONObject()
+                .put(m.type, m.value)
+                .put("unit", m.unit)
+                .put("provenance", m.provenance)
+                .toString())
+            .put("source", "ANDROID_MEASUREMENT")
+            .put("algorithm_version", JSONObject.NULL)
+            .put("label", if (m.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("feature_vectors", featureVectors)
+
+    root.put("profiles", JSONArray())
+    root.put("symptoms", JSONArray())
+    root.put("cycles", JSONArray())
+    root.put("wearable_devices", JSONArray())
+    root.put("reports", JSONArray())
+    root.put("doctor_notes", JSONArray())
+    root.put("personal_baselines", JSONArray())
+    root.put("learning_runs", JSONArray())
+    root.put("research_studies", JSONArray())
+    root.put("research_labels", JSONArray())
+    root.put("model_results", JSONArray())
+    root.put("analysis_results", JSONArray())
+
+    root.put(
+        "note",
+        "Phone local export. Raw BLE payloads are preserved for board-specific decoding. "
+        + "Wear/removal/reconnect events are preserved. Missing intervals are never filled."
+    )
+    return root.toString(2)
+}
 @Composable
 private fun SectionTitle(title: String, subtitle: String? = null) {
     Column {
@@ -315,6 +419,25 @@ private fun MeasureScreen(patientId: String) {
     var packetCount by remember { mutableStateOf(0) }
     val devices = remember { mutableStateListOf<WearableDeviceSummary>() }
 
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    val json = buildPatientSyncPackage(db, patientId)
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error("Could not open export destination.")
+                }.onSuccess {
+                    scanMessage = "Complete patient package exported locally for Doctor import."
+                }.onFailure {
+                    scanMessage = "Export failed: " + it.message
+                }
+            }
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -419,6 +542,11 @@ private fun MeasureScreen(patientId: String) {
                             bleState = "DISCONNECTED"
                         }) {
                             Text("Disconnect")
+                        }
+                        OutlinedButton(onClick = {
+                            exportLauncher.launch("endo_twin_" + patientId + "_sync.json")
+                        }) {
+                            Text("Export to doctor")
                         }
                     }
                     Text(scanMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
