@@ -27,3 +27,5 @@ V8.6 workstation flow: startup-only DEMO/LIVE selection, processed live sensor m
 ## Website
 
 The static ENDO-TWIN research portal lives in `../website/`. Launch it with `./START.sh website` from the project root. The legacy launcher paths `LAUNCH/WEBSITE.sh` and `launchers/WEBSITE.sh` are preserved for compatibility.
+
+- [Prototype Lab](PROTOTYPE_LAB.md) — add local patients and run hardware/packet/module acceptance tests from the Doctor Workstation.
