@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
+import org.chronopcos.patient.ui.screens.PatientHomeScreen
 
 /**
  * ENDO-TWIN Patient V8.4
@@ -119,7 +120,7 @@ fun PatientApp(currentPatientId: String) {
             startDestination = PatientTab.Home.route,
             modifier = Modifier.padding(padding)
         ) {
-            composable("home") { HomeScreen(currentPatientId) }
+            composable("home") { PatientHomeScreen(currentPatientId) }
             composable("health") { HealthScreen(currentPatientId) }
             composable("measure") { MeasureScreen(currentPatientId) }
             composable("timeline") { TimelineScreen(currentPatientId) }
