@@ -461,6 +461,23 @@ class LocalDatabase:
         row = self.conn.execute('SELECT baseline_id FROM personal_baselines WHERE patient_id=? AND feature_name=?', (patient_id, feature_name)).fetchone()
         return str(row[0])
 
+    def record_research_label(self, patient_id: str, target: str, label_value: str, source: str, entered_by: Optional[str] = None, notes: str = '') -> str:
+        label_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO research_labels(label_id, patient_id, target, label_value, source, entered_by, timestamp, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (label_id, patient_id, target, label_value, source, entered_by, time.time(), notes),
+        )
+        self.conn.commit()
+        self._log_audit(entered_by, patient_id, 'record_research_label', {'target': target, 'source': source})
+        return label_id
+
+    def list_research_labels(self, target: Optional[str] = None) -> List[Dict]:
+        if target:
+            rows = self.conn.execute('SELECT * FROM research_labels WHERE target=? ORDER BY timestamp DESC', (target,)).fetchall()
+        else:
+            rows = self.conn.execute('SELECT * FROM research_labels ORDER BY timestamp DESC').fetchall()
+        return [dict(r) for r in rows]
+
     def record_learning_run(self, patient_id: Optional[str], model_name: str, base_model_version: Optional[str], mode: str, status: str, input_sessions: Optional[List[str]] = None, metrics: Optional[Dict] = None, limitations: str = '') -> str:
         run_id = str(uuid.uuid4())
         self.conn.execute(
@@ -616,6 +633,20 @@ class LocalDatabase:
             FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
         )
         """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS research_labels (
+            label_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            target TEXT NOT NULL,
+            label_value TEXT NOT NULL,
+            source TEXT NOT NULL,
+            entered_by TEXT,
+            timestamp REAL NOT NULL,
+            notes TEXT,
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_research_labels_target ON research_labels(target, timestamp)""")
         cur.execute("""
         CREATE TABLE IF NOT EXISTS learning_runs (
             run_id TEXT PRIMARY KEY,
@@ -1051,6 +1082,8 @@ class LocalDatabase:
         package = {'schema_version': '1.1', 'exported_at': time.time(), 'label': 'EXPORTED_PACKAGE', 'patient': patient}
 
         for key, table, where, params in [
+            ('research_studies', 'research_studies', 'patient_id=?', (patient_id,)),
+            ('research_labels', 'research_labels', 'patient_id=?', (patient_id,)),
             ('profiles', 'profiles', 'patient_id=?', (patient_id,)),
             ('symptoms', 'symptoms', 'patient_id=?', (patient_id,)),
             ('cycles', 'cycles', 'patient_id=?', (patient_id,)),
@@ -1101,6 +1134,7 @@ class LocalDatabase:
             )
 
         merge_tables = [
+            ('research_studies','study_id'), ('research_labels','label_id'),
             ('profiles','profile_id'), ('symptoms','symptom_id'), ('cycles','cycle_id'),
             ('sessions','session_id'), ('wearable_devices','device_id'), ('wearable_events','event_id'),
             ('feature_vectors','feature_id'), ('reports','report_id'), ('doctor_notes','note_id'),
