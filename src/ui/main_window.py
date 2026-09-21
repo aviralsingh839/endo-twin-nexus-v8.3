@@ -143,6 +143,9 @@ class MainWindow(QMainWindow):
             ("✦  Explanation", self._build_explanation_tab()),
             ("▤  Report", self._build_report_tab()),
             ("✓  Validation", self._build_validation_tab()),
+            ("⌘  Care & Supplies", self._build_care_tab()),
+            ("▣  Database", self._build_database_tab()),
+            ("◫  Audit", self._build_audit_tab()),
         ]
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
@@ -522,6 +525,7 @@ class MainWindow(QMainWindow):
         if self.active_session_id:
             self.local_db.close_sensor_session(pid, self.active_session_id, "Study ended.")
             self.active_session_id = None
+        self.stop_stream()
         if self.active_device_id:
             self.local_db.set_wearable_state(pid, self.active_device_id, "NOT_CONNECTED", "study ended")
         study = self.local_db.get_active_study(pid)
@@ -748,6 +752,98 @@ class MainWindow(QMainWindow):
         self.learning_details.setText(
             gate['note'] + "\n\nNo disease-model weights are changed by this gate."
         )
+
+    def _build_care_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+        title = QLabel("Care discovery & supplies")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        sub = QLabel("Accessibility/discovery layer separated from the private patient record. Demo providers remain explicitly marked demo.")
+        sub.setWordWrap(True)
+        sub.setObjectName("HeroSubtitle")
+        root.addWidget(sub)
+
+        providers = self.local_db.list_providers()
+        group = QGroupBox("Providers")
+        layout = QVBoxLayout(group)
+        table = QTableWidget(0, 5)
+        table.setHorizontalHeaderLabels(["Name", "Type", "Specialty", "Distance", "Verification"])
+        table.horizontalHeader().setStretchLastSection(True)
+        for p in providers:
+            row = table.rowCount()
+            table.insertRow(row)
+            vals = [p.get("name"), p.get("type"), p.get("specialty"), p.get("distance_km"), p.get("verification_status")]
+            for col, value in enumerate(vals):
+                table.setItem(row, col, QTableWidgetItem(str(value if value is not None else "—")))
+        layout.addWidget(table)
+        root.addWidget(group, 1)
+
+        supplies = self.local_db.list_supplies()
+        supply_group = QGroupBox("Monitoring supplies")
+        sl = QVBoxLayout(supply_group)
+        supply_table = QTableWidget(0, 3)
+        supply_table.setHorizontalHeaderLabels(["Item", "Category", "Availability"])
+        for item in supplies:
+            row = supply_table.rowCount()
+            supply_table.insertRow(row)
+            for col, value in enumerate([item.get("name"), item.get("category"), item.get("availability")]):
+                supply_table.setItem(row, col, QTableWidgetItem(str(value if value is not None else "—")))
+        sl.addWidget(supply_table)
+        root.addWidget(supply_group, 1)
+        return tab
+
+    def _build_database_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+        title = QLabel("Local database")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        info = QFrame()
+        info.setObjectName("ScientificCard")
+        il = QVBoxLayout(info)
+        patient_count = len(self.local_db.list_patients(include_archived=True))
+        il.addWidget(QLabel(f"Database: {self.local_db.db_path}"))
+        il.addWidget(QLabel(f"Patients: {patient_count}"))
+        il.addWidget(QLabel("Canonical storage: patients → studies → wear sessions → raw channels → feature vectors → baselines → learning runs → reports"))
+        il.addWidget(QLabel("Mobile sync: patient-scoped export/import package; DEMO_DATA and REAL labels are preserved."))
+        root.addWidget(info)
+        return tab
+
+    def _build_audit_tab(self):
+        tab = QWidget()
+        root = QVBoxLayout(tab)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(14)
+        title = QLabel("Audit & provenance")
+        title.setObjectName("HeroTitle")
+        root.addWidget(title)
+        text = QTextEdit()
+        text.setReadOnly(True)
+        rows = []
+        if self.active_patient_id:
+            rows = self.local_db.conn.execute(
+                "SELECT timestamp, action, details_json FROM audit_records WHERE patient_id=? ORDER BY timestamp DESC LIMIT 200",
+                (self.active_patient_id,),
+            ).fetchall()
+        if rows:
+            lines = []
+            for row in rows:
+                lines.append(
+                    f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(row['timestamp']))}  •  {row['action']}  •  {row['details_json'] or ''}"
+                )
+            text.setText("\n".join(lines))
+        else:
+            text.setText(
+                "Select/open a patient to inspect patient-scoped audit entries.\n\n"
+                "Provenance layers: MEASURED • DERIVED • CLINICALLY_ENTERED • IMAGE-DERIVED • MODEL-INFERRED • DEMO_DATA • UNKNOWN"
+            )
+        root.addWidget(text, 1)
+        return tab
 
     def _build_overview_tab(self):
         tab = QWidget()
