@@ -295,6 +295,7 @@ class MainWindow(QMainWindow):
             self.patient_context_label.setText(
                 f"Active patient: {alias}  •  study: {'ACTIVE' if study else 'none'}"
             )
+        self._refresh_session_table(patient_id)
 
     def _selected_patient_id(self) -> str | None:
         if not hasattr(self, "patient_table"):
@@ -328,6 +329,26 @@ class MainWindow(QMainWindow):
         self.patient_status.setText(
             f"{len(patients)} active local patient record(s). Real observations and DEMO_DATA remain explicitly separated."
         )
+
+    def _refresh_session_table(self, patient_id: str | None = None) -> None:
+        if not hasattr(self, "session_table"):
+            return
+        pid = patient_id or self.active_patient_id
+        self.session_table.setRowCount(0)
+        if not pid:
+            return
+        for session in self.local_db.list_sessions(pid):
+            row = self.session_table.rowCount()
+            self.session_table.insertRow(row)
+            values = [
+                str(session.get("session_id", ""))[:12] + "…",
+                time.strftime("%Y-%m-%d %H:%M", time.localtime(session["start_at"])),
+                time.strftime("%Y-%m-%d %H:%M", time.localtime(session["end_at"])) if session.get("end_at") else "ACTIVE",
+                session.get("sample_count", 0),
+                "—" if session.get("data_quality") is None else f"{float(session['data_quality']):.2f}",
+            ]
+            for col, value in enumerate(values):
+                self.session_table.setItem(row, col, QTableWidgetItem(str(value)))
 
     def _create_patient_dialog(self) -> None:
         alias, ok = QInputDialog.getText(self, "Create research participant", "Anonymous participant ID:")
@@ -545,8 +566,16 @@ class MainWindow(QMainWindow):
         self.patient_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.patient_table.horizontalHeader().setStretchLastSection(True)
         self.patient_table.horizontalHeader().setSectionResizeMode(0, QTableWidget.ResizeMode.Stretch)
-        self.patient_table.itemSelectionChanged.connect(self._open_selected_patient)
+        self.patient_table.itemSelectionChanged.connect(lambda: self._set_active_patient(self._selected_patient_id()))
         root.addWidget(self.patient_table, 1)
+
+        sessions_title = QLabel("Selected patient's wear sessions")
+        sessions_title.setObjectName("SectionEyebrow")
+        root.addWidget(sessions_title)
+        self.session_table = QTableWidget(0, 5)
+        self.session_table.setHorizontalHeaderLabels(["Session", "Start", "End", "Samples", "Quality"])
+        self.session_table.horizontalHeader().setStretchLastSection(True)
+        root.addWidget(self.session_table, 1)
 
         self.patient_status = QLabel("Loading…")
         self.patient_status.setObjectName("SmallMuted")
@@ -1185,7 +1214,7 @@ class MainWindow(QMainWindow):
         try:
             self.arduino_reader = ArduinoReader(port=p, baud=115200)
             self.arduino_reader.start()
-            self.mode_label.setText(f"Mode: LIVE SERIAL {p}")
+            self.mode_label.setText(f"LIVE • wearable serial {p} • patient session required for storage")
             self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
         except Exception as e:
             self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
@@ -1200,7 +1229,7 @@ class MainWindow(QMainWindow):
             port = int(parts[1]) if len(parts) > 1 else 7777
             self.network_reader = NetworkReader(host=host, port=port)
             self.network_reader.start()
-            self.mode_label.setText(f"Mode: LIVE NETWORK {hostport}")
+            self.mode_label.setText(f"LIVE • network bridge {hostport} • patient session required for storage")
             self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
         except Exception as e:
             self.mode_label.setText(f"Mode: NETWORK FAILED {e}")
@@ -1208,7 +1237,7 @@ class MainWindow(QMainWindow):
     def start_demo(self):
         self.demo_stream = DemoSensorStream()
         self.demo_stream.start()
-        self.mode_label.setText("Mode: DEMO SYNTHETIC - clearly labelled")
+        self.mode_label.setText("DEMO • synthetic display stream • never stored as REAL")
         self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
 
     def stop_stream(self):
@@ -1301,6 +1330,30 @@ class MainWindow(QMainWindow):
             self.feature_history.append(fv)
             if len(self.feature_history) > 5000:
                 self.feature_history = self.feature_history[-5000:]
+
+            # Persist only real transport data inside an explicitly active wear session.
+            # DEMO streams remain presentation-only and cannot contaminate research records.
+            if (
+                self.active_patient_id
+                and self.active_session_id
+                and getattr(sample, "source", "serial") not in {"demo", "synthetic"}
+            ):
+                try:
+                    self.local_db.save_sensor_sample(
+                        self.active_patient_id,
+                        self.active_session_id,
+                        sample,
+                        feature_vector=fv,
+                        label="REAL",
+                    )
+                    self.local_db.set_wearable_state(
+                        self.active_patient_id,
+                        self.active_device_id or "WEARABLE-01",
+                        "WORN",
+                        "live sample received",
+                    )
+                except Exception as exc:
+                    self.sync_status_label.setText(f"Local database write error: {exc}")
 
             # Update UI vitals
             self._update_vital_cards(fv)
