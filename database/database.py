@@ -371,6 +371,45 @@ class LocalDatabase:
         self.conn.commit()
         return event_id
 
+    def save_sensor_sample(self, patient_id: str, session_id: str, sample: Any, feature_vector: Optional[Any] = None, label: str = 'REAL') -> None:
+        """Persist one raw wearable sample plus derived feature vector.
+
+        The raw channels remain separate from derived features so the doctor
+        workstation can inspect acquisition quality and provenance independently.
+        """
+        if not self.get_session(session_id, patient_id=patient_id):
+            raise ValueError('Patient-scoped sensor session not found')
+        ts = float(getattr(sample, 'timestamp_s', time.time()))
+        quality = float(getattr(sample, 'ppg_quality', 0.0))
+        fv = feature_vector
+        self.conn.execute(
+            'INSERT INTO ppg_data(session_id,timestamp_s,ir,red,hr_bpm,spo2_pct,pulse_amplitude,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'ir', None), getattr(sample, 'red', None), getattr(fv, 'hr_bpm', None), getattr(fv, 'spo2_pct', None), getattr(fv, 'ppg_pulse_amplitude_corrected', None) or getattr(fv, 'ppg_pulse_amplitude', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO hrv_data(session_id,timestamp_s,hr_bpm,resting_hr_bpm,rmssd_ms,sdnn_ms,pnn50_pct,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(fv, 'hr_bpm', None), getattr(fv, 'resting_hr_bpm', None), getattr(fv, 'rmssd_ms', None), getattr(fv, 'sdnn_ms', None), getattr(fv, 'pnn50_pct', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO gsr_data(session_id,timestamp_s,gsr_raw,gsr_tonic,gsr_phasic_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'gsr_raw', None), getattr(fv, 'gsr_tonic', None), getattr(fv, 'gsr_phasic_per_min', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO motion_data(session_id,timestamp_s,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,motion_index,activity_level,quality,label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'ax_g', None), getattr(sample, 'ay_g', None), getattr(sample, 'az_g', None), getattr(sample, 'gx_dps', None), getattr(sample, 'gy_dps', None), getattr(sample, 'gz_dps', None), getattr(fv, 'motion_index', None), getattr(fv, 'activity_level', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO temperature_data(session_id,timestamp_s,skin_temp_c,room_temp_c,temp_slope_c_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'temp_c', None), getattr(sample, 'room_temp_c', None), getattr(fv, 'temp_slope_c_per_min', None), quality, label),
+        )
+        if fv is not None:
+            self.conn.execute(
+                'INSERT INTO feature_vectors(feature_id,patient_id,session_id,timestamp_s,data_json,source,algorithm_version,label) VALUES (?,?,?,?,?,?,?,?)',
+                (str(uuid.uuid4()), patient_id, session_id, ts, json.dumps(fv.as_dict(), default=str, sort_keys=True), getattr(sample, 'source', 'wearable'), 'realtime-feature-extractor', label),
+            )
+        self.update_session_observation_count(session_id, quality)
+        self.conn.commit()
+
     def update_session_observation_count(self, session_id: str, data_quality: Optional[float] = None) -> None:
         cur = self.conn.cursor()
         cur.execute(
