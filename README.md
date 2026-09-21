@@ -866,3 +866,57 @@ Educational research prototype. Not a medical device. Not clinically validated. 
 Prioritizes: Science, Clarity, Reproducibility, Explainability, Honest Limitations, **General Platform Architecture**, **Disease Model Plugin System**, **Preserved Original Functionality**, **Extensibility**.
 
 **One Sentence: ENDO-TWIN is the platform; CHRONO-PCOS is its first disease-specific model.**
+
+
+---
+
+## V8.4 Upgrade Status
+
+The V8.4 upgrade is an incremental extension of the V8.3 platform.
+
+### New executable capability
+- Doctor Test Workstation: `./START.sh doctor-test`
+- Creates/opens a test patient and a DEMO_DATA test session.
+- Runs explicit sensor/infrastructure state checks.
+- Uses `PASS`, `WARN`, `FAIL` states and never turns an unavailable sensor into a plausible measurement.
+
+### Data integrity improvements
+- New Pydantic contracts for patient, measurement and feature records.
+- Report labels are explicit; DEMO_DATA is no longer forced into a REAL report label.
+- New patient-scoped session lookup helpers.
+- New patient archive operation with audit logging.
+- New PBKDF2 password hashing for new accounts with legacy SHA-256 verification retained for existing records.
+
+### Research infrastructure
+- Dependency-gated NeuroKit2 and pyHRV adapters.
+- pydicom/MONAI capability detection.
+- Optional packaged disease-module discovery.
+- Existing signal-processing, database, desktop and native Android functionality remains preserved.
+
+### Documentation
+See:
+- `PROJECT_AUDIT.md`
+- `UPGRADE_ROADMAP.md`
+- `ARCHITECTURE.md`
+- `BUILD_GUIDE.md`
+- `HARDWARE_BUILD_GUIDE.md`
+- `WIRING_GUIDE.md`
+- `WEARABLE_MEASUREMENT_SPEC.md`
+- `SENSOR_CALIBRATION_GUIDE.md`
+- `SENSOR_TESTING_GUIDE.md`
+- `FIRMWARE_GUIDE.md`
+- `SIGNAL_PROCESSING_GUIDE.md`
+- `AI_ML_GUIDE.md`
+- `MODEL_TRAINING_GUIDE.md`
+- `MODEL_VALIDATION_GUIDE.md`
+- `ULTRASOUND_GUIDE.md`
+- `DATABASE_ARCHITECTURE.md`
+- `API_GUIDE.md`
+- `ANDROID_BUILD_GUIDE.md`
+- `DOCTOR_WORKSTATION_GUIDE.md`
+- `PATIENT_APP_GUIDE.md`
+- `DEMO_GUIDE.md`
+- `TESTING_GUIDE.md`
+- `SECURITY.md`
+- `RESEARCH_LIMITATIONS.md`
+- `TROUBLESHOOTING.md`
