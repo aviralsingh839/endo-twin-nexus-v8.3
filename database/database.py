@@ -664,7 +664,7 @@ class LocalDatabase:
             FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
         )
         """)
-        self._ensure_column(cur.connection, "sensor_sessions", "study_id", "TEXT")
+        self._ensure_column(self.conn, "sensor_sessions", "study_id", "TEXT")
 
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_feature_vectors_patient_ts ON feature_vectors(patient_id, timestamp_s)""")
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_wearable_events_patient_ts ON wearable_events(patient_id, timestamp)""")
