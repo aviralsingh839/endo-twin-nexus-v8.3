@@ -365,11 +365,15 @@ QTabBar::tab:selected {{
 }}
 
 QTextEdit, QPlainTextEdit {{
-    background: {p["panel_alt"]};
-    border: 1px solid {p["border"]};
+    background: transparent;
+    border: 1px solid transparent;
     border-radius: 12px;
-    padding: 10px;
+    padding: 8px;
     selection-background-color: {p["accent_deep"]};
+}}
+QTextEdit:focus, QPlainTextEdit:focus {{
+    border-color: {p["border"]};
+    background: rgba(20, 34, 58, 0.28);
 }}
 
 QListWidget, QTableWidget {{
