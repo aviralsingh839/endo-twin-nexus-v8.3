@@ -26,6 +26,7 @@ import json
 import sqlite3
 import time
 import hashlib
+import secrets
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -497,7 +498,7 @@ class LocalDatabase:
     # User management
     def create_user(self, username: str, password: str, role: str) -> str:
         user_id = str(uuid.uuid4())
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        password_hash = self._hash_password(password)
         cur = self.conn.cursor()
         cur.execute("""
         INSERT INTO users (user_id, username, password_hash, role, created_at)
@@ -508,16 +509,37 @@ class LocalDatabase:
         return user_id
 
     def authenticate(self, username: str, password: str) -> Optional[Dict]:
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
         cur = self.conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username=? AND password_hash=? AND is_active=1", (username, password_hash))
+        cur.execute("SELECT * FROM users WHERE username=? AND is_active=1", (username,))
         row = cur.fetchone()
+        if row and not self._verify_password(password, row["password_hash"]):
+            row = None
         if row:
             cur.execute("UPDATE users SET last_login=? WHERE user_id=?", (time.time(), row["user_id"]))
             self.conn.commit()
             self._log_audit(row["user_id"], None, "login", {"username": username})
             return dict(row)
         return None
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
+        return "pbkdf2_sha256$200000$" + salt.hex() + "$" + digest.hex()
+
+    @staticmethod
+    def _verify_password(password: str, stored: str) -> bool:
+        if stored.startswith("pbkdf2_sha256$"):
+            try:
+                _, rounds, salt_hex, digest_hex = stored.split("$", 3)
+                digest = hashlib.pbkdf2_hmac(
+                    "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(rounds)
+                )
+                return secrets.compare_digest(digest.hex(), digest_hex)
+            except (ValueError, TypeError):
+                return False
+        legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        return secrets.compare_digest(legacy, stored)
 
     # Patient management
     def create_patient(self, user_id: Optional[str] = None, display_name: Optional[str] = None, age_years: Optional[float] = None, bmi: Optional[float] = None, anonymous_id: Optional[str] = None) -> str:
@@ -563,6 +585,42 @@ class LocalDatabase:
             else:
                 cur.execute("SELECT * FROM patients WHERE is_archived=0")
         return [dict(row) for row in cur.fetchall()]
+
+    def archive_patient(self, patient_id: str, archived: bool = True, user_id: Optional[str] = None) -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            "UPDATE patients SET is_archived=?, updated_at=? WHERE patient_id=?",
+            (1 if archived else 0, time.time(), patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self._log_audit(
+                user_id, patient_id,
+                "archive_patient" if archived else "unarchive_patient",
+                {"archived": archived},
+            )
+        return changed
+
+    def list_sessions(self, patient_id: str) -> List[Dict]:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT * FROM sensor_sessions WHERE patient_id=? ORDER BY start_at DESC",
+            (patient_id,),
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+    def get_session(self, session_id: str, patient_id: Optional[str] = None) -> Optional[Dict]:
+        cur = self.conn.cursor()
+        if patient_id is None:
+            cur.execute("SELECT * FROM sensor_sessions WHERE session_id=?", (session_id,))
+        else:
+            cur.execute(
+                "SELECT * FROM sensor_sessions WHERE session_id=? AND patient_id=?",
+                (session_id, patient_id),
+            )
+        row = cur.fetchone()
+        return dict(row) if row else None
 
     def search_patients(self, query: str) -> List[Dict]:
         cur = self.conn.cursor()
@@ -648,13 +706,13 @@ class LocalDatabase:
         return [dict(row) for row in cur.fetchall()]
 
     # Reports
-    def create_report(self, patient_id: str, report_type: str, content_text: str, created_by: Optional[str] = None) -> str:
+    def create_report(self, patient_id: str, report_type: str, content_text: str, created_by: Optional[str] = None, label: str = "REAL") -> str:
         report_id = str(uuid.uuid4())
         cur = self.conn.cursor()
         cur.execute("""
         INSERT INTO reports (report_id, patient_id, report_type, content_text, created_at, created_by, label)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (report_id, patient_id, report_type, content_text, time.time(), created_by, "REAL"))
+        """, (report_id, patient_id, report_type, content_text, time.time(), created_by, label))
         self.conn.commit()
         return report_id
 
