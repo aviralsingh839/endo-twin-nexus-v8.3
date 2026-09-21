@@ -26,6 +26,7 @@ from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.network_reader import NetworkReader
 from src.utils.demo_stream import DemoSensorStream
 from desktop.unified_engine import DISCLAIMER, context_ready, compute_research_index
+from desktop.model_lab import ModelLabWidget
 
 APP_QSS = """
 QWidget{background:#07111f;color:#edf5f9;font-family:"Noto Sans","DejaVu Sans",sans-serif;}
@@ -154,13 +155,13 @@ class UnifiedWorkstation(QMainWindow):
         side=QFrame(); side.setObjectName("sidebar"); side.setFixedWidth(215); sv=QVBoxLayout(side); sv.setContentsMargins(14,18,10,16)
         b=QLabel("Endo-Twin Nexus"); b.setObjectName("brand"); sv.addWidget(b); x=QLabel("UNIFIED WORKSTATION"); x.setObjectName("eyebrow"); sv.addWidget(x); d=QLabel("Patient + Doctor + Prototype Lab"); d.setObjectName("muted"); sv.addWidget(d); sv.addSpacing(15)
         self.nav={}; 
-        for k,t in [("patient","◉  Patient"),("doctor","♙  Doctor"),("lab","⌁  Prototype Lab"),("settings","⚙  Settings")]:
+        for k,t in [("patient","◉  Patient"),("doctor","♙  Doctor"),("lab","⌁  Prototype Lab"),("model","⌁  Model Lab"),("settings","⚙  Settings")]:
             q=QPushButton(t); q.setObjectName("nav"); q.setCheckable(True); q.clicked.connect(lambda _,kk=k:self._go(kk)); self.nav[k]=q; sv.addWidget(q)
         sv.addStretch(); m=QFrame(); m.setObjectName("hero"); mv=QVBoxLayout(m); e=QLabel("SESSION"); e.setObjectName("eyebrow"); mv.addWidget(e); self.mode_lbl=QLabel(); self.mode_lbl.setObjectName("value"); mv.addWidget(self.mode_lbl); self.state_lbl=QLabel("starting"); self.state_lbl.setObjectName("muted"); mv.addWidget(self.state_lbl); sv.addWidget(m); shell.addWidget(side,0,0)
         right=QWidget(); rv=QVBoxLayout(right); rv.setContentsMargins(0,0,0,0); rv.setSpacing(0)
         top=QFrame(); top.setObjectName("topbar"); tv=QHBoxLayout(top); tv.setContentsMargins(16,7,16,7); brand=QLabel("ENDO-TWIN"); brand.setStyleSheet("font-size:16px;font-weight:900;color:#fff;"); tv.addWidget(brand); sub=QLabel("Personalized Physiological Modelling Platform"); sub.setStyleSheet("color:#e8eaff;font-size:10px;font-weight:700;"); tv.addWidget(sub); tv.addStretch(); self.patient_lbl=QLabel("No patient"); self.patient_lbl.setStyleSheet("color:#fff;font-weight:850;"); tv.addWidget(self.patient_lbl); self.quality=QLabel("Quality —"); self.quality.setStyleSheet("color:#fff;"); tv.addWidget(self.quality); rv.addWidget(top)
         self.stack=QStackedWidget(); rv.addWidget(self.stack,1); shell.addWidget(right,0,1)
-        self.stack.addWidget(self._patient_page()); self.stack.addWidget(self._doctor_page()); self.stack.addWidget(self._lab_page()); self.stack.addWidget(self._settings_page()); self._go("patient")
+        self.stack.addWidget(self._patient_page()); self.stack.addWidget(self._doctor_page()); self.stack.addWidget(self._lab_page()); self.stack.addWidget(ModelLabWidget(ROOT)); self.stack.addWidget(self._settings_page()); self._go("patient")
     def _card(self,t,val="—",detail=""):
         f=QFrame(); f.setObjectName("card"); v=QVBoxLayout(f); v.addWidget(QLabel(t)); q=v.itemAt(0).widget(); q.setObjectName("eyebrow"); z=QLabel(str(val)); z.setObjectName("value"); v.addWidget(z); m=QLabel(detail); m.setObjectName("muted"); m.setWordWrap(True); v.addWidget(m); return f
     def _patient_page(self):
@@ -188,7 +189,7 @@ class UnifiedWorkstation(QMainWindow):
         v.addWidget(self.modules,1); self.lab_log=QTextEdit(); self.lab_log.setReadOnly(True); self.lab_log.setMaximumHeight(155); v.addWidget(self.lab_log); return p
     def _settings_page(self):
         p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Settings"); t.setObjectName("title"); v.addWidget(t); q=QLabel("Restart to change DEMO/LIVE or the live transport. Research bridge is LAN-only."); q.setObjectName("muted"); q.setWordWrap(True); v.addWidget(q); box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box); bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}")); bv.addWidget(QLabel("ESP8266: use 5V→3.3V level shifting on Mega TX1→ESP RX0.")); v.addWidget(box); v.addStretch(); return p
-    def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","lab","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
+    def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","lab","model","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
     def _seed_demo(self):
         if self.cfg.mode=="demo": self.current={"patient_id":"DEMO-021","anonymous_id":"DEMO-021","display_name":"Mira","age_years":23.0,"bmi":24.7,"cycle_irregular":True,"cycle_length":42,"years_post_menarche":10,"hyperandrogenism":True,"pcom_present":False,"exclusions_completed":True,"glucose_mg_dl":98.0,"demo":True}
     def _enrich(self,p):
