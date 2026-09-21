@@ -920,3 +920,12 @@ See:
 - `SECURITY.md`
 - `RESEARCH_LIMITATIONS.md`
 - `TROUBLESHOOTING.md`
+
+
+## VoxVasc — Experimental Voice Modality
+
+VoxVasc is an optional research modality inside CHRONO-PCOS and is now surfaced in the active desktop UI and native research workspaces. It extracts transparent acoustic features from a sustained-vowel WAV recording and reports an experimental feature index. It is explicitly **not** a hormone measurement, vascular measurement, diagnostic test, clinical probability, or validated replacement for clinical/physiological evidence.
+
+Implementation: `src/models/voice_vasc_model.py` and `src/ui/voice_vasc_tab.py`.
+
+Full research boundary and acquisition notes: `docs/VOXVASC_RESEARCH_MODULE.md`.
