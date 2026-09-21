@@ -5,6 +5,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 from desktop.doctor_app.main_enhanced import EnhancedDoctorApp
 def main():
+    if "--test-mode" in sys.argv:
+        from desktop.doctor_app.test_workstation import launch_gui
+        raise SystemExit(launch_gui())
     app = EnhancedDoctorApp()
     try:
         import PySide6
