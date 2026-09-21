@@ -329,181 +329,6 @@ class LocalDatabase:
         """)
 
         # Wearable lifecycle / local synchronization
-    def register_wearable(self, patient_id: str, device_id: str, device_type: str, transport: str, firmware_version: Optional[str] = None) -> str:
-        now = time.time()
-        cur = self.conn.cursor()
-        cur.execute("""
-        INSERT INTO wearable_devices(device_id, patient_id, device_type, transport, firmware_version, state, first_seen, last_seen)
-        VALUES (?, ?, ?, ?, ?, 'NOT_CONNECTED', ?, ?)
-        ON CONFLICT(device_id) DO UPDATE SET
-            patient_id=excluded.patient_id,
-            device_type=excluded.device_type,
-            transport=excluded.transport,
-            firmware_version=excluded.firmware_version,
-            last_seen=excluded.last_seen
-        """, (device_id, patient_id, device_type, transport, firmware_version, now, now))
-        self.conn.commit()
-        return device_id
-
-    def set_wearable_state(self, patient_id: str, device_id: str, state: str, reason: str = '') -> bool:
-        allowed = {'NOT_CONNECTED', 'CONNECTED', 'WORN', 'REMOVED', 'RECONNECTING', 'ERROR', 'CHARGING'}
-        state = state.upper()
-        if state not in allowed:
-            raise ValueError(f'Unsupported wearable state: {state}')
-        now = time.time()
-        cur = self.conn.cursor()
-        cur.execute(
-            'UPDATE wearable_devices SET state=?, last_seen=? WHERE device_id=? AND patient_id=?',
-            (state, now, device_id, patient_id),
-        )
-        changed = cur.rowcount > 0
-        self.conn.commit()
-        if changed:
-            self.record_wearable_event(patient_id, None, 'WEARABLE_STATE', {'device_id': device_id, 'state': state, 'reason': reason})
-        return changed
-
-    def record_wearable_event(self, patient_id: str, session_id: Optional[str], event_type: str, detail: Optional[Dict[str, Any]] = None, label: str = 'REAL') -> str:
-        event_id = str(uuid.uuid4())
-        self.conn.execute(
-            'INSERT INTO wearable_events(event_id, patient_id, session_id, timestamp, event_type, detail_json, label) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            (event_id, patient_id, session_id, time.time(), event_type, json.dumps(detail or {}, sort_keys=True), label),
-        )
-        self.conn.commit()
-        return event_id
-
-    def save_sensor_sample(self, patient_id: str, session_id: str, sample: Any, feature_vector: Optional[Any] = None, label: str = 'REAL') -> None:
-        """Persist one raw wearable sample plus derived feature vector.
-
-        The raw channels remain separate from derived features so the doctor
-        workstation can inspect acquisition quality and provenance independently.
-        """
-        if not self.get_session(session_id, patient_id=patient_id):
-            raise ValueError('Patient-scoped sensor session not found')
-        ts = float(getattr(sample, 'timestamp_s', time.time()))
-        quality = float(getattr(sample, 'ppg_quality', 0.0))
-        fv = feature_vector
-        self.conn.execute(
-            'INSERT INTO ppg_data(session_id,timestamp_s,ir,red,hr_bpm,spo2_pct,pulse_amplitude,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
-            (session_id, ts, getattr(sample, 'ir', None), getattr(sample, 'red', None), getattr(fv, 'hr_bpm', None), getattr(fv, 'spo2_pct', None), getattr(fv, 'ppg_pulse_amplitude_corrected', None) or getattr(fv, 'ppg_pulse_amplitude', None), quality, label),
-        )
-        self.conn.execute(
-            'INSERT INTO hrv_data(session_id,timestamp_s,hr_bpm,resting_hr_bpm,rmssd_ms,sdnn_ms,pnn50_pct,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
-            (session_id, ts, getattr(fv, 'hr_bpm', None), getattr(fv, 'resting_hr_bpm', None), getattr(fv, 'rmssd_ms', None), getattr(fv, 'sdnn_ms', None), getattr(fv, 'pnn50_pct', None), quality, label),
-        )
-        self.conn.execute(
-            'INSERT INTO gsr_data(session_id,timestamp_s,gsr_raw,gsr_tonic,gsr_phasic_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
-            (session_id, ts, getattr(sample, 'gsr_raw', None), getattr(fv, 'gsr_tonic', None), getattr(fv, 'gsr_phasic_per_min', None), quality, label),
-        )
-        self.conn.execute(
-            'INSERT INTO motion_data(session_id,timestamp_s,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,motion_index,activity_level,quality,label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-            (session_id, ts, getattr(sample, 'ax_g', None), getattr(sample, 'ay_g', None), getattr(sample, 'az_g', None), getattr(sample, 'gx_dps', None), getattr(sample, 'gy_dps', None), getattr(sample, 'gz_dps', None), getattr(fv, 'motion_index', None), getattr(fv, 'activity_level', None), quality, label),
-        )
-        self.conn.execute(
-            'INSERT INTO temperature_data(session_id,timestamp_s,skin_temp_c,room_temp_c,temp_slope_c_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
-            (session_id, ts, getattr(sample, 'temp_c', None), getattr(sample, 'room_temp_c', None), getattr(fv, 'temp_slope_c_per_min', None), quality, label),
-        )
-        if fv is not None:
-            self.conn.execute(
-                'INSERT INTO feature_vectors(feature_id,patient_id,session_id,timestamp_s,data_json,source,algorithm_version,label) VALUES (?,?,?,?,?,?,?,?)',
-                (str(uuid.uuid4()), patient_id, session_id, ts, json.dumps(fv.as_dict(), default=str, sort_keys=True), getattr(sample, 'source', 'wearable'), 'realtime-feature-extractor', label),
-            )
-        self.update_session_observation_count(session_id, quality)
-        self.conn.commit()
-
-    def update_session_observation_count(self, session_id: str, data_quality: Optional[float] = None) -> None:
-        cur = self.conn.cursor()
-        cur.execute(
-            'UPDATE sensor_sessions SET sample_count=COALESCE(sample_count,0)+1, data_quality=COALESCE(?, data_quality) WHERE session_id=?',
-            (data_quality, session_id),
-        )
-        self.conn.commit()
-
-    def close_sensor_session(self, patient_id: str, session_id: str, notes: Optional[str] = None) -> bool:
-        cur = self.conn.cursor()
-        cur.execute(
-            'UPDATE sensor_sessions SET end_at=?, notes=COALESCE(?, notes) WHERE session_id=? AND patient_id=?',
-            (time.time(), notes, session_id, patient_id),
-        )
-        changed = cur.rowcount > 0
-        self.conn.commit()
-        if changed:
-            self.record_wearable_event(patient_id, session_id, 'SESSION_ENDED', {'notes': notes or ''})
-        return changed
-
-    def save_raw_wearable_packet(self, patient_id: str, session_id: Optional[str], payload_base64: str, transport: str = 'BLE', quality: Optional[float] = None, label: str = 'REAL') -> str:
-        packet_id = str(uuid.uuid4())
-        self.conn.execute(
-            'INSERT INTO raw_wearable_packets(packet_id, patient_id, session_id, timestamp, payload_base64, transport, quality, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            (packet_id, patient_id, session_id, time.time(), payload_base64, transport, quality, label),
-        )
-        self.conn.commit()
-        return packet_id
-
-    def save_feature_vector(self, patient_id: str, session_id: Optional[str], feature_vector: Any, source: str = 'wearable', algorithm_version: Optional[str] = None, label: str = 'REAL') -> str:
-        data = feature_vector.as_dict() if hasattr(feature_vector, 'as_dict') else dict(feature_vector)
-        feature_id = str(uuid.uuid4())
-        self.conn.execute(
-            'INSERT INTO feature_vectors(feature_id, patient_id, session_id, timestamp_s, data_json, source, algorithm_version, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            (feature_id, patient_id, session_id, float(data.get('timestamp_s', time.time())), json.dumps(data, default=str, sort_keys=True), source, algorithm_version, label),
-        )
-        self.conn.commit()
-        return feature_id
-
-    def save_personal_baseline(self, patient_id: str, feature_name: str, stats: Dict[str, Any], algorithm_version: str) -> str:
-        baseline_id = str(uuid.uuid4())
-        self.conn.execute("""
-        INSERT INTO personal_baselines(baseline_id, patient_id, feature_name, median_value, mean_value, std_value, mad_value, sample_count, days_covered, confidence, algorithm_version, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(patient_id, feature_name) DO UPDATE SET
-            median_value=excluded.median_value, mean_value=excluded.mean_value,
-            std_value=excluded.std_value, mad_value=excluded.mad_value,
-            sample_count=excluded.sample_count, days_covered=excluded.days_covered,
-            confidence=excluded.confidence, algorithm_version=excluded.algorithm_version,
-            updated_at=excluded.updated_at
-        """, (
-            baseline_id, patient_id, feature_name, stats.get('median'), stats.get('mean'),
-            stats.get('std'), stats.get('mad'), int(stats.get('sample_count', 0)),
-            float(stats.get('days_covered', 0)), float(stats.get('confidence', 0)),
-            algorithm_version, time.time()
-        ))
-        self.conn.commit()
-        row = self.conn.execute('SELECT baseline_id FROM personal_baselines WHERE patient_id=? AND feature_name=?', (patient_id, feature_name)).fetchone()
-        return str(row[0])
-
-    def record_research_label(self, patient_id: str, target: str, label_value: str, source: str, entered_by: Optional[str] = None, notes: str = '') -> str:
-        label_id = str(uuid.uuid4())
-        self.conn.execute(
-            'INSERT INTO research_labels(label_id, patient_id, target, label_value, source, entered_by, timestamp, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            (label_id, patient_id, target, label_value, source, entered_by, time.time(), notes),
-        )
-        self.conn.commit()
-        self._log_audit(entered_by, patient_id, 'record_research_label', {'target': target, 'source': source})
-        return label_id
-
-    def list_research_labels(self, target: Optional[str] = None) -> List[Dict]:
-        if target:
-            rows = self.conn.execute('SELECT * FROM research_labels WHERE target=? ORDER BY timestamp DESC', (target,)).fetchall()
-        else:
-            rows = self.conn.execute('SELECT * FROM research_labels ORDER BY timestamp DESC').fetchall()
-        return [dict(r) for r in rows]
-
-    def record_learning_run(self, patient_id: Optional[str], model_name: str, base_model_version: Optional[str], mode: str, status: str, input_sessions: Optional[List[str]] = None, metrics: Optional[Dict] = None, limitations: str = '') -> str:
-        run_id = str(uuid.uuid4())
-        self.conn.execute(
-            'INSERT INTO learning_runs(run_id, patient_id, model_name, base_model_version, mode, started_at, completed_at, status, input_sessions_json, metrics_json, limitations, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (run_id, patient_id, model_name, base_model_version, mode, time.time(), time.time(), status, json.dumps(input_sessions or []), json.dumps(metrics or {}, sort_keys=True), limitations, 'RESEARCH'),
-        )
-        self.conn.commit()
-        return run_id
-
-    def list_wearable_events(self, patient_id: str, limit: int = 500) -> List[Dict]:
-        rows = self.conn.execute('SELECT * FROM wearable_events WHERE patient_id=? ORDER BY timestamp DESC LIMIT ?', (patient_id, limit)).fetchall()
-        return [dict(r) for r in rows]
-
-    def list_feature_vectors(self, patient_id: str, limit: int = 5000) -> List[Dict]:
-        rows = self.conn.execute('SELECT * FROM feature_vectors WHERE patient_id=? ORDER BY timestamp_s DESC LIMIT ?', (patient_id, limit)).fetchall()
-        return [dict(r) for r in rows]
-
     # Providers - care discovery (separate from patient health data)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS providers (
@@ -688,6 +513,8 @@ class LocalDatabase:
             FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
         )
         """)
+        self._ensure_column(self.conn, "features", "extra_json", "TEXT")
+        self._ensure_column(self.conn, "sensor_sessions", "participant_id", "TEXT")
         self._ensure_column(self.conn, "sensor_sessions", "study_id", "TEXT")
 
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_feature_vectors_patient_ts ON feature_vectors(patient_id, timestamp_s)""")
@@ -695,6 +522,182 @@ class LocalDatabase:
         cur.execute("""CREATE INDEX IF NOT EXISTS idx_learning_runs_patient_ts ON learning_runs(patient_id, started_at)""")
 
         self.conn.commit()
+
+
+    def register_wearable(self, patient_id: str, device_id: str, device_type: str, transport: str, firmware_version: Optional[str] = None) -> str:
+        now = time.time()
+        cur = self.conn.cursor()
+        cur.execute("""
+        INSERT INTO wearable_devices(device_id, patient_id, device_type, transport, firmware_version, state, first_seen, last_seen)
+        VALUES (?, ?, ?, ?, ?, 'NOT_CONNECTED', ?, ?)
+        ON CONFLICT(device_id) DO UPDATE SET
+            patient_id=excluded.patient_id,
+            device_type=excluded.device_type,
+            transport=excluded.transport,
+            firmware_version=excluded.firmware_version,
+            last_seen=excluded.last_seen
+        """, (device_id, patient_id, device_type, transport, firmware_version, now, now))
+        self.conn.commit()
+        return device_id
+
+    def set_wearable_state(self, patient_id: str, device_id: str, state: str, reason: str = '') -> bool:
+        allowed = {'NOT_CONNECTED', 'CONNECTED', 'WORN', 'REMOVED', 'RECONNECTING', 'ERROR', 'CHARGING'}
+        state = state.upper()
+        if state not in allowed:
+            raise ValueError(f'Unsupported wearable state: {state}')
+        now = time.time()
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE wearable_devices SET state=?, last_seen=? WHERE device_id=? AND patient_id=?',
+            (state, now, device_id, patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self.record_wearable_event(patient_id, None, 'WEARABLE_STATE', {'device_id': device_id, 'state': state, 'reason': reason})
+        return changed
+
+    def record_wearable_event(self, patient_id: str, session_id: Optional[str], event_type: str, detail: Optional[Dict[str, Any]] = None, label: str = 'REAL') -> str:
+        event_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO wearable_events(event_id, patient_id, session_id, timestamp, event_type, detail_json, label) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (event_id, patient_id, session_id, time.time(), event_type, json.dumps(detail or {}, sort_keys=True), label),
+        )
+        self.conn.commit()
+        return event_id
+
+    def save_sensor_sample(self, patient_id: str, session_id: str, sample: Any, feature_vector: Optional[Any] = None, label: str = 'REAL') -> None:
+        """Persist one raw wearable sample plus derived feature vector.
+
+        The raw channels remain separate from derived features so the doctor
+        workstation can inspect acquisition quality and provenance independently.
+        """
+        if not self.get_session(session_id, patient_id=patient_id):
+            raise ValueError('Patient-scoped sensor session not found')
+        ts = float(getattr(sample, 'timestamp_s', time.time()))
+        quality = float(getattr(sample, 'ppg_quality', 0.0))
+        fv = feature_vector
+        self.conn.execute(
+            'INSERT INTO ppg_data(session_id,timestamp_s,ir,red,hr_bpm,spo2_pct,pulse_amplitude,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'ir', None), getattr(sample, 'red', None), getattr(fv, 'hr_bpm', None), getattr(fv, 'spo2_pct', None), getattr(fv, 'ppg_pulse_amplitude_corrected', None) or getattr(fv, 'ppg_pulse_amplitude', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO hrv_data(session_id,timestamp_s,hr_bpm,resting_hr_bpm,rmssd_ms,sdnn_ms,pnn50_pct,quality,label) VALUES (?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(fv, 'hr_bpm', None), getattr(fv, 'resting_hr_bpm', None), getattr(fv, 'rmssd_ms', None), getattr(fv, 'sdnn_ms', None), getattr(fv, 'pnn50_pct', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO gsr_data(session_id,timestamp_s,gsr_raw,gsr_tonic,gsr_phasic_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'gsr_raw', None), getattr(fv, 'gsr_tonic', None), getattr(fv, 'gsr_phasic_per_min', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO motion_data(session_id,timestamp_s,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,motion_index,activity_level,quality,label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'ax_g', None), getattr(sample, 'ay_g', None), getattr(sample, 'az_g', None), getattr(sample, 'gx_dps', None), getattr(sample, 'gy_dps', None), getattr(sample, 'gz_dps', None), getattr(fv, 'motion_index', None), getattr(fv, 'activity_level', None), quality, label),
+        )
+        self.conn.execute(
+            'INSERT INTO temperature_data(session_id,timestamp_s,skin_temp_c,room_temp_c,temp_slope_c_per_min,quality,label) VALUES (?,?,?,?,?,?,?)',
+            (session_id, ts, getattr(sample, 'temp_c', None), getattr(sample, 'room_temp_c', None), getattr(fv, 'temp_slope_c_per_min', None), quality, label),
+        )
+        if fv is not None:
+            self.conn.execute(
+                'INSERT INTO feature_vectors(feature_id,patient_id,session_id,timestamp_s,data_json,source,algorithm_version,label) VALUES (?,?,?,?,?,?,?,?)',
+                (str(uuid.uuid4()), patient_id, session_id, ts, json.dumps(fv.as_dict(), default=str, sort_keys=True), getattr(sample, 'source', 'wearable'), 'realtime-feature-extractor', label),
+            )
+        self.update_session_observation_count(session_id, quality)
+        self.conn.commit()
+
+    def update_session_observation_count(self, session_id: str, data_quality: Optional[float] = None) -> None:
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE sensor_sessions SET sample_count=COALESCE(sample_count,0)+1, data_quality=COALESCE(?, data_quality) WHERE session_id=?',
+            (data_quality, session_id),
+        )
+        self.conn.commit()
+
+    def close_sensor_session(self, patient_id: str, session_id: str, notes: Optional[str] = None) -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE sensor_sessions SET end_at=?, notes=COALESCE(?, notes) WHERE session_id=? AND patient_id=?',
+            (time.time(), notes, session_id, patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self.record_wearable_event(patient_id, session_id, 'SESSION_ENDED', {'notes': notes or ''})
+        return changed
+
+    def save_raw_wearable_packet(self, patient_id: str, session_id: Optional[str], payload_base64: str, transport: str = 'BLE', quality: Optional[float] = None, label: str = 'REAL') -> str:
+        packet_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO raw_wearable_packets(packet_id, patient_id, session_id, timestamp, payload_base64, transport, quality, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (packet_id, patient_id, session_id, time.time(), payload_base64, transport, quality, label),
+        )
+        self.conn.commit()
+        return packet_id
+
+    def save_feature_vector(self, patient_id: str, session_id: Optional[str], feature_vector: Any, source: str = 'wearable', algorithm_version: Optional[str] = None, label: str = 'REAL') -> str:
+        data = feature_vector.as_dict() if hasattr(feature_vector, 'as_dict') else dict(feature_vector)
+        feature_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO feature_vectors(feature_id, patient_id, session_id, timestamp_s, data_json, source, algorithm_version, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (feature_id, patient_id, session_id, float(data.get('timestamp_s', time.time())), json.dumps(data, default=str, sort_keys=True), source, algorithm_version, label),
+        )
+        self.conn.commit()
+        return feature_id
+
+    def save_personal_baseline(self, patient_id: str, feature_name: str, stats: Dict[str, Any], algorithm_version: str) -> str:
+        baseline_id = str(uuid.uuid4())
+        self.conn.execute("""
+        INSERT INTO personal_baselines(baseline_id, patient_id, feature_name, median_value, mean_value, std_value, mad_value, sample_count, days_covered, confidence, algorithm_version, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(patient_id, feature_name) DO UPDATE SET
+            median_value=excluded.median_value, mean_value=excluded.mean_value,
+            std_value=excluded.std_value, mad_value=excluded.mad_value,
+            sample_count=excluded.sample_count, days_covered=excluded.days_covered,
+            confidence=excluded.confidence, algorithm_version=excluded.algorithm_version,
+            updated_at=excluded.updated_at
+        """, (
+            baseline_id, patient_id, feature_name, stats.get('median'), stats.get('mean'),
+            stats.get('std'), stats.get('mad'), int(stats.get('sample_count', 0)),
+            float(stats.get('days_covered', 0)), float(stats.get('confidence', 0)),
+            algorithm_version, time.time()
+        ))
+        self.conn.commit()
+        row = self.conn.execute('SELECT baseline_id FROM personal_baselines WHERE patient_id=? AND feature_name=?', (patient_id, feature_name)).fetchone()
+        return str(row[0])
+
+    def record_research_label(self, patient_id: str, target: str, label_value: str, source: str, entered_by: Optional[str] = None, notes: str = '') -> str:
+        label_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO research_labels(label_id, patient_id, target, label_value, source, entered_by, timestamp, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (label_id, patient_id, target, label_value, source, entered_by, time.time(), notes),
+        )
+        self.conn.commit()
+        self._log_audit(entered_by, patient_id, 'record_research_label', {'target': target, 'source': source})
+        return label_id
+
+    def list_research_labels(self, target: Optional[str] = None) -> List[Dict]:
+        if target:
+            rows = self.conn.execute('SELECT * FROM research_labels WHERE target=? ORDER BY timestamp DESC', (target,)).fetchall()
+        else:
+            rows = self.conn.execute('SELECT * FROM research_labels ORDER BY timestamp DESC').fetchall()
+        return [dict(r) for r in rows]
+
+    def record_learning_run(self, patient_id: Optional[str], model_name: str, base_model_version: Optional[str], mode: str, status: str, input_sessions: Optional[List[str]] = None, metrics: Optional[Dict] = None, limitations: str = '') -> str:
+        run_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO learning_runs(run_id, patient_id, model_name, base_model_version, mode, started_at, completed_at, status, input_sessions_json, metrics_json, limitations, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (run_id, patient_id, model_name, base_model_version, mode, time.time(), time.time(), status, json.dumps(input_sessions or []), json.dumps(metrics or {}, sort_keys=True), limitations, 'RESEARCH'),
+        )
+        self.conn.commit()
+        return run_id
+
+    def list_wearable_events(self, patient_id: str, limit: int = 500) -> List[Dict]:
+        rows = self.conn.execute('SELECT * FROM wearable_events WHERE patient_id=? ORDER BY timestamp DESC LIMIT ?', (patient_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def list_feature_vectors(self, patient_id: str, limit: int = 5000) -> List[Dict]:
+        rows = self.conn.execute('SELECT * FROM feature_vectors WHERE patient_id=? ORDER BY timestamp_s DESC LIMIT ?', (patient_id, limit)).fetchall()
+        return [dict(r) for r in rows]
 
     def _seed_demo_providers(self):
         """Seed demo providers for prototype - clearly marked demo."""
