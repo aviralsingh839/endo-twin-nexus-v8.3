@@ -29,15 +29,32 @@ class DemoSensorStream(QObject):
         self.i = 0
         self.rng = np.random.default_rng(7)
         self.mode = "rest"
+        self._latest_sample: SensorSample | None = None
+        self._sample_available = False
+
+    def has_sample(self) -> bool:
+        """Return whether a new sample is waiting for the UI poller."""
+        return self._sample_available
+
+    def get_sample(self) -> SensorSample | None:
+        """Return the latest sample once, then clear the pending flag."""
+        sample = self._latest_sample
+        self._latest_sample = None
+        self._sample_available = False
+        return sample
 
     def start(self) -> None:
         self.t0 = time.time()
         self.i = 0
+        self._latest_sample = None
+        self._sample_available = False
         self.timer.start(int(1000 / self.fs_hz))
         self.state_changed.emit("demo-running")
 
     def stop(self) -> None:
         self.timer.stop()
+        self._latest_sample = None
+        self._sample_available = False
         self.state_changed.emit("demo-stopped")
 
     def write_command(self, command: str) -> None:
@@ -101,4 +118,6 @@ class DemoSensorStream(QObject):
             source="demo",
         )
         self.i += 1
+        self._latest_sample = sample
+        self._sample_available = True
         self.sample_received.emit(sample)
