@@ -354,8 +354,7 @@ class PrototypeLabWidget(QWidget):
             f"TEST COMPLETE • {packets} packets • "
             f"average quality {avg_q*100:.0f}%" if avg_q is not None else f"TEST COMPLETE • {packets} packets"
         )
-        self.test_summary.findChildren(QLabel)[1].setText("
-".join(lines))
+        self.test_summary.findChildren(QLabel)[1].setText("\n".join(lines))
 
     def _export_report(self):
         default_dir = self.root / "data" / "prototype_tests"
