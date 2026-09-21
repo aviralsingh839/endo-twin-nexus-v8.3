@@ -422,6 +422,17 @@ class MainWindow(QMainWindow):
         self._set_active_patient(pid)
         patient = self.local_db.get_patient(pid) or {}
         sessions = self.local_db.list_sessions(pid)
+
+        # Restore this participant's entered context before running any module.
+        self.profile.age_years = patient.get("age_years") or self.profile.age_years
+        self.profile.bmi = patient.get("bmi")
+        self.clinical_data = {
+            "age_years": self.profile.age_years,
+            "bmi": self.profile.bmi,
+            "profile": self.profile,
+        }
+        self.extractor.set_profile(self.profile)
+
         loaded = self._load_stored_features(pid)
         self.patient_status.setText(
             f"Active patient {patient.get('anonymous_id', pid)} • {len(sessions)} stored wear session(s) • "
