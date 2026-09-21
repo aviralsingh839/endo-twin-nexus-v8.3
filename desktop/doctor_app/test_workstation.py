@@ -79,6 +79,7 @@ def launch_gui() -> int:
             QPushButton, QLabel, QTableWidget, QTableWidgetItem, QMessageBox,
         )
         from PySide6.QtCore import Qt
+        from src.ui.theme import DARK_QSS
     except ImportError:
         print("PySide6 is required for the Doctor Test Workstation.")
         return 2
@@ -88,27 +89,32 @@ def launch_gui() -> int:
 
     app = QApplication(sys.argv)
     window = QWidget()
-    window.setWindowTitle("ENDO-TWIN — Doctor Test Workstation")
-    window.resize(980, 620)
+    window.setWindowTitle("ENDO-TWIN NEXUS • Doctor Test Workbench")
+    window.resize(1100, 700)
+    window.setStyleSheet(DARK_QSS)
 
     layout = QVBoxLayout(window)
+    layout.setContentsMargins(18, 18, 18, 18)
+    layout.setSpacing(12)
     title = QLabel(
         "ENDO-TWIN Doctor Test Workstation\n"
         "Create a patient → create a test session → execute explicit hardware/infrastructure checks."
     )
     title.setWordWrap(True)
-    title.setStyleSheet("font-size: 18px; font-weight: 700; padding: 12px;")
+    title.setObjectName("HeroTitle")
     layout.addWidget(title)
 
     row = QHBoxLayout()
     row.addWidget(QLabel("Test patient ID:"))
     patient_edit = QLineEdit("TEST-001")
     row.addWidget(patient_edit)
-    run_button = QPushButton("Create Patient + Run Test")
+    run_button = QPushButton("Create patient + run test")
+    run_button.setObjectName("Primary")
     row.addWidget(run_button)
     layout.addLayout(row)
 
-    status = QLabel("Ready. Results are test/infrastructure states, not physiological measurements.")
+    status = QLabel("READY  •  infrastructure checks only  •  no physiological measurement is implied")
+    status.setObjectName("SmallMuted")
     status.setWordWrap(True)
     layout.addWidget(status)
 
