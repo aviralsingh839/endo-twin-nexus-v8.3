@@ -45,6 +45,15 @@ class LocalDatabase:
         self._init_schema()
         self._seed_demo_providers()
 
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+        """Add a missing compatibility column without touching existing data."""
+        columns = {
+            row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
     def _init_schema(self):
         cur = self.conn.cursor()
 
