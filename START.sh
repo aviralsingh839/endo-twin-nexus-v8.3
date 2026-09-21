@@ -35,6 +35,7 @@ Modes:
   gui           Launch Control Center GUI - launcher/main.py
   endo-twin     Launch ENDO-TWIN general dashboard
   doctor        Launch Doctor Desktop
+  doctor-test   Launch Doctor Test Workstation
   patient       Launch Patient App (Kivy PC demo if no APK)
   doctor-android Launch Doctor Android App (Kivy PC demo if no APK)
   research      Launch Research Lab
@@ -139,6 +140,12 @@ launch_doctor() {
     else
         "$VENV_PYTHON" "$PROJECT_ROOT/desktop/doctor_app/main.py" 2>&1 | tee -a "$LOG_FILE"
     fi
+}
+
+launch_doctor_test() {
+    check_venv
+    log "Launching Doctor Test Workstation"
+    "$VENV_PYTHON" "$PROJECT_ROOT/launcher/doctor_pc.py" --test-mode 2>&1 | tee -a "$LOG_FILE"
 }
 
 launch_doctor_android() {
@@ -440,6 +447,9 @@ case "$MODE" in
         ;;
     doctor|doctor-pc|doctor-desktop)
         launch_doctor
+        ;;
+    doctor-test|doctor_test|test-workstation)
+        launch_doctor_test
         ;;
     patient|patient-android|patient-demo)
         launch_patient
