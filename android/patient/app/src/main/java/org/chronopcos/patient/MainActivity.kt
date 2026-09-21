@@ -1,7 +1,12 @@
 package org.chronopcos.patient
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,6 +18,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +31,12 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
 import org.chronopcos.patient.ui.screens.PatientHomeScreen
+import org.chronopcos.patient.data.database.PatientDatabase
+import org.chronopcos.patient.data.repository.PatientRepository
+import org.chronopcos.patient.data.wearable.WearableBleManager
+import org.chronopcos.patient.data.wearable.WearableDeviceSummary
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * ENDO-TWIN Patient V8.4
