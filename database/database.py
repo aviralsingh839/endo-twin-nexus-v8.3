@@ -328,7 +328,118 @@ class LocalDatabase:
         )
         """)
 
-        # Providers - care discovery (separate from patient health data)
+        # Wearable lifecycle / local synchronization
+    def register_wearable(self, patient_id: str, device_id: str, device_type: str, transport: str, firmware_version: Optional[str] = None) -> str:
+        now = time.time()
+        cur = self.conn.cursor()
+        cur.execute("""
+        INSERT INTO wearable_devices(device_id, patient_id, device_type, transport, firmware_version, state, first_seen, last_seen)
+        VALUES (?, ?, ?, ?, ?, 'NOT_CONNECTED', ?, ?)
+        ON CONFLICT(device_id) DO UPDATE SET
+            patient_id=excluded.patient_id,
+            device_type=excluded.device_type,
+            transport=excluded.transport,
+            firmware_version=excluded.firmware_version,
+            last_seen=excluded.last_seen
+        """, (device_id, patient_id, device_type, transport, firmware_version, now, now))
+        self.conn.commit()
+        return device_id
+
+    def set_wearable_state(self, patient_id: str, device_id: str, state: str, reason: str = '') -> bool:
+        allowed = {'NOT_CONNECTED', 'CONNECTED', 'WORN', 'REMOVED', 'RECONNECTING', 'ERROR', 'CHARGING'}
+        state = state.upper()
+        if state not in allowed:
+            raise ValueError(f'Unsupported wearable state: {state}')
+        now = time.time()
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE wearable_devices SET state=?, last_seen=? WHERE device_id=? AND patient_id=?',
+            (state, now, device_id, patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self.record_wearable_event(patient_id, None, 'WEARABLE_STATE', {'device_id': device_id, 'state': state, 'reason': reason})
+        return changed
+
+    def record_wearable_event(self, patient_id: str, session_id: Optional[str], event_type: str, detail: Optional[Dict[str, Any]] = None, label: str = 'REAL') -> str:
+        event_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO wearable_events(event_id, patient_id, session_id, timestamp, event_type, detail_json, label) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (event_id, patient_id, session_id, time.time(), event_type, json.dumps(detail or {}, sort_keys=True), label),
+        )
+        self.conn.commit()
+        return event_id
+
+    def update_session_observation_count(self, session_id: str, data_quality: Optional[float] = None) -> None:
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE sensor_sessions SET sample_count=COALESCE(sample_count,0)+1, data_quality=COALESCE(?, data_quality) WHERE session_id=?',
+            (data_quality, session_id),
+        )
+        self.conn.commit()
+
+    def close_sensor_session(self, patient_id: str, session_id: str, notes: Optional[str] = None) -> bool:
+        cur = self.conn.cursor()
+        cur.execute(
+            'UPDATE sensor_sessions SET end_at=?, notes=COALESCE(?, notes) WHERE session_id=? AND patient_id=?',
+            (time.time(), notes, session_id, patient_id),
+        )
+        changed = cur.rowcount > 0
+        self.conn.commit()
+        if changed:
+            self.record_wearable_event(patient_id, session_id, 'SESSION_ENDED', {'notes': notes or ''})
+        return changed
+
+    def save_feature_vector(self, patient_id: str, session_id: Optional[str], feature_vector: Any, source: str = 'wearable', algorithm_version: Optional[str] = None, label: str = 'REAL') -> str:
+        data = feature_vector.as_dict() if hasattr(feature_vector, 'as_dict') else dict(feature_vector)
+        feature_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO feature_vectors(feature_id, patient_id, session_id, timestamp_s, data_json, source, algorithm_version, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (feature_id, patient_id, session_id, float(data.get('timestamp_s', time.time())), json.dumps(data, default=str, sort_keys=True), source, algorithm_version, label),
+        )
+        self.conn.commit()
+        return feature_id
+
+    def save_personal_baseline(self, patient_id: str, feature_name: str, stats: Dict[str, Any], algorithm_version: str) -> str:
+        baseline_id = str(uuid.uuid4())
+        self.conn.execute("""
+        INSERT INTO personal_baselines(baseline_id, patient_id, feature_name, median_value, mean_value, std_value, mad_value, sample_count, days_covered, confidence, algorithm_version, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(patient_id, feature_name) DO UPDATE SET
+            median_value=excluded.median_value, mean_value=excluded.mean_value,
+            std_value=excluded.std_value, mad_value=excluded.mad_value,
+            sample_count=excluded.sample_count, days_covered=excluded.days_covered,
+            confidence=excluded.confidence, algorithm_version=excluded.algorithm_version,
+            updated_at=excluded.updated_at
+        """, (
+            baseline_id, patient_id, feature_name, stats.get('median'), stats.get('mean'),
+            stats.get('std'), stats.get('mad'), int(stats.get('sample_count', 0)),
+            float(stats.get('days_covered', 0)), float(stats.get('confidence', 0)),
+            algorithm_version, time.time()
+        ))
+        self.conn.commit()
+        row = self.conn.execute('SELECT baseline_id FROM personal_baselines WHERE patient_id=? AND feature_name=?', (patient_id, feature_name)).fetchone()
+        return str(row[0])
+
+    def record_learning_run(self, patient_id: Optional[str], model_name: str, base_model_version: Optional[str], mode: str, status: str, input_sessions: Optional[List[str]] = None, metrics: Optional[Dict] = None, limitations: str = '') -> str:
+        run_id = str(uuid.uuid4())
+        self.conn.execute(
+            'INSERT INTO learning_runs(run_id, patient_id, model_name, base_model_version, mode, started_at, completed_at, status, input_sessions_json, metrics_json, limitations, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (run_id, patient_id, model_name, base_model_version, mode, time.time(), time.time(), status, json.dumps(input_sessions or []), json.dumps(metrics or {}, sort_keys=True), limitations, 'RESEARCH'),
+        )
+        self.conn.commit()
+        return run_id
+
+    def list_wearable_events(self, patient_id: str, limit: int = 500) -> List[Dict]:
+        rows = self.conn.execute('SELECT * FROM wearable_events WHERE patient_id=? ORDER BY timestamp DESC LIMIT ?', (patient_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def list_feature_vectors(self, patient_id: str, limit: int = 5000) -> List[Dict]:
+        rows = self.conn.execute('SELECT * FROM feature_vectors WHERE patient_id=? ORDER BY timestamp_s DESC LIMIT ?', (patient_id, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    # Providers - care discovery (separate from patient health data)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS providers (
             provider_id TEXT PRIMARY KEY,
@@ -392,6 +503,86 @@ class LocalDatabase:
             FOREIGN KEY(doctor_id) REFERENCES users(user_id)
         )
         """)
+
+        # Wearable lifecycle, synchronization and personalized-learning metadata.
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS wearable_devices (
+            device_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            device_type TEXT NOT NULL,
+            transport TEXT NOT NULL,
+            firmware_version TEXT,
+            state TEXT NOT NULL DEFAULT 'NOT_CONNECTED',
+            first_seen REAL NOT NULL,
+            last_seen REAL,
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS wearable_events (
+            event_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            session_id TEXT,
+            timestamp REAL NOT NULL,
+            event_type TEXT NOT NULL,
+            detail_json TEXT,
+            label TEXT NOT NULL DEFAULT 'REAL',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id),
+            FOREIGN KEY(session_id) REFERENCES sensor_sessions(session_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS feature_vectors (
+            feature_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            session_id TEXT,
+            timestamp_s REAL NOT NULL,
+            data_json TEXT NOT NULL,
+            source TEXT NOT NULL,
+            algorithm_version TEXT,
+            label TEXT NOT NULL DEFAULT 'REAL',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id),
+            FOREIGN KEY(session_id) REFERENCES sensor_sessions(session_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS personal_baselines (
+            baseline_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            feature_name TEXT NOT NULL,
+            median_value REAL,
+            mean_value REAL,
+            std_value REAL,
+            mad_value REAL,
+            sample_count INTEGER NOT NULL DEFAULT 0,
+            days_covered REAL NOT NULL DEFAULT 0,
+            confidence REAL NOT NULL DEFAULT 0,
+            algorithm_version TEXT NOT NULL,
+            updated_at REAL NOT NULL,
+            UNIQUE(patient_id, feature_name),
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS learning_runs (
+            run_id TEXT PRIMARY KEY,
+            patient_id TEXT,
+            model_name TEXT NOT NULL,
+            base_model_version TEXT,
+            mode TEXT NOT NULL,
+            started_at REAL NOT NULL,
+            completed_at REAL,
+            status TEXT NOT NULL,
+            input_sessions_json TEXT,
+            metrics_json TEXT,
+            limitations TEXT,
+            label TEXT NOT NULL DEFAULT 'RESEARCH',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_feature_vectors_patient_ts ON feature_vectors(patient_id, timestamp_s)""")
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_wearable_events_patient_ts ON wearable_events(patient_id, timestamp)""")
+        cur.execute("""CREATE INDEX IF NOT EXISTS idx_learning_runs_patient_ts ON learning_runs(patient_id, started_at)""")
 
         self.conn.commit()
 
@@ -542,8 +733,8 @@ class LocalDatabase:
         return secrets.compare_digest(legacy, stored)
 
     # Patient management
-    def create_patient(self, user_id: Optional[str] = None, display_name: Optional[str] = None, age_years: Optional[float] = None, bmi: Optional[float] = None, anonymous_id: Optional[str] = None) -> str:
-        patient_id = str(uuid.uuid4())
+    def create_patient(self, user_id: Optional[str] = None, display_name: Optional[str] = None, age_years: Optional[float] = None, bmi: Optional[float] = None, anonymous_id: Optional[str] = None, patient_id: Optional[str] = None) -> str:
+        patient_id = patient_id or str(uuid.uuid4())
         if anonymous_id is None:
             # Ensure unique anonymous_id with uuid fallback if collision
             for _ in range(5):
@@ -765,58 +956,99 @@ class LocalDatabase:
 
     # Export/Import
     def export_patient_data(self, patient_id: str) -> Dict:
-        """Export patient data as controlled package."""
+        """Export a complete patient-scoped local package for phone → doctor sync."""
         patient = self.get_patient(patient_id)
         if not patient:
             return {}
-
         cur = self.conn.cursor()
+        package = {'schema_version': '1.1', 'exported_at': time.time(), 'label': 'EXPORTED_PACKAGE', 'patient': patient}
 
-        cur.execute("SELECT * FROM profiles WHERE patient_id=?", (patient_id,))
-        profiles = [dict(row) for row in cur.fetchall()]
+        for key, table, where, params in [
+            ('profiles', 'profiles', 'patient_id=?', (patient_id,)),
+            ('symptoms', 'symptoms', 'patient_id=?', (patient_id,)),
+            ('cycles', 'cycles', 'patient_id=?', (patient_id,)),
+            ('sessions', 'sensor_sessions', 'patient_id=?', (patient_id,)),
+            ('wearable_devices', 'wearable_devices', 'patient_id=?', (patient_id,)),
+            ('wearable_events', 'wearable_events', 'patient_id=?', (patient_id,)),
+            ('feature_vectors', 'feature_vectors', 'patient_id=?', (patient_id,)),
+            ('reports', 'reports', 'patient_id=?', (patient_id,)),
+            ('doctor_notes', 'doctor_notes', 'patient_id=?', (patient_id,)),
+            ('personal_baselines', 'personal_baselines', 'patient_id=?', (patient_id,)),
+            ('learning_runs', 'learning_runs', 'patient_id=?', (patient_id,)),
+            ('model_results', 'model_results', 'patient_id=?', (patient_id,)),
+            ('analysis_results', 'analysis_results', 'patient_id=?', (patient_id,)),
+        ]:
+            cur.execute(f'SELECT * FROM {table} WHERE {where}', params)
+            package[key] = [dict(r) for r in cur.fetchall()]
 
-        cur.execute("SELECT * FROM symptoms WHERE patient_id=?", (patient_id,))
-        symptoms = [dict(row) for row in cur.fetchall()]
+        session_ids = [r['session_id'] for r in package['sessions']]
+        placeholders = ','.join('?' for _ in session_ids)
+        if session_ids:
+            for key, table in [('ppg_data', 'ppg_data'), ('hrv_data', 'hrv_data'), ('gsr_data', 'gsr_data'), ('motion_data', 'motion_data'), ('temperature_data', 'temperature_data'), ('sensor_quality', 'sensor_quality')]:
+                cur.execute(f'SELECT * FROM {table} WHERE session_id IN ({placeholders})', tuple(session_ids))
+                package[key] = [dict(r) for r in cur.fetchall()]
+        else:
+            for key in ('ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality'):
+                package[key] = []
 
-        cur.execute("SELECT * FROM cycles WHERE patient_id=?", (patient_id,))
-        cycles = [dict(row) for row in cur.fetchall()]
-
-        cur.execute("SELECT * FROM sensor_sessions WHERE patient_id=?", (patient_id,))
-        sessions = [dict(row) for row in cur.fetchall()]
-
-        cur.execute("SELECT * FROM reports WHERE patient_id=?", (patient_id,))
-        reports = [dict(row) for row in cur.fetchall()]
-
-        return {
-            "patient": patient,
-            "profiles": profiles,
-            "symptoms": symptoms,
-            "cycles": cycles,
-            "sessions": sessions,
-            "reports": reports,
-            "exported_at": time.time(),
-            "label": "EXPORTED_PACKAGE",
-            "note": "Research data export - not a medical record, local-first",
-        }
+        package['note'] = 'Complete local patient research package. DEMO_DATA/REAL labels are preserved. Wear/removal/reconnection gaps are events, never silently filled.'
+        return package
 
     def import_patient_data(self, data: Dict) -> str:
-        """Import patient data package."""
-        patient_data = data.get("patient")
-        if not patient_data:
-            raise ValueError("No patient data in package")
+        """Merge a patient-scoped package while preserving stable IDs and provenance."""
+        patient_data = data.get('patient') or {}
+        if not patient_data or not patient_data.get('patient_id'):
+            raise ValueError('No stable patient identity in package')
 
-        # Create new patient with imported data - generate new anonymous_id to avoid collision
-        patient_id = self.create_patient(
-            display_name=patient_data.get("display_name"),
-            age_years=patient_data.get("age_years"),
-            bmi=patient_data.get("bmi"),
-            anonymous_id=None  # force new unique
-        )
+        patient_id = str(patient_data['patient_id'])
+        existing = self.get_patient(patient_id)
+        if not existing:
+            anon = patient_data.get('anonymous_id') or f'P{uuid.uuid4().hex[:8]}'
+            clash = self.conn.execute('SELECT patient_id FROM patients WHERE anonymous_id=?', (anon,)).fetchone()
+            if clash and clash[0] != patient_id:
+                anon = f'{anon}-SYNC-{uuid.uuid4().hex[:4]}'
+            self.create_patient(
+                user_id=patient_data.get('user_id'), display_name=patient_data.get('display_name'),
+                age_years=patient_data.get('age_years'), bmi=patient_data.get('bmi'),
+                anonymous_id=anon, patient_id=patient_id
+            )
 
-        # Import related data would go here - simplified for prototype
+        merge_tables = [
+            ('profiles','profile_id'), ('symptoms','symptom_id'), ('cycles','cycle_id'),
+            ('sessions','session_id'), ('wearable_devices','device_id'), ('wearable_events','event_id'),
+            ('feature_vectors','feature_id'), ('reports','report_id'), ('doctor_notes','note_id'),
+            ('personal_baselines','baseline_id'), ('learning_runs','run_id'),
+            ('model_results','result_id'), ('analysis_results','analysis_id'),
+        ]
+        for key, pk in merge_tables:
+            rows = data.get(key) or []
+            if not rows:
+                continue
+            for row in rows:
+                # Preserve the primary key for stable synchronization except where
+                # the table has a unique composite key and a regenerated UUID is safer.
+                columns = list(row.keys())
+                values = [row[col] for col in columns]
+                qs = ','.join('?' for _ in columns)
+                self.conn.execute(f'INSERT OR IGNORE INTO {self._validate_identifier(key)} ({",".join(columns)}) VALUES ({qs})', values)
 
-        self._log_audit(None, patient_id, "import_patient_data", {"original_id": patient_data.get("patient_id")})
+        for key in ('ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality'):
+            for row in data.get(key) or []:
+                columns = list(row.keys())
+                values = [row[col] for col in columns]
+                qs = ','.join('?' for _ in columns)
+                self.conn.execute(f'INSERT OR IGNORE INTO {self._validate_identifier(key)} ({",".join(columns)}) VALUES ({qs})', values)
+
+        self.conn.commit()
+        self._log_audit(None, patient_id, 'import_patient_data', {'source_label': data.get('label'), 'schema_version': data.get('schema_version')})
         return patient_id
+
+    @staticmethod
+    def _validate_identifier(identifier: str) -> str:
+        allowed = {'profiles','symptoms','cycles','sensor_sessions','wearable_devices','wearable_events','feature_vectors','reports','doctor_notes','personal_baselines','learning_runs','model_results','analysis_results','ppg_data','hrv_data','gsr_data','motion_data','temperature_data','sensor_quality'}
+        if identifier not in allowed:
+            raise ValueError(f'Unsupported table: {identifier}')
+        return identifier
 
     def backup_database(self, backup_path: Path) -> Path:
         """Backup database file."""
