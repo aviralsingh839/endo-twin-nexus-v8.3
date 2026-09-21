@@ -45,9 +45,9 @@ class GaugeWidget(QWidget):
         self.update()
 
     def _color(self):
-        display_value = 100.0 - self.value if self.higher_is_better else self.value
+        display_value = (100.0 - self.value if self.higher_is_better else self.value) / 100.0
         for lo, hi, col in ZONES:
-            if display_value < hi * 100.0:
+            if display_value < hi:
                 return QColor(col)
         return QColor(ZONES[-1][2])
 
