@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
+import java.util.UUID
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
@@ -165,6 +167,29 @@ class WearableBleManager(private val context: Context) {
                         if (!g.setCharacteristicNotification(characteristic, true)) {
                             onState("NOTIFICATION_SETUP_FAILED")
                             return
+                        }
+                        val cccd = characteristic.getDescriptor(
+                            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+                        )
+                        if (cccd != null) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                val result = g.writeDescriptor(
+                                    cccd,
+                                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                                )
+                                if (result != BluetoothGatt.GATT_SUCCESS) {
+                                    onState("CCCD_WRITE_FAILED:$result")
+                                    return
+                                }
+                            } else {
+                                @Suppress("DEPRECATION")
+                                cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                                @Suppress("DEPRECATION")
+                                if (!g.writeDescriptor(cccd)) {
+                                    onState("CCCD_WRITE_FAILED")
+                                    return
+                                }
+                            }
                         }
                         onState(
                             "READY:" + characteristic.serviceUuid + ":" + characteristic.uuid
