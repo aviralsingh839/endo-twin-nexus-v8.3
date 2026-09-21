@@ -19,6 +19,7 @@ import json
 import time
 from pathlib import Path
 from collections import deque
+from dataclasses import fields
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -377,6 +378,39 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Patient creation failed", str(exc))
 
+    def _load_stored_features(self, patient_id: str) -> int:
+        """Load patient-scoped stored features into the live analysis view."""
+        rows = list(reversed(self.local_db.list_feature_vectors(patient_id, limit=5000)))
+        vectors = []
+        feature_names = {f.name for f in fields(FeatureVector)}
+        for row in rows:
+            try:
+                data = json.loads(row.get("data_json", "{}"))
+                if not isinstance(data, dict):
+                    continue
+                kwargs = {name: data[name] for name in feature_names if name in data}
+                vectors.append(FeatureVector(**kwargs))
+            except Exception:
+                continue
+
+        self.feature_history = vectors[-5000:]
+        self.shared_history = []
+        self.current_shared = None
+        if self.feature_history:
+            try:
+                self.current_shared = self.shared_extractor.extract(
+                    self.feature_history[-1],
+                    self.feature_history[-50:],
+                )
+                self.shared_history.append(self.current_shared)
+            except Exception:
+                self.current_shared = None
+            try:
+                self._update_risk()
+            except Exception:
+                pass
+        return len(self.feature_history)
+
     def _open_selected_patient(self) -> None:
         pid = self._selected_patient_id()
         if not pid:
@@ -385,11 +419,12 @@ class MainWindow(QMainWindow):
         self._set_active_patient(pid)
         patient = self.local_db.get_patient(pid) or {}
         sessions = self.local_db.list_sessions(pid)
+        loaded = self._load_stored_features(pid)
         self.patient_status.setText(
             f"Active patient {patient.get('anonymous_id', pid)} • {len(sessions)} stored wear session(s) • "
-            f"study {'ACTIVE' if self.local_db.get_active_study(pid) else 'none'}"
+            f"{loaded} stored feature vector(s) loaded • study {'ACTIVE' if self.local_db.get_active_study(pid) else 'none'}"
         )
-        self._switch_workspace(2)
+        self._switch_workspace(0)
 
     def _start_48h_study(self) -> None:
         pid = self._selected_patient_id() or self.active_patient_id
@@ -525,9 +560,10 @@ class MainWindow(QMainWindow):
             package = json.loads(Path(path).read_text(encoding="utf-8"))
             pid = self.local_db.import_patient_data(package)
             self._set_active_patient(pid)
+            loaded = self._load_stored_features(pid)
             self._refresh_patient_table()
             self.sync_status_label.setText(
-                f"Imported patient {pid}: sessions, raw sensor channels, features, events and research metadata merged."
+                f"Imported patient {pid}: sessions, raw sensor channels, features, events and research metadata merged. {loaded} feature vector(s) available for analysis."
             )
         except Exception as exc:
             QMessageBox.critical(self, "Import failed", str(exc))
