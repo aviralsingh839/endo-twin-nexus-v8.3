@@ -3,9 +3,9 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
 command -v arduino-cli >/dev/null || { echo "ERROR: arduino-cli is required."; exit 1; }
 
+arduino-cli config add board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
 arduino-cli core update-index
 arduino-cli core install arduino:avr
-arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
 arduino-cli core install esp8266:esp8266
 
 for lib in   "SparkFun MAX3010x Pulse and Proximity Sensor Library"   "Adafruit MPU6050"   "Adafruit Unified Sensor"   "OneWire"   "DallasTemperature"   "BH1750"   "Adafruit BME280 Library"   "Adafruit GFX Library"   "Adafruit SSD1306"; do
