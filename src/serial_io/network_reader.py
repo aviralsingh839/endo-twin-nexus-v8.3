@@ -13,6 +13,7 @@ from __future__ import annotations
 import socket
 import threading
 import time
+from collections import deque
 from typing import Optional
 
 from PySide6.QtCore import QObject, Signal
@@ -35,6 +36,25 @@ class NetworkReader(QObject):
         self._stop = threading.Event()
         self._sock: Optional[socket.socket] = None
         self.parser = PacketParser(require_crc=require_crc)
+        self._sample_queue = deque(maxlen=20000)
+        self._queue_lock = threading.Lock()
+
+    def has_sample(self) -> bool:
+        with self._queue_lock:
+            return bool(self._sample_queue)
+
+    def get_samples(self, max_samples: int = 250):
+        out = []
+        with self._queue_lock:
+            for _ in range(max(0, int(max_samples))):
+                if not self._sample_queue:
+                    break
+                out.append(self._sample_queue.popleft())
+        return out
+
+    def get_sample(self):
+        samples = self.get_samples(1)
+        return samples[0] if samples else None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -45,6 +65,8 @@ class NetworkReader(QObject):
 
     def stop(self) -> None:
         self._stop.set()
+        with self._queue_lock:
+            self._sample_queue.clear()
         self._close_socket()
         self.state_changed.emit("stopped")
 
@@ -101,6 +123,8 @@ class NetworkReader(QObject):
                         continue
                     try:
                         sample = self.parser.parse(line)
+                        with self._queue_lock:
+                            self._sample_queue.append(sample)
                         self.sample_received.emit(sample)
                     except Exception as exc:
                         self.error_received.emit(f"Packet parse error: {exc}")

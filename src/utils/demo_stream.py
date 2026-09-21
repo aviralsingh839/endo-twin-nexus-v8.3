@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import deque
 
 import numpy as np
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -29,15 +30,33 @@ class DemoSensorStream(QObject):
         self.i = 0
         self.rng = np.random.default_rng(7)
         self.mode = "rest"
+        self._sample_queue = deque(maxlen=10000)
+
+    def has_sample(self) -> bool:
+        return bool(self._sample_queue)
+
+    def get_samples(self, max_samples: int = 250) -> list[SensorSample]:
+        samples = []
+        for _ in range(max(0, int(max_samples))):
+            if not self._sample_queue:
+                break
+            samples.append(self._sample_queue.popleft())
+        return samples
+
+    def get_sample(self) -> SensorSample | None:
+        samples = self.get_samples(1)
+        return samples[0] if samples else None
 
     def start(self) -> None:
         self.t0 = time.time()
         self.i = 0
+        self._sample_queue.clear()
         self.timer.start(int(1000 / self.fs_hz))
         self.state_changed.emit("demo-running")
 
     def stop(self) -> None:
         self.timer.stop()
+        self._sample_queue.clear()
         self.state_changed.emit("demo-stopped")
 
     def write_command(self, command: str) -> None:
@@ -101,4 +120,5 @@ class DemoSensorStream(QObject):
             source="demo",
         )
         self.i += 1
+        self._sample_queue.append(sample)
         self.sample_received.emit(sample)

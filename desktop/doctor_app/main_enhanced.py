@@ -62,7 +62,7 @@ class EnhancedDoctorApp:
         self.physio_viewer = PhysiologicalDataViewer(self.db)
         self.advanced_viewer = AdvancedAnalysisViewer(self.db)
         self.ultrasound_viewer = UltrasoundViewer(self.db)
-        self.longitudinal_viewer = LongitudinalViewer()
+        self.longitudinal_viewer = LongitudinalViewer(db=self.db)
         self.report_gen = ReportGenerator(db=self.db)
 
     def run_console_demo(self):
@@ -82,12 +82,14 @@ class EnhancedDoctorApp:
         for p in patients[:3]:
             print(f"  - {p['anonymous_id']} Age {p.get('age_years','')} BMI {p.get('bmi','')} (USER-ENTERED)")
 
-        print("\n[Signals] Physiological Data: raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts, visualization, time-series")
+        print("\n[Signals] Physiological Data: patient-scoped raw/derived channels")
         session_data = self.physio_viewer.get_session_data("session_001")
-        print(f"Session data quality overall: {session_data['quality']['overall']}")
-        print(f"  - HR: {session_data['hr']['mean']} bpm MEASURED quality 0.91")
-        print(f"  - HRV RMSSD: {session_data['hrv']['rmssd']} ms DERIVED quality 0.85 limitations PPG less accurate than ECG")
-        print(f"  - Artifacts: {session_data['artifacts']}")
+        print(f"Session status: {session_data.get('status')}")
+        if session_data.get("status") == "OK":
+            for channel in ("ppg", "hrv", "gsr", "motion", "temperature", "quality"):
+                print(f"  - {channel}: {len(session_data.get(channel, []))} stored row(s)")
+        else:
+            print("  - No stored observations for session_001; returning explicit unavailable state.")
 
         print("\n[Longitudinal] Longitudinal Analysis: comparison trends baseline deviation")
         long_comp = self.longitudinal_viewer.compare("patient_001", ["s1", "s2"])

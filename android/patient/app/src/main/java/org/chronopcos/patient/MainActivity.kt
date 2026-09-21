@@ -1,7 +1,12 @@
 package org.chronopcos.patient
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,6 +18,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
+import org.chronopcos.patient.ui.screens.PatientHomeScreen
+import org.chronopcos.patient.data.database.PatientDatabase
+import org.chronopcos.patient.data.repository.PatientRepository
+import org.chronopcos.patient.data.wearable.WearableBleManager
+import org.chronopcos.patient.data.wearable.WearableDeviceSummary
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * ENDO-TWIN Patient V8.4
@@ -119,7 +134,7 @@ fun PatientApp(currentPatientId: String) {
             startDestination = PatientTab.Home.route,
             modifier = Modifier.padding(padding)
         ) {
-            composable("home") { HomeScreen(currentPatientId) }
+            composable("home") { PatientHomeScreen(currentPatientId) }
             composable("health") { HealthScreen(currentPatientId) }
             composable("measure") { MeasureScreen(currentPatientId) }
             composable("timeline") { TimelineScreen(currentPatientId) }
@@ -128,6 +143,110 @@ fun PatientApp(currentPatientId: String) {
     }
 }
 
+
+private suspend fun buildPatientSyncPackage(db: PatientDatabase, patientId: String): String {
+    val patient = db.patientDao().getPatient(patientId)
+    val root = JSONObject()
+        .put("schema_version", "android-room-2")
+        .put("label", if (patient?.isDemo == true) "DEMO_DATA" else "EXPORTED_PACKAGE")
+        .put("exported_at", System.currentTimeMillis() / 1000.0)
+
+    if (patient != null) {
+        root.put("patient", JSONObject()
+            .put("patient_id", patient.patientId)
+            .put("anonymous_id", patient.anonymousId)
+            .put("display_name", patient.displayName)
+            .put("age_years", patient.ageYears)
+            .put("bmi", patient.bmi)
+        )
+    }
+
+    val sessions = JSONArray()
+    db.wearableDao().getSessions(patientId).forEach { s ->
+        sessions.put(JSONObject()
+            .put("session_id", s.sessionId)
+            .put("patient_id", s.patientId)
+            .put("source", "ANDROID_BLE")
+            .put("start_at", s.startedAt / 1000.0)
+            .put("end_at", s.endedAt?.div(1000.0))
+            .put("sample_count", 0)
+            .put("data_quality", JSONObject.NULL)
+            .put("notes", "Android local wearable session")
+            .put("label", if (s.isDemo) "DEMO_DATA" else "REAL")
+            .put("created_at", s.startedAt / 1000.0)
+            .put("study_id", JSONObject.NULL)
+        )
+    }
+    root.put("sessions", sessions)
+
+    val events = JSONArray()
+    db.wearableDao().getEvents(patientId).forEach { e ->
+        events.put(JSONObject()
+            .put("event_id", e.eventId)
+            .put("patient_id", e.patientId)
+            .put("session_id", e.sessionId ?: JSONObject.NULL)
+            .put("timestamp", e.timestamp / 1000.0)
+            .put("event_type", e.eventType)
+            .put("detail_json", e.detail)
+            .put("label", if (e.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("wearable_events", events)
+
+    val packets = JSONArray()
+    db.wearableDao().getPackets(patientId).forEach { p ->
+        packets.put(JSONObject()
+            .put("packet_id", p.packetId)
+            .put("patient_id", p.patientId)
+            .put("session_id", p.sessionId ?: JSONObject.NULL)
+            .put("timestamp", p.timestamp / 1000.0)
+            .put("payload_base64", p.payloadBase64)
+            .put("transport", p.transport)
+            .put("quality", p.quality ?: JSONObject.NULL)
+            .put("label", if (p.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("raw_wearable_packets", packets)
+
+    val featureVectors = JSONArray()
+    db.patientDao().getMeasurements(patientId).forEach { m ->
+        featureVectors.put(JSONObject()
+            .put("feature_id", m.measurementId)
+            .put("patient_id", m.patientId)
+            .put("session_id", JSONObject.NULL)
+            .put("timestamp_s", m.timestamp / 1000.0)
+            .put("data_json", JSONObject()
+                .put(m.type, m.value)
+                .put("unit", m.unit)
+                .put("provenance", m.provenance)
+                .toString())
+            .put("source", "ANDROID_MEASUREMENT")
+            .put("algorithm_version", JSONObject.NULL)
+            .put("label", if (m.isDemo) "DEMO_DATA" else "REAL")
+        )
+    }
+    root.put("feature_vectors", featureVectors)
+
+    root.put("profiles", JSONArray())
+    root.put("symptoms", JSONArray())
+    root.put("cycles", JSONArray())
+    root.put("wearable_devices", JSONArray())
+    root.put("reports", JSONArray())
+    root.put("doctor_notes", JSONArray())
+    root.put("personal_baselines", JSONArray())
+    root.put("learning_runs", JSONArray())
+    root.put("research_studies", JSONArray())
+    root.put("research_labels", JSONArray())
+    root.put("model_results", JSONArray())
+    root.put("analysis_results", JSONArray())
+
+    root.put(
+        "note",
+        "Phone local export. Raw BLE payloads are preserved for board-specific decoding. "
+        + "Wear/removal/reconnect events are preserved. Missing intervals are never filled."
+    )
+    return root.toString(2)
+}
 @Composable
 private fun SectionTitle(title: String, subtitle: String? = null) {
     Column {
@@ -297,53 +416,274 @@ private fun HealthScreen(patientId: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MeasureScreen(patientId: String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val ble = remember { WearableBleManager(context) }
+    val db = remember { PatientDatabase.getInstance(context) }
+    val repository = remember {
+        PatientRepository(db.patientDao(), db.wearableDao()).also {
+            it.setCurrentPatientId(patientId)
+        }
+    }
+
     var selected by remember { mutableStateOf("Overview") }
-    val filters = listOf("Overview", "Signals", "Quality", "Models")
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { SectionTitle("Measurements", "Sensor and derived data • $patientId") }
+    var bleState by remember { mutableStateOf("NOT_CONNECTED") }
+    var scanMessage by remember { mutableStateOf("Ready to scan for a nearby wearable.") }
+    var sessionId by remember { mutableStateOf<String?>(null) }
+    var packetCount by remember { mutableStateOf(0) }
+    val devices = remember { mutableStateListOf<WearableDeviceSummary>() }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    val json = buildPatientSyncPackage(db, patientId)
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error("Could not open export destination.")
+                }.onSuccess {
+                    scanMessage = "Complete patient package exported locally for Doctor import."
+                }.onFailure {
+                    scanMessage = "Export failed: " + it.message
+                }
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        scanMessage = if (ble.missingPermissions().isEmpty()) {
+            "Bluetooth permission granted. Tap Scan again."
+        } else {
+            "Bluetooth permission was not granted."
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            ble.stopScan()
+            ble.disconnect()
+        }
+    }
+
+    fun scan() {
+        val missing = ble.missingPermissions()
+        if (missing.isNotEmpty()) {
+            permissionLauncher.launch(missing)
+            return
+        }
+        devices.clear()
+        scanMessage = "Scanning for BLE devices…"
+        ble.startScan(
+            onDevice = { device ->
+                if (devices.none { it.address == device.address }) {
+                    devices.add(device)
+                }
+            },
+            onError = { scanMessage = it }
+        )
+    }
+
+    fun startEpisode(device: WearableDeviceSummary) {
+        scope.launch {
+            sessionId = repository.startWearSession(device.address, "BLE", false)
+            packetCount = 0
+            bleState = "WORN • SESSION ACTIVE"
+            scanMessage = "Wear episode started for " + device.name + "."
+        }
+    }
+
+    fun connect(device: WearableDeviceSummary) {
+        ble.connect(
+            device.address,
+            onState = { state -> bleState = state },
+            onBytes = { bytes ->
+                val active = sessionId
+                if (active != null && bytes.isNotEmpty()) {
+                    scope.launch {
+                        repository.recordWearablePacket(
+                            active,
+                            Base64.encodeToString(bytes, Base64.NO_WRAP),
+                            "BLE",
+                            null,
+                            false
+                        )
+                        packetCount += 1
+                    }
+                }
+            }
+        )
+    }
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { SectionTitle("Measurements", "Wearable connection + local acquisition • $patientId") }
+
+        item {
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Bluetooth, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text("Wearable connection", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                bleState,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Text("The phone stores raw BLE packets locally. Sensor decoding is kept separate until the exact board firmware packet specification is fixed.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { scan() }) {
+                            Icon(Icons.Default.Search, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Scan")
+                        }
+                        OutlinedButton(onClick = {
+                            ble.stopScan()
+                            ble.disconnect()
+                            bleState = "DISCONNECTED"
+                        }) {
+                            Text("Disconnect")
+                        }
+                        OutlinedButton(onClick = {
+                            exportLauncher.launch("endo_twin_" + patientId + "_sync.json")
+                        }) {
+                            Text("Export to doctor")
+                        }
+                    }
+                    Text(scanMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        if (devices.isNotEmpty()) {
+            item { Text("Nearby devices", style = MaterialTheme.typography.titleMedium) }
+            items(devices) { device ->
+                Card(shape = MaterialTheme.shapes.medium) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Watch, null, tint = MaterialTheme.colorScheme.tertiary)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(device.name, style = MaterialTheme.typography.titleMedium)
+                            Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (sessionId == null) {
+                            Button(onClick = { startEpisode(device) }) { Text("Start wear") }
+                        }
+                        OutlinedButton(onClick = { connect(device) }) { Text("Connect") }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Wear lifecycle", style = MaterialTheme.typography.titleMedium)
+                    Text("Current session: " + (sessionId?.take(12) ?: "none"))
+                    Text("Raw packets stored locally: " + packetCount)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            enabled = sessionId != null,
+                            onClick = {
+                                scope.launch {
+                                    val active = sessionId ?: return@launch
+                                    repository.recordWearableEvent(
+                                        active,
+                                        "WEARABLE_REMOVED_BATHING",
+                                        "Device removed before bathing; interval remains an explicit missing-data gap.",
+                                        false
+                                    )
+                                    repository.endWearSession(active, "REMOVED_FOR_BATHING")
+                                    sessionId = null
+                                    ble.disconnect()
+                                    bleState = "REMOVED • BATHING GAP RECORDED"
+                                    scanMessage = "No measurements are created while the wearable is removed."
+                                }
+                            }
+                        ) { Text("Remove for bathing") }
+
+                        OutlinedButton(
+                            enabled = sessionId == null && devices.isNotEmpty(),
+                            onClick = { startEpisode(devices.first()) }
+                        ) { Text("New episode") }
+                    }
+                }
+            }
+        }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                filters.forEach { filter ->
+                listOf("Overview", "Signals", "Quality", "Models", "VoxVasc").forEach { filter ->
                     FilterChip(selected = selected == filter, onClick = { selected = filter }, label = { Text(filter) })
                 }
             }
         }
-        item { DemoBanner() }
+
         when (selected) {
             "Overview" -> {
-                item { MetricCard("PPG", "20 Hz", "Illustrative MAX30102 acquisition configuration", "DEMO_DATA") }
-                item { MetricCard("GSR", "Tonic + phasic", "Illustrative electrodermal signal channels", "DEMO_DATA") }
-                item { MetricCard("Motion", "IMU", "Illustrative MPU6050 activity channel", "DEMO_DATA") }
-                item { MetricCard("Temperature", "Skin trend", "Illustrative DS18B20 channel", "DEMO_DATA") }
+                item { MetricCard("BLE", bleState, "Transport state", "LOCAL") }
+                item { MetricCard("Raw packets", packetCount.toString(), "Stored on device", "LOCAL") }
+                item { MetricCard("Sensor decoding", "Pending", "Exact wearable packet contract is required before displaying physiological values.", "UNKNOWN") }
             }
             "Signals" -> item {
-                Card(shape = RoundedCornerShape(20.dp)) {
+                Card(shape = MaterialTheme.shapes.medium) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Signal pipeline", style = MaterialTheme.typography.titleMedium)
-                        Text("Raw acquisition → quality control → filtering → feature extraction → longitudinal context")
-                        Text("No values are synthesized into real patient records. Long gaps remain missing.")
+                        Text("Wearable → BLE → raw packet → validation → timestamp → local storage → board-specific decoder → QC → features → personal twin → research modules")
+                        Text("Bathing removals are explicit lifecycle events; missing intervals are never filled with synthetic observations.")
                     }
                 }
             }
             "Quality" -> item {
-                Card(shape = RoundedCornerShape(20.dp)) {
+                Card(shape = MaterialTheme.shapes.medium) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Data quality", style = MaterialTheme.typography.titleMedium)
-                        Text("Sensor quality should be reported per channel and carried into downstream model uncertainty.")
-                        LinearProgressIndicator(progress = 0.91f, modifier = Modifier.fillMaxWidth())
-                        Text("Illustrative quality: 0.91 • DEMO_DATA")
+                        Text("Acquisition quality", style = MaterialTheme.typography.titleMedium)
+                        Text("Connection: " + bleState)
+                        Text("Stored raw packets: " + packetCount)
+                        Text("Per-channel physiological quality appears only after valid decoding.")
                     }
                 }
             }
             "Models" -> item {
-                Card(shape = RoundedCornerShape(20.dp)) {
+                Card(shape = MaterialTheme.shapes.medium) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Research-model separation", style = MaterialTheme.typography.titleMedium)
-                        Text("Observed data and model-inferred output are displayed as separate layers.")
+                        Text("ENDO-TWIN research layers", style = MaterialTheme.typography.titleMedium)
+                        Text("Raw observations, derived features, personal adaptation and disease-module inference remain separate.")
                         ProvenanceBadge("MODEL-INFERRED", MaterialTheme.colorScheme.tertiaryContainer)
                     }
                 }
             }
+            "VoxVasc" -> item {
+                Card(shape = MaterialTheme.shapes.medium) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("VoxVasc", style = MaterialTheme.typography.titleMedium)
+                        ProvenanceBadge("EXPERIMENTAL", MaterialTheme.colorScheme.tertiaryContainer)
+                        Text("Optional voice-acoustic research modality. It remains unavailable until a valid recording is acquired.")
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(
+                "Research / risk-screening output — not a medical diagnosis.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

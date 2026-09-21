@@ -23,16 +23,18 @@ ZONES = [
 
 
 class GaugeWidget(QWidget):
-    def __init__(self, title: str = "Risk", parent=None):
+    def __init__(self, title: str = "Risk", higher_is_better: bool = False, parent=None):
         super().__init__(parent)
         self.title = title
+        self.higher_is_better = higher_is_better
         self.value = 0.0
-        self.ci = (0.0, 0.0)
-        self.withheld: str | None = None
+        self.ci = (None, None)
+        self.withheld: str | None = "Waiting for live data / quality-gated model input"
         self.setMinimumSize(190, 156)
 
     def set_value(self, value: float, ci_low: float | None = None, ci_high: float | None = None):
         self.value = max(0.0, min(100.0, float(value)))
+        self.withheld = None
         if ci_low is not None and ci_high is not None:
             self.ci = (float(ci_low), float(ci_high))
         self.update()
@@ -43,8 +45,9 @@ class GaugeWidget(QWidget):
         self.update()
 
     def _color(self):
+        display_value = (100.0 - self.value if self.higher_is_better else self.value) / 100.0
         for lo, hi, col in ZONES:
-            if self.value < hi:
+            if display_value < hi:
                 return QColor(col)
         return QColor(ZONES[-1][2])
 
@@ -130,5 +133,9 @@ class GaugeWidget(QWidget):
         # 7) Confidence interval.
         p.setPen(QColor("#94a6c2"))
         p.setFont(painter_font(9))
-        p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter,
-                   f"90% CI {self.ci[0]:.0f}–{self.ci[1]:.0f}%")
+        ci_text = (
+            "90% CI not computed"
+            if self.ci[0] is None or self.ci[1] is None
+            else f"90% CI {self.ci[0]:.0f}–{self.ci[1]:.0f}%"
+        )
+        p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter, ci_text)

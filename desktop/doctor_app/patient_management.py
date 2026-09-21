@@ -54,18 +54,26 @@ class PatientManager:
     def open_patient(self, patient_id):
         return self.db.get_patient(patient_id)
 
-    def archive_patient(self, patient_id):
-        # Mark archived - add field or status
-        return {'archived': True, 'patient_id': patient_id}
+    def archive_patient(self, patient_id, user_id=None):
+        return {
+            'archived': self.db.archive_patient(patient_id, archived=True, user_id=user_id),
+            'patient_id': patient_id,
+        }
 
     def get_history(self, patient_id):
-        # Get all sessions, symptoms, cycles, reports, notes
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM symptoms WHERE patient_id=? ORDER BY logged_at DESC", (patient_id,))
+        symptoms = [dict(row) for row in cur.fetchall()]
+        cur.execute("SELECT * FROM cycles WHERE patient_id=? ORDER BY start_date DESC", (patient_id,))
+        cycles = [dict(row) for row in cur.fetchall()]
+        cur.execute("SELECT * FROM reports WHERE patient_id=? ORDER BY created_at DESC", (patient_id,))
+        reports = [dict(row) for row in cur.fetchall()]
         return {
             'patient': self.db.get_patient(patient_id),
-            'sessions': [],  # Would query sensor_sessions
-            'symptoms': [],
-            'cycles': [],
-            'reports': [],
+            'sessions': self.db.list_sessions(patient_id),
+            'symptoms': symptoms,
+            'cycles': cycles,
+            'reports': reports,
             'notes': self.db.get_doctor_notes(patient_id)
         }
 
@@ -77,53 +85,141 @@ class PhysiologicalDataViewer:
     def __init__(self, db: LocalDatabase):
         self.db = db
 
-    def get_session_data(self, session_id):
-        # Would fetch ppg_data, hrv_data, etc.
-        return {
-            'session_id': session_id,
-            'ppg': {'raw': [], 'filtered': [], 'quality': 0.85},
-            'hr': {'values': [], 'mean': 72},
-            'hrv': {'rmssd': 48, 'sdnn': 55},
-            'gsr': {'values': []},
-            'motion': {'activity': 35},
-            'temperature': {'values': [], 'mean': 32.5},
-            'quality': {'overall': 0.85, 'ppg': 0.91, 'motion': 0.8},
-            'artifacts': {'detected': 2, 'details': 'Motion artifact at 12:03, baseline drift at 12:05'}
-        }
+    def get_session_data(self, session_id, patient_id=None):
+        session = self.db.get_session(session_id, patient_id=patient_id)
+        if not session:
+            return {'session_id': session_id, 'status': 'SESSION_NOT_FOUND'}
+        cur = self.db.conn.cursor()
+        out = {'session': session, 'ppg': [], 'hrv': [], 'gsr': [], 'motion': [], 'temperature': [], 'quality': []}
+        for key, table in {
+            'ppg': 'ppg_data', 'hrv': 'hrv_data', 'gsr': 'gsr_data',
+            'motion': 'motion_data', 'temperature': 'temperature_data', 'quality': 'sensor_quality'
+        }.items():
+            cur.execute(f"SELECT * FROM {table} WHERE session_id=? ORDER BY timestamp_s", (session_id,))
+            out[key] = [dict(row) for row in cur.fetchall()]
+        out['status'] = 'OK'
+        return out
 
 class AdvancedAnalysisViewer:
-    """
-    Circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML outputs
-    Distinguish established/derived/experimental/ML/clinical, explainability
-    """
+    """Patient-scoped analysis facade with explicit unavailable states."""
     def __init__(self, db: LocalDatabase):
         self.db = db
         self.fingerprint_engine = ChronoMetabolicFingerprint()
 
-    def analyze(self, patient_id, session_id=None):
-        # Would run disease modules, fusion, fingerprint
-        features = {'hrv_rmssd': 48, 'activity_level': 35, 'skin_temperature': 32.5, 'sleep_regularity': 0.75}
-        quality = {'ppg': 0.91, 'motion': 0.8, 'temperature': 0.88}
-
-        fingerprint = self.fingerprint_engine.build_from_features(features, quality)
-
-        # EXAMPLE analysis - real path uses disease_models/chrono_pcos/model/real_pcos_model_adapter.py
-        # Real confidence comes from calibrated model probability, not hard-coded 0.75
-        # This is for UI demo when no real patient data
+    @staticmethod
+    def _insufficient(patient_id, session_id=None, reason="Insufficient data"):
         return {
-            'circadian': {'pattern': 'moderate disruption', 'category': 'experimental_research', 'explainability': 'HR/HRV circadian variation', 'provenance': 'EXAMPLE_DATA'},
-            'autonomic': {'signal': 'moderate dysregulation', 'category': 'derived_feature', 'explainability': 'RMSSD parasympathetic', 'provenance': 'EXAMPLE_DATA'},
-            'metabolic': {'signal': 'experimental', 'category': 'experimental_research', 'limitations': 'Not clinical metabolic measurement', 'provenance': 'EXAMPLE_DATA'},
-            'fingerprint': fingerprint,
-            'multimodal': {'fusion_output': 'research risk signal', 'confidence': 0.75, 'quality': 0.85, 'provenance': 'EXAMPLE_DATA', 'note': 'EXAMPLE confidence - real path uses real_pcos_model_adapter calibrated probability, not hard-coded 0.75'},
-            'ai_outputs': [
-                {'module': 'PCOSModule v8.3.0', 'output': 'pcos_associated_risk low', 'confidence': 0.75, 'quality': 0.85, 'validation': 'NOT ESTABLISHED - engineering validation only', 'provenance': 'EXAMPLE_DATA', 'warning': 'EXAMPLE - real inference uses real_pcos_model_adapter'},
-                {'module': 'SleepModule v8.3.0', 'output': 'circadian_disruption_pattern moderate', 'confidence': 0.68, 'provenance': 'EXAMPLE_DATA'},
-            ],
-            'disclaimer': 'Research / risk-screening output — not a medical diagnosis',
-            'provenance': 'EXAMPLE_DATA - real analysis uses real models with calibrated confidence',
-            'label': 'EXAMPLE analysis for UI demo, real path uses real_pcos_model_adapter'
+            'status': 'INSUFFICIENT_DATA',
+            'patient_id': patient_id,
+            'session_id': session_id,
+            'reason': reason,
+            'provenance': 'UNKNOWN',
+            'circadian': {'status': 'INSUFFICIENT_DATA'},
+            'autonomic': {'status': 'INSUFFICIENT_DATA'},
+            'metabolic': {'status': 'INSUFFICIENT_DATA'},
+            'fingerprint': {'status': 'INSUFFICIENT_DATA', 'components': []},
+            'multimodal': {'status': 'INSUFFICIENT_DATA'},
+            'ai_outputs': [],
         }
+
+    def analyze(self, patient_id, session_id=None):
+        if session_id is None:
+            return self._insufficient(patient_id, reason='Select a stored sensor session before analysis')
+        data = PhysiologicalDataViewer(self.db).get_session_data(session_id, patient_id=patient_id)
+        if data.get('status') != 'OK':
+            return self._insufficient(patient_id, session_id, 'Session not found or not patient-scoped')
+        counts = {k: len(data.get(k, [])) for k in ('ppg', 'hrv', 'gsr', 'motion', 'temperature')}
+        if sum(counts.values()) == 0:
+            return self._insufficient(patient_id, session_id, 'No sensor observations are stored for this session')
+        return {
+            'status': 'DATA_AVAILABLE',
+            'patient_id': patient_id,
+            'session_id': session_id,
+            'sensor_counts': counts,
+            'provenance': 'STORED_OBSERVATION',
+            'circadian': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'autonomic': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'metabolic': {'status': 'PENDING_FEATURE_EXTRACTION'},
+            'fingerprint': {'status': 'PENDING_FEATURE_EXTRACTION', 'components': []},
+            'multimodal': {'status': 'PENDING_FUSION'},
+            'ai_outputs': [],
+            'note': 'Route stored observations through the real feature/fusion/model pipeline; no hard-coded prediction is emitted.',
+        }
+
+
+class LongitudinalViewer:
+    """Patient-scoped longitudinal comparison facade.
+
+    This component reports stored observations and explicit unavailable states.
+    It does not invent trends, baseline statistics, or model-inferred findings.
+    """
+
+    def __init__(self, db=None):
+        self.db = db
+
+    def compare(self, patient_id, session_ids):
+        if not patient_id:
+            return {
+                'status': 'INVALID_PATIENT',
+                'patient_id': patient_id,
+                'session_ids': session_ids or [],
+                'trends': [],
+                'baseline_deviation': None,
+            }
+
+        session_ids = list(session_ids or [])
+        if not session_ids:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': [],
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'No sessions supplied for longitudinal comparison',
+            }
+
+        viewer = PhysiologicalDataViewer(self.db) if getattr(self, 'db', None) else None
+        # Keep the constructor optional for compatibility with the existing
+        # EnhancedDoctorApp, while allowing a database-backed implementation.
+        if viewer is None:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': session_ids,
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'Longitudinal database context is unavailable',
+            }
+
+        stored = []
+        for session_id in session_ids:
+            data = viewer.get_session_data(session_id, patient_id=patient_id)
+            if data.get('status') == 'OK':
+                stored.append({
+                    'session_id': session_id,
+                    'counts': {k: len(data.get(k, [])) for k in ('ppg', 'hrv', 'gsr', 'motion', 'temperature')},
+                })
+
+        if not stored:
+            return {
+                'status': 'INSUFFICIENT_DATA',
+                'patient_id': patient_id,
+                'session_ids': session_ids,
+                'trends': [],
+                'baseline_deviation': None,
+                'reason': 'No patient-scoped stored observations were found',
+            }
+
+        return {
+            'status': 'DATA_AVAILABLE',
+            'patient_id': patient_id,
+            'session_ids': session_ids,
+            'stored_sessions': stored,
+            'trends': [],
+            'baseline_deviation': None,
+            'note': 'Trend and personal-baseline calculations require the real longitudinal feature pipeline; no synthetic values are emitted.',
+        }
+
 
 class UltrasoundViewer:
     """
@@ -149,40 +245,34 @@ class UltrasoundViewer:
         return {
             'result': 'inference requires trained model',
             'confidence': None,  # Do not hard-code fake confidence
-            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established without validation dataset',
-            'provenance': 'If insufficient training data, state insufficient'
+            'disclaimer': 'Ultrasound analysis is research, not diagnosis, requires clinical evaluation, model accuracy not established',
         }
 
-class LongitudinalViewer:
-    def compare(self, patient_id, session_ids):
-        return {
-            'patient_id': patient_id,
-            'sessions': session_ids,
-            'trends': 'Longitudinal comparison - HR trend, HRV trend, activity trend, temp trend',
-            'baseline_deviation': 'Deviation from personal baseline'
-        }
 
 class ReportGenerator:
     def __init__(self, db=None):
         self.db = db
 
     def generate(self, patient_id, analysis, include_disclaimer=True):
-        # EXAMPLE report - real report uses real model confidence from adapter
+        status = analysis.get('status', 'UNKNOWN')
         report = {
             'patient_id': patient_id,
             'analysis': analysis,
             'generated_at': 'now',
-            'provenance': 'EXAMPLE_DATA - real report uses real model calibrated confidence',
-            'label': 'EXAMPLE report for UI demo',
+            'provenance': analysis.get('provenance', 'UNKNOWN'),
+            'label': 'REAL' if status == 'DATA_AVAILABLE' else 'INSUFFICIENT_DATA',
             'disclaimer': 'Research / risk-screening output — not a medical diagnosis.' if include_disclaimer else '',
             'model_transparency': {
-                'models_used': ['PCOSModule v8.3.0', 'SleepModule v8.3.0'],
-                'input_data': 'PPG, HRV, activity, temp',
-                'data_quality': '0.85 overall',
-                'confidence': '0.75 (model output, not clinical certainty) - EXAMPLE, real path uses calibrated probability from real_pcos_model_adapter',
-                'features': 'HRV RMSSD, activity level, skin temp',
-                'limitations': 'Engineering validation only, clinical validation NOT ESTABLISHED, not replacement for professional evaluation',
-                'note': 'EXAMPLE confidence - real report uses real model adapter confidence'
-            }
+                'models_used': [],
+                'input_data': analysis.get('sensor_counts', {}),
+                'data_quality': 'Not computed' if status != 'DATA_AVAILABLE' else 'See stored channel quality',
+                'confidence': None,
+                'features': [],
+                'limitations': 'Model inference is not performed when required inputs are unavailable.',
+                'status': status,
+                'note': 'No confidence value is invented by the Doctor workstation.',
+            },
         }
         return report
+
+

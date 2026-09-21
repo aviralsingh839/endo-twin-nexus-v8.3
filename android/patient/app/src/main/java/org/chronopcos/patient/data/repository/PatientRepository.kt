@@ -1,6 +1,10 @@
 package org.chronopcos.patient.data.repository
 
 import org.chronopcos.patient.data.database.PatientDao
+import org.chronopcos.patient.data.database.WearableDao
+import org.chronopcos.patient.data.database.WearableEventEntity
+import org.chronopcos.patient.data.database.WearableSessionEntity
+import org.chronopcos.patient.data.database.RawWearablePacketEntity
 import org.chronopcos.patient.data.model.*
 
 /**
@@ -11,7 +15,8 @@ import org.chronopcos.patient.data.model.*
  */
 
 class PatientRepository(
-    private val patientDao: PatientDao
+    private val patientDao: PatientDao,
+    private val wearableDao: WearableDao? = null
 ) {
     // Current patient - stable ID
     private var currentPatientId: String = "DEMO-001" // Default demo, would be set from DataStore in real app
@@ -83,6 +88,71 @@ class PatientRepository(
                 isDemo = it.isDemo
             )
         }
+    }
+
+    suspend fun startWearSession(deviceId: String?, transport: String = "BLE", isDemo: Boolean = false): String {
+        val dao = wearableDao ?: error("WearableDao is not configured")
+        val sessionId = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        dao.insertSession(
+            WearableSessionEntity(
+                sessionId = sessionId,
+                patientId = currentPatientId,
+                deviceId = deviceId,
+                transport = transport,
+                startedAt = now,
+                state = "ACTIVE",
+                isDemo = isDemo
+            )
+        )
+        dao.insertEvent(
+            WearableEventEntity(
+                eventId = java.util.UUID.randomUUID().toString(),
+                patientId = currentPatientId,
+                sessionId = sessionId,
+                timestamp = now,
+                eventType = "WEAR_STARTED",
+                detail = "Wear session started; gaps remain explicit.",
+                isDemo = isDemo
+            )
+        )
+        return sessionId
+    }
+
+    suspend fun recordWearablePacket(sessionId: String?, payloadBase64: String, transport: String = "BLE", quality: Double? = null, isDemo: Boolean = false) {
+        val dao = wearableDao ?: error("WearableDao is not configured")
+        dao.insertPacket(
+            RawWearablePacketEntity(
+                packetId = java.util.UUID.randomUUID().toString(),
+                patientId = currentPatientId,
+                sessionId = sessionId,
+                timestamp = System.currentTimeMillis(),
+                payloadBase64 = payloadBase64,
+                transport = transport,
+                quality = quality,
+                isDemo = isDemo
+            )
+        )
+    }
+
+    suspend fun recordWearableEvent(sessionId: String?, eventType: String, detail: String, isDemo: Boolean = false) {
+        val dao = wearableDao ?: error("WearableDao is not configured")
+        dao.insertEvent(
+            WearableEventEntity(
+                eventId = java.util.UUID.randomUUID().toString(),
+                patientId = currentPatientId,
+                sessionId = sessionId,
+                timestamp = System.currentTimeMillis(),
+                eventType = eventType,
+                detail = detail,
+                isDemo = isDemo
+            )
+        )
+    }
+
+    suspend fun endWearSession(sessionId: String, state: String = "ENDED") {
+        val dao = wearableDao ?: error("WearableDao is not configured")
+        dao.closeSession(sessionId, currentPatientId, System.currentTimeMillis(), state)
     }
 
     fun getDemoProviders(): List<Provider> {
