@@ -131,6 +131,128 @@ class SelfLearningEngine:
             return 0.0
         return max(0.0, (max(timestamps) - min(timestamps)) / 86400.0)
 
+    def train_candidate(self, db, target: str = "pcos_reference", artifact_path: str | None = None, min_participants: int = 5) -> dict:
+        """Train a research candidate model from explicitly labelled participants.
+
+        This is never auto-promoted. Each participant is aggregated before the
+        split, preventing repeated samples from the same participant leaking
+        across train/validation folds.
+        """
+        gate = self.candidate_training_gate(db, target)
+        if gate["distinct_participants"] < min_participants:
+            return {**gate, "status": "INSUFFICIENT_COHORT"}
+
+        try:
+            import joblib
+            import numpy as np
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.metrics import accuracy_score, f1_score
+            from sklearn.model_selection import StratifiedKFold, cross_val_predict
+            from sklearn.pipeline import Pipeline
+            from sklearn.preprocessing import StandardScaler
+        except ImportError as exc:
+            return {
+                **gate,
+                "status": "DEPENDENCY_UNAVAILABLE",
+                "reason": str(exc),
+            }
+
+        labels = {}
+        for row in db.list_research_labels(target):
+            labels.setdefault(row["patient_id"], row["label_value"])
+
+        X = []
+        y = []
+        participants = []
+        for patient_id, label in labels.items():
+            rows = db.list_feature_vectors(patient_id, limit=5000)
+            parsed = []
+            for row in rows:
+                try:
+                    data = json.loads(row["data_json"])
+                    parsed.append(data)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+            vector = []
+            valid = True
+            for field in CORE_FIELDS:
+                vals = self._finite(item.get(field) for item in parsed)
+                if not vals:
+                    valid = False
+                    break
+                vector.append(statistics.fmean(vals))
+            if valid:
+                X.append(vector)
+                y.append(str(label))
+                participants.append(patient_id)
+
+        if len(set(y)) < 2 or len(X) < min_participants:
+            return {
+                **gate,
+                "status": "INSUFFICIENT_TRAINING_DATA",
+                "usable_participants": len(X),
+                "classes": sorted(set(y)),
+            }
+
+        class_counts = {label: y.count(label) for label in set(y)}
+        n_splits = min(5, min(class_counts.values()))
+        if n_splits < 2:
+            return {
+                **gate,
+                "status": "INSUFFICIENT_CLASS_BALANCE",
+                "usable_participants": len(X),
+                "classes": class_counts,
+            }
+
+        model = Pipeline([
+            ("scale", StandardScaler()),
+            ("classifier", LogisticRegression(max_iter=2000, random_state=7)),
+        ])
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=7)
+        predictions = cross_val_predict(model, np.asarray(X, dtype=float), y, cv=cv)
+        metrics = {
+            "accuracy": float(accuracy_score(y, predictions)),
+            "f1_weighted": float(f1_score(y, predictions, average="weighted")),
+            "participants": len(X),
+            "classes": sorted(set(y)),
+            "feature_count": len(CORE_FIELDS),
+        }
+
+        model.fit(np.asarray(X, dtype=float), y)
+        path = artifact_path or str(db.db_path.parent / f"{target}_candidate.joblib")
+        joblib.dump({
+            "model": model,
+            "target": target,
+            "feature_names": list(CORE_FIELDS),
+            "participants": participants,
+            "metrics": metrics,
+            "status": "RESEARCH_CANDIDATE",
+            "clinical_validation": "NOT ESTABLISHED",
+        }, path)
+
+        run_id = db.record_learning_run(
+            None,
+            model_name=f"{target} research candidate",
+            base_model_version=None,
+            mode="CANDIDATE_TRAINING",
+            status="COMPLETED_CANDIDATE",
+            input_sessions=[],
+            metrics=metrics,
+            limitations=(
+                "Research candidate only. Metrics are engineering evaluation on the "
+                "labelled cohort and are not clinical validation. Review leakage, "
+                "confounding, external validity and independent validation before use."
+            ),
+        )
+        return {
+            **gate,
+            "status": "CANDIDATE_TRAINED",
+            "artifact_path": path,
+            "learning_run_id": run_id,
+            "metrics": metrics,
+            "note": "Candidate model was trained offline and is not automatically promoted into inference.",
+        }
+
     def candidate_training_gate(self, db, target: str = "pcos_reference") -> dict:
         labels = db.list_research_labels(target)
         patient_ids = {row["patient_id"] for row in labels}
