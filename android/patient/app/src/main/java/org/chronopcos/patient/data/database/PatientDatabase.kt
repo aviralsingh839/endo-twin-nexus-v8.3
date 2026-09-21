@@ -199,6 +199,12 @@ interface WearableDao {
 
     @Query("SELECT COUNT(*) FROM raw_wearable_packets WHERE sessionId = :sessionId")
     suspend fun packetCount(sessionId: String): Int
+
+    @Query("SELECT * FROM wearable_events WHERE patientId = :patientId ORDER BY timestamp")
+    suspend fun getEvents(patientId: String): List<WearableEventEntity>
+
+    @Query("SELECT * FROM raw_wearable_packets WHERE patientId = :patientId ORDER BY timestamp")
+    suspend fun getPackets(patientId: String): List<RawWearablePacketEntity>
 }
 
 @Database(
