@@ -23,7 +23,7 @@ from collections import deque
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QLabel, QPushButton, QGroupBox, QGridLayout, QTextEdit,
+    QStackedWidget, QButtonGroup, QLabel, QPushButton, QGroupBox, QGridLayout, QTextEdit,
     QDoubleSpinBox, QSpinBox, QComboBox, QScrollArea, QFrame,
     QLineEdit, QProgressBar, QSplitter
 )
@@ -44,6 +44,7 @@ from src.ui.theme import DARK_QSS, GREEN, ORANGE, RED, YELLOW, TEXT_MUTED
 from src.ui.gauges import GaugeWidget
 from src.ui.vital_cards import VitalCard
 from src.ui.live_plots import TimeSeriesPlot
+from src.ui.voice_vasc_tab import VoiceVascTab
 from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
@@ -90,35 +91,88 @@ class MainWindow(QMainWindow):
         self.risk_timer.timeout.connect(self._update_risk)
         self.risk_timer.start(2000)
 
-        # Build UI
+        # Modern application shell: persistent branding + left navigation + stacked workspaces.
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(14, 14, 14, 10)
+        layout.setSpacing(10)
 
-        # Header
-        header = self._build_header()
-        layout.addWidget(header)
+        layout.addWidget(self._build_header())
 
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_overview_tab(), "Overview")
-        self.tabs.addTab(self._build_baseline_tab(), "Baseline")
-        self.tabs.addTab(self._build_trends_tab(), "Trends")
-        self.tabs.addTab(self._build_health_signals_tab(), "Health Signals")
-        self.tabs.addTab(self._build_data_quality_tab(), "Data Quality")
-        self.tabs.addTab(self._build_clinical_tab(), "Clinical Inputs")
-        self.tabs.addTab(self._build_ultrasound_tab(), "Ultrasound")
-        self.tabs.addTab(self._build_explanation_tab(), "Explanation")
-        self.tabs.addTab(self._build_report_tab(), "Report")
-        self.tabs.addTab(self._build_validation_tab(), "Validation")
+        body = QHBoxLayout()
+        body.setSpacing(12)
 
-        layout.addWidget(self.tabs, 1)
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setMinimumWidth(218)
+        sidebar.setMaximumWidth(250)
+        side_layout = QVBoxLayout(sidebar)
+        side_layout.setContentsMargins(10, 12, 10, 12)
+        side_layout.setSpacing(5)
 
-        # Status bar
-        self.status_label = QLabel(f"{APP_NAME} V8.3 | {APP_TAGLINE} | {DISCLAIMER}")
-        self.status_label.setObjectName("SmallMuted")
+        section = QLabel("WORKSPACES")
+        section.setObjectName("SectionEyebrow")
+        side_layout.addWidget(section)
+        side_layout.addSpacing(4)
+
+        self.stack = QStackedWidget()
+        self.tabs = self.stack  # Compatibility alias for existing integrations.
+
+        pages = [
+            ("⌂  Overview", self._build_overview_tab()),
+            ("◌  Personal Baseline", self._build_baseline_tab()),
+            ("⌁  Longitudinal Trends", self._build_trends_tab()),
+            ("◈  Health Signals", self._build_health_signals_tab()),
+            ("◉  VoxVasc", VoiceVascTab()),
+            ("◇  Data Quality", self._build_data_quality_tab()),
+            ("▦  Clinical Inputs", self._build_clinical_tab()),
+            ("◉  Ultrasound", self._build_ultrasound_tab()),
+            ("✦  Explanation", self._build_explanation_tab()),
+            ("▤  Report", self._build_report_tab()),
+            ("✓  Validation", self._build_validation_tab()),
+        ]
+        self.nav_group = QButtonGroup(self)
+        self.nav_group.setExclusive(True)
+        self.nav_buttons = []
+
+        for idx, (label, page) in enumerate(pages):
+            button = QPushButton(label)
+            button.setObjectName("NavButton")
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.nav_group.addButton(button, idx)
+            self.nav_buttons.append(button)
+            side_layout.addWidget(button)
+            self.stack.addWidget(page)
+
+        side_layout.addStretch(1)
+
+        context = QFrame()
+        context.setObjectName("StatusPill")
+        context_layout = QVBoxLayout(context)
+        context_layout.setContentsMargins(10, 9, 10, 9)
+        context_layout.addWidget(QLabel("ACTIVE CONTEXT"))
+        context_label = QLabel("ENDO-TWIN core → CHRONO-PCOS")
+        context_label.setStyleSheet("font-weight: 750;")
+        context_layout.addWidget(context_label)
+        context_layout.addWidget(QLabel("Local-first • provenance-aware"))
+        side_layout.addWidget(context)
+
+        self.nav_group.idClicked.connect(self._switch_workspace)
+        self.nav_buttons[0].setChecked(True)
+        self.stack.setCurrentIndex(0)
+
+        body.addWidget(sidebar)
+        body.addWidget(self.stack, 1)
+        layout.addLayout(body, 1)
+
+        self.status_label = QLabel(
+            f"● {APP_NAME} V8.3  •  ENDO-TWIN platform  •  Research prototype  •  {DISCLAIMER}"
+        )
+        self.status_label.setObjectName("FooterText")
         layout.addWidget(self.status_label)
+
 
         if start_demo:
             self.start_demo()
@@ -127,41 +181,93 @@ class MainWindow(QMainWindow):
         if net:
             self.connect_network(net)
 
+    def _switch_workspace(self, index: int) -> None:
+        self.stack.setCurrentIndex(index)
+        if 0 <= index < len(self.nav_buttons):
+            self.nav_buttons[index].setChecked(True)
+
     def _build_header(self):
-        box = QGroupBox(f"{APP_NAME} V8.3 - {APP_TAGLINE}")
-        layout = QHBoxLayout(box)
+        header = QFrame()
+        header.setObjectName("AppHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(12)
+
+        mark = QFrame()
+        mark.setObjectName("BrandMark")
+        mark.setFixedSize(52, 52)
+        mark_layout = QVBoxLayout(mark)
+        mark_layout.setContentsMargins(0, 0, 0, 0)
+        logo = QLabel("ET")
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setStyleSheet("color: white; font-size: 17pt; font-weight: 900;")
+        mark_layout.addWidget(logo)
+        layout.addWidget(mark)
+
+        brand = QVBoxLayout()
+        title = QLabel("ENDO-TWIN NEXUS")
+        title.setObjectName("BrandTitle")
+        subtitle = QLabel(
+            "Personalized physiological modelling platform  •  CHRONO-PCOS first disease module"
+        )
+        subtitle.setObjectName("BrandSubtitle")
+        brand.addWidget(title)
+        brand.addWidget(subtitle)
+        layout.addLayout(brand, 1)
+
+        local = QFrame()
+        local.setObjectName("StatusPill")
+        local_layout = QVBoxLayout(local)
+        local_layout.setContentsMargins(10, 6, 10, 6)
+        local_layout.addWidget(QLabel("LOCAL • RESEARCH"))
+        local_label = local.findChild(QLabel)
+        if local_label:
+            local_label.setObjectName("Good")
+        local_layout.addWidget(QLabel("No cloud upload by default"))
+        layout.addWidget(local)
 
         self.port_combo = QComboBox()
         self.port_combo.setEditable(True)
-        self.port_combo.addItems(["COM5", "/dev/ttyACM0", "/dev/ttyUSB0"])
+        self.port_combo.addItems(["/dev/ttyACM0", "/dev/ttyUSB0", "COM5"])
+        self.port_combo.setToolTip("Serial port for the wearable controller")
+        layout.addWidget(self.port_combo)
+
         refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("Secondary")
         refresh_btn.clicked.connect(self._refresh_ports)
-        connect_btn = QPushButton("Connect Wearable")
+        layout.addWidget(refresh_btn)
+
+        connect_btn = QPushButton("Connect wearable")
+        connect_btn.setObjectName("Primary")
         connect_btn.clicked.connect(self.connect_serial)
-        demo_btn = QPushButton("Demo Mode (Synthetic)")
+        layout.addWidget(connect_btn)
+
+        demo_btn = QPushButton("Run synthetic demo")
+        demo_btn.setObjectName("Secondary")
         demo_btn.clicked.connect(self.start_demo)
+        layout.addWidget(demo_btn)
+
         stop_btn = QPushButton("Stop")
+        stop_btn.setObjectName("Danger")
         stop_btn.clicked.connect(self.stop_stream)
+        layout.addWidget(stop_btn)
 
         self.net_edit = QLineEdit()
-        self.net_edit.setPlaceholderText("ESP8266 bridge IP:port e.g. 192.168.4.1:7777")
-        net_btn = QPushButton("Connect Wi-Fi Bridge")
+        self.net_edit.setPlaceholderText("Wi-Fi bridge IP:port")
+        self.net_edit.setMaximumWidth(190)
+        layout.addWidget(self.net_edit)
+
+        net_btn = QPushButton("Bridge")
+        net_btn.setObjectName("Secondary")
         net_btn.clicked.connect(lambda: self.connect_network(self.net_edit.text().strip()))
-
-        scenario_btn = QPushButton("Load Scenario")
-        scenario_btn.clicked.connect(self._load_scenario_dialog)
-
-        layout.addWidget(QLabel("Port"))
-        layout.addWidget(self.port_combo, 1)
-        layout.addWidget(refresh_btn)
-        layout.addWidget(connect_btn)
-        layout.addWidget(demo_btn)
-        layout.addWidget(stop_btn)
-        layout.addWidget(self.net_edit, 1)
         layout.addWidget(net_btn)
+
+        scenario_btn = QPushButton("Scenario")
+        scenario_btn.setObjectName("Secondary")
+        scenario_btn.clicked.connect(self._load_scenario_dialog)
         layout.addWidget(scenario_btn)
 
-        return box
+        return header
 
     def _build_overview_tab(self):
         tab = QWidget()
