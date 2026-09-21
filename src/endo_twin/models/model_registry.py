@@ -30,6 +30,7 @@ import json
 import time
 
 from .disease_model_interface import DiseaseModel, DiseaseModelManifest, DiseaseModelCategory
+from .plugin_discovery import discover_disease_models
 
 
 @dataclass
@@ -130,6 +131,20 @@ class ModelRegistry:
             limitations="Experimental research, not diagnosis, requires validation"
         ))
     
+    def discover_external_disease_models(self) -> List[str]:
+        """Discover optional packaged disease-model factories without hard dependencies."""
+        registered = []
+        for candidate in discover_disease_models():
+            try:
+                model = candidate() if isinstance(candidate, type) else candidate()
+                if isinstance(model, DiseaseModel):
+                    self.register_disease_model(model)
+                    registered.append(model.name)
+            except Exception:
+                # A broken optional plugin must never prevent ENDO-TWIN from launching.
+                continue
+        return registered
+
     def register_general_model(self, model_info: GeneralModelInfo):
         """Register a general physiological model"""
         self.general_models[model_info.name] = model_info
