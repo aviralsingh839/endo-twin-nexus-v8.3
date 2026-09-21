@@ -150,7 +150,7 @@ private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
 @Composable
 private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
     var tab by remember { mutableStateOf("Overview") }
-    val tabs = listOf("Overview", "Physiology", "Signals", "Ultrasound", "Models", "Reports", "Audit")
+    val tabs = listOf("Overview", "Physiology", "Signals", "VoxVasc", "Ultrasound", "Models", "Reports", "Audit")
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Card(shape = RoundedCornerShape(22.dp)) {
@@ -194,6 +194,11 @@ private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
                 item { SectionCard("GSR", "Tonic + phasic", "Electrodermal example • artifact handling remains explicit.") }
                 item { SectionCard("Motion", "6-axis IMU", "MPU6050 example • activity and motion artifact context.") }
                 item { SafetyCard("Missing is a state", "Long gaps should remain missing; bounded interpolation should carry a quality penalty.") }
+            }
+            "VoxVasc" -> {
+                item { SectionCard("VoxVasc", "Experimental voice modality", "Optional acoustic feature path inside CHRONO-PCOS. No hormone measurement and no standalone diagnostic interpretation.") }
+                item { SectionCard("Acquisition", "Sustained-vowel WAV", "Use a consistent microphone position and research protocol. The raw recording should retain provenance.") }
+                item { SafetyCard("Model gate", "Unavailable until valid audio is acquired.", "The feature remains experimental and should not override measured physiology or validated clinical inputs.") }
             }
             "Ultrasound" -> {
                 item { SectionCard("Study provenance", "IMAGE-DERIVED", "The image can be stored and quality-checked; unsupported anatomical features remain UNKNOWN.") }
