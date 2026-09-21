@@ -154,6 +154,9 @@ class LongitudinalViewer:
     It does not invent trends, baseline statistics, or model-inferred findings.
     """
 
+    def __init__(self, db=None):
+        self.db = db
+
     def compare(self, patient_id, session_ids):
         if not patient_id:
             return {
