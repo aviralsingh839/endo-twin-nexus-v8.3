@@ -39,3 +39,23 @@ else:
         provenance: str = Field(min_length=1)
         source: Optional[str] = None
         confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+
+
+if BaseModel is object:
+    class FeatureSchema:
+        def __init__(self, **data: Any) -> None:
+            self.__dict__.update(data)
+else:
+    class FeatureSchema(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        patient_id: str = Field(min_length=1)
+        timestamp: float
+        name: str = Field(min_length=1)
+        value: Optional[float] = None
+        category: str = Field(min_length=1)
+        source: str = Field(min_length=1)
+        sensor: Optional[str] = None
+        quality: float = Field(ge=0.0, le=1.0)
+        provenance: str = Field(min_length=1)
+        algorithm_version: Optional[str] = None
