@@ -317,7 +317,7 @@ class MainWindow(QMainWindow):
         gauge_card.setObjectName("ScientificCard")
         gauge_layout = QVBoxLayout(gauge_card)
         gauge_layout.addWidget(QLabel("RESEARCH INDEX"))
-        self.risk_gauge = GaugeWidget("Quality-gated research signal")
+        self.risk_gauge = GaugeWidget("Overall data quality", higher_is_better=True)
         gauge_layout.addWidget(self.risk_gauge, 1)
         top.addWidget(gauge_card, 2)
 
@@ -1004,20 +1004,14 @@ class MainWindow(QMainWindow):
             fusion_result = self.fusion_engine.fuse(module_results, context)
             self.fusion_result = fusion_result
 
-            # Update overview gauges
-            overall_risk = 0
-            if module_results:
-                # Average of elevated signals or max
-                scores = []
-                for r in module_results.values():
-                    # Map level to score
-                    level_map = {"low": 15, "moderate": 40, "elevated": 65, "high": 85}
-                    scores.append(level_map.get(r.level, 30))
-                overall_risk = float(sum(scores) / len(scores)) if scores else 0
-
-            self.risk_gauge.set_value(overall_risk)
-            self.confidence_label.setText(f"Model Confidence: {fusion_result.confidence_breakdown.get('model_confidence', 0):.2f}")
-            self.quality_label.setText(f"Data Quality: {fusion_result.confidence_breakdown.get('data_quality', 0):.2f}")
+            # Update overview: the gauge represents measured/computed data quality,
+            # not an invented composite disease-risk score.
+            overall_quality = float(fusion_result.confidence_breakdown.get("data_quality", 0.0))
+            self.risk_gauge.set_value(overall_quality * 100.0)
+            self.confidence_label.setText(
+                f"Model confidence: {fusion_result.confidence_breakdown.get('model_confidence', 0):.2f}"
+            )
+            self.quality_label.setText(f"Data quality: {overall_quality:.2f}")
             self.coverage_label.setText(f"Coverage: {fusion_result.confidence_breakdown.get('fusion_coverage', 0):.0%}")
             self.quality_gauge.set_value(fusion_result.confidence_breakdown.get('data_quality', 0) * 100)
 
