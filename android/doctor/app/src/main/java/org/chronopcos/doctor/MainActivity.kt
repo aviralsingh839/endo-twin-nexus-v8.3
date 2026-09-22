@@ -329,20 +329,15 @@ private fun ModelPage() {
 @Composable
 private fun HardwarePage() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val client = remember { org.chronopcos.doctor.ble.EndoTwinBleClient(context) }
+    val client = remember { org.chronopcos.doctor.wifi.EndoTwinTcpClient(context) }
     var state by remember { mutableStateOf(client.state) }
+    var host by remember { mutableStateOf("192.168.4.1") }
+    var portText by remember { mutableStateOf("7777") }
     var device by remember { mutableStateOf<String?>(null) }
     var packets by remember { mutableStateOf(0) }
     var latest by remember { mutableStateOf("Waiting for CP2…") }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val permissions = remember {
-        if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
-        else arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
-    }
-    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
-    ) { granted -> if (granted.values.all { it }) client.scan() else error = "Bluetooth permission not granted." }
     DisposableEffect(client) {
         client.onState = { state = it }
         client.onDevice = { device = it }
@@ -350,31 +345,37 @@ private fun HardwarePage() {
         client.onSample = { sample -> packets += 1; latest = "IR ${sample.ir} • Red ${sample.red} • GSR ${sample.gsr} • status ${sample.status}" }
         onDispose { client.disconnect() }
     }
-    fun scan() {
-        val missing = permissions.any { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
-        if (missing) launcher.launch(permissions) else client.scan()
-    }
+
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { PageTitle("Hardware Lab", "ESP32 wearable BLE • live engineering validation") }
-        item { SectionCard("BLE state", state.name, "${device ?: "No ESP32 discovered"} • $packets CP2 packets") }
-        item { SectionCard("Latest live frame", "MEASURED", latest) }
+        item { PageTitle("Hardware Lab", "ESP8266 wearable Wi-Fi/TCP • live engineering validation") }
+        item {
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(host, { host = it }, label = { Text("ESP8266 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(portText, { portText = it }, label = { Text("TCP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text("TCP ${state.name} • ${device ?: "Not connected"}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                    Text("$packets CP2 packets • $latest")
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            }
+        }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { scan() }, Modifier.weight(1f)) { Text("Scan ESP32") }
+                Button(onClick = { client.connect(host, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP8266") }
                 OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.ble.EndoTwinBleClient.State.CONNECTED) { Text("PING") }
-                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.ble.EndoTwinBleClient.State.CONNECTED) { Text("WHOAMI") }
+                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("PING") }
+                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("WHOAMI") }
             }
         }
-        item { error?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { SectionCard("Bench controller", "Arduino Mega", "USB-only CP2 bench/lab controller remains separate from the ESP32 wearable.") }
-        item { Text("Live hardware evidence is separate from DEMO_DATA and from disease-model output.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+        item { SectionCard("Bench controller", "Arduino Mega", "USB-only CP2 bench/lab controller remains separate from the ESP8266 wearable.") }
+        item { Text("The ESP8266 has no BLE. Mobile/remote acquisition uses Wi-Fi/TCP; USB serial remains available for desktop bench testing.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
     }
 }
+
 @Composable
 private fun MobilePage() {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
