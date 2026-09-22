@@ -1,6 +1,7 @@
 package org.chronopcos.patient.data.database
 
 import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * ENDO-TWIN Patient Database - Local-first SQLite, Room
@@ -148,6 +149,12 @@ interface PatientDao {
 
     @Query("SELECT MAX(receivedAt) FROM raw_sensor_packets WHERE patientId=:patientId AND receivedAt BETWEEN :from AND :to")
     suspend fun lastPacketAt(patientId: String, from: Long, to: Long): Long?
+}
+
+val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS public_studies (studyId TEXT NOT NULL, participantId TEXT NOT NULL, startedAt INTEGER NOT NULL, plannedEndAt INTEGER NOT NULL, endedAt INTEGER, consentAcknowledged INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'ACTIVE', PRIMARY KEY(studyId))")
+    }
 }
 
 @Database(
