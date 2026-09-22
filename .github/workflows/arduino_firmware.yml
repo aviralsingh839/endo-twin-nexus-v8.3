@@ -1,14 +1,16 @@
-name: Arduino firmware quality gate
+name: Active firmware quality gate
 
 on:
   push:
     paths:
-      - 'chrono_pcos_project V8/arduino/**'
+      - 'hardware/esp32/**'
+      - 'hardware/arduino/endo_twin_mega_lab/**'
       - 'scripts/build/build_firmware.sh'
       - '.github/workflows/arduino_firmware.yml'
   pull_request:
     paths:
-      - 'chrono_pcos_project V8/arduino/**'
+      - 'hardware/esp32/**'
+      - 'hardware/arduino/endo_twin_mega_lab/**'
       - 'scripts/build/build_firmware.sh'
       - '.github/workflows/arduino_firmware.yml'
 
@@ -19,13 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@v2
-      - name: Install cores
+      - name: Install active cores
         run: |
-          arduino-cli config add board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
           arduino-cli core update-index
           arduino-cli core install arduino:avr
-          arduino-cli core install esp8266:esp8266
-      - name: Install libraries
+          arduino-cli core install esp32:esp32
+      - name: Install sensor libraries
         run: |
           arduino-cli lib install 'SparkFun MAX3010x Pulse and Proximity Sensor Library'
           arduino-cli lib install 'Adafruit MPU6050'
@@ -36,7 +37,7 @@ jobs:
           arduino-cli lib install 'Adafruit BME280 Library'
           arduino-cli lib install 'Adafruit GFX Library'
           arduino-cli lib install 'Adafruit SSD1306'
-      - name: Compile Mega 2560
-        run: arduino-cli compile --fqbn arduino:avr:mega --export-binaries 'chrono_pcos_project V8/arduino/chrono_pcos_mega_firmware'
-      - name: Compile ESP8266 NodeMCU
-        run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --export-binaries 'chrono_pcos_project V8/arduino/chrono_pcos_esp8266_bridge'
+      - name: Compile ESP32 primary wearable
+        run: arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries 'hardware/esp32/endo_twin_wearable'
+      - name: Compile Arduino Mega bench/lab
+        run: arduino-cli compile --fqbn arduino:avr:mega --export-binaries 'hardware/arduino/endo_twin_mega_lab'
