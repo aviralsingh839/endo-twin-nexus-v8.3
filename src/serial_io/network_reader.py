@@ -1,6 +1,6 @@
-"""TCP network reader for the ESP8266 Wi-Fi bridge.
+"""TCP network reader for the active ESP8266 Wi-Fi wearable.
 
-The ESP8266 bridge (arduino/chrono_pcos_esp8266_bridge) exposes a small TCP
+The active ESP8266 wearable exposes a small TCP
 server: the Arduino Mega serial packets are relayed to any connected TCP
 client. This reader connects to that bridge and feeds the exact same packet
 parser used for USB serial, with the same auto-reconnect behaviour.
