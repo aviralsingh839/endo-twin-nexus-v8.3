@@ -9,7 +9,7 @@ on:
       - '.github/workflows/arduino_firmware.yml'
   pull_request:
     paths:
-      - 'hardware/esp32/**'
+      - 'hardware/esp8266/**'
       - 'hardware/arduino/endo_twin_mega_lab/**'
       - 'scripts/build/build_firmware.sh'
       - '.github/workflows/arduino_firmware.yml'
