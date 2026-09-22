@@ -1,218 +1,173 @@
-# HARDWARE BUILD GUIDE - V8.3
+# HARDWARE BUILD GUIDE - ENDO-TWIN V8.7
 
 ## Overview
 
-Two boards, both documented:
+- **ESP32 DevKit: primary wearable controller. Arduino Nano is not required.**
+- **Arduino UNO: bench/prototype validation** for MAX30102 + MPU6050 + DS18B20 + optional GSR.
+- **Arduino Mega 2560: expanded laboratory/hub platform** for ECG, microphone, FSR, environment sensors, OLED, buttons and other extensions.
+- **ESP32 BLE → Android** is the preferred wearable transport; USB serial at 115200 remains available for PC diagnostics.
+- The canonical data contract remains newline-delimited **$CP2** with XOR CRC.
 
-- **Arduino Nano wearable pod**: MAX30102 PPG, DS18B20 skin temperature, MPU6050 motion, optional GSR. Streams 20 Hz $CP2 packets.
-- **Arduino Mega 2560 bench hub and base station**: pod sensors plus ECG, microphone, FSR, light and environment sensors, OLED, LEDs, buzzer and buttons. In relay mode forwards pod stream to PC.
-- Optional **ESP8266 Wi-Fi bridge** relays same packets over TCP port 7777.
+### Active firmware
 
-Dashboard runs with no hardware: demo mode, manual entries, replay, scenarios all exercise same longitudinal engine.
-
-Firmware lives in `hardware/arduino/`: `chrono_pcos_mega_firmware` (bench hub), `chrono_pcos_nano_pod` (wearable pod), `chrono_pcos_esp8266_bridge` (Wi-Fi relay).
-
-Preserved from V8.1, still works in V8.3.
+- Wearable: `hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+- UNO bench: `hardware/arduino/endo_twin_uno_bench/endo_twin_uno_bench.ino`
+- Mega bench/hub: `hardware/arduino/chrono_pcos_mega_firmware/chrono_pcos_mega_firmware.ino`
+- `hardware/arduino/chrono_pcos_nano_pod/` and `hardware/arduino/chrono_pcos_esp8266_bridge/` are retained as legacy references only and are not required for the current build.
 
 ---
 
 ## Bill of Materials
 
-### Nano Pod (Primary Wearable)
+### ESP32 wearable
 
-- Arduino Nano (ATmega328P)
-- MAX30102 PPG sensor (I2C, 3.3V, SDA A4, SCL A5)
-- MPU6050 IMU (I2C, same bus, address 0x68)
-- DS18B20 skin temperature (D2, OneWire, 4.7k pull-up to 5V)
-- GSR module (optional, A0)
-- LEDs: Green D8, Yellow D9, Red D10 via 220 ohm
-- Buzzer D6
-- Power: 3.7V LiPo + TP4056 charger + 5V boost, or USB phone charger (never mains when on body)
-- Enclosure: small 3D printed pod, wrist/upper arm strap
+- ESP32 DevKit
+- MAX30102 PPG
+- MPU6050 IMU
+- DS18B20 + 4.7k resistor
+- GSR module (optional)
+- Battery/power-bank solution suitable for isolated body-worn prototype use
+- Insulated wire, perfboard/breadboard for bench bring-up, enclosure and strap
 
-### Mega Hub (Expanded Lab)
+### UNO bench
 
-- Arduino Mega 2560
-- All pod sensors plus:
-  - ECG module (AD8232, A1)
-  - Microphone (MAX4466, A2, plus RMS and pitch estimation)
-  - FSR pressure sensor (A3, for finger pressure correction)
-  - Light sensor (BH1750 I2C or LDR A4)
-  - BME280 environment (I2C, room temp, humidity, pressure)
-  - OLED 128x64 I2C (0x3C)
-  - LEDs, buzzer, buttons (D22-33)
-- Power: 5V 2A supply for bench use
+- Arduino UNO
+- Same MAX30102, MPU6050, DS18B20 and optional GSR
+- USB cable
+- Breadboard/jumper wires
 
-### ESP8266 Bridge (Optional)
+### Mega expanded lab
 
-- ESP8266 NodeMCU
-- Connects to Nano TX (via level shifter) and forwards to TCP 7777
-- Allows wireless pod → PC
+Use the existing Mega firmware for ECG (AD8232), microphone, FSR, BH1750, BME280, OLED, LEDs, buzzer and buttons.
 
 ---
 
-## Wiring - Nano Pod
+## ESP32 wiring
 
 ```
 MAX30102:
-  VIN → 3.3V (or 5V if module has regulator)
-  GND → GND
-  SDA → A4
-  SCL → A5
-  INT → not connected
+  VIN/VCC -> compatible 3.3V supply for your breakout
+  GND     -> GND
+  SDA     -> GPIO21
+  SCL     -> GPIO22
 
 MPU6050:
-  VCC → 5V (or 3.3V)
-  GND → GND
-  SDA → A4 (same bus)
-  SCL → A5 (same bus)
-  AD0 → GND (address 0x68)
+  VCC     -> compatible supply for your breakout
+  GND     -> GND
+  SDA     -> GPIO21
+  SCL     -> GPIO22
+  AD0     -> GND for address 0x68
 
 DS18B20:
-  VCC → 5V
-  GND → GND
-  DATA → D2 with 4.7k pull-up to 5V
+  VCC     -> 3.3V
+  GND     -> GND
+  DATA    -> GPIO18
+  4.7k resistor between DATA and 3.3V
 
-GSR (optional):
-  VCC → 5V
-  GND → GND
-  SIG → A0
+GSR:
+  SIG     -> GPIO34
+  VCC/GND -> according to your GSR module specification
 
-LEDs:
-  Green → D8 → 220Ω → GND
-  Yellow → D9 → 220Ω → GND
-  Red → D10 → 220Ω → GND
-
-Buzzer:
-  + → D6
-  - → GND
+Optional status LED:
+  GPIO2 -> resistor -> LED -> GND
 ```
 
-**Calibrate IMU:** Rest board flat and still for first ~1.3s, mean becomes zero offset.
+**Important:** breakout-board voltage handling varies. Do not assume a sensor marked "5V" or "VIN" is safe to connect directly to an ESP32 GPIO. Keep ESP32 GPIO signals at 3.3V levels.
 
 ---
 
-## Wiring - Mega Hub
+## UNO bench wiring
 
-See legacy `chrono_pcos_project V8/docs/ARDUINO_WIRING_GUIDE.md` for full Mega wiring - preserved.
+```
+MAX30102/MPU6050: SDA=A4, SCL=A5
+DS18B20:          DATA=D2, 4.7k pull-up to 5V
+GSR:              SIG=A0
+USB serial:       115200 baud
+```
 
-Key:
-
-- Same pod sensors on same pins where possible
-- ECG AD8232: OUTPUT A1, LO- D30, LO+ D31, 3.3V, GND
-- Mic: A2
-- FSR: A3 with 10k divider
-- BME280: I2C SDA 20, SCL 21
-- OLED: I2C same bus
-- Buttons: D22-25 with pull-ups
+The UNO is for desk testing and validation, not the body-worn controller.
 
 ---
 
-## Firmware Upload
+## Firmware upload
 
-**Libraries needed (Arduino Library Manager):**
+### ESP32
+
+Install the ESP32 board package in Arduino IDE, select your exact ESP32 board, then upload:
+
+`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+
+Libraries:
 - SparkFun MAX3010x Pulse and Proximity Sensor Library
 - Adafruit MPU6050
 - Adafruit Unified Sensor
 - OneWire
 - DallasTemperature
-- Adafruit BME280
-- Adafruit GFX + SSD1306 (for OLED)
+- BLE support from the Arduino-ESP32 core
 
-**Upload:**
+### UNO
 
-- Nano Pod: Board "Arduino Nano", Processor "ATmega328P", Port, Upload `chrono_pcos_nano_pod.ino`, Baud 115200, 20 Hz packets
-- Mega Hub: Board "Arduino Mega 2560", Port, Upload `chrono_pcos_mega_firmware.ino`, set RELAY_POD_SERIAL1 1 if using pod → mega → PC relay (Nano TX D1 → Mega RX1 D19, common GND, power Nano from charger)
-- ESP8266 Bridge: Board "NodeMCU 1.0", Upload `chrono_pcos_esp8266_bridge.ino`, connects to WiFi, TCP 7777
+Select Arduino UNO and upload:
 
-**Commands accepted on same serial (sent by dashboard):**
-- LED,G / LED,Y / LED,R
-- BEEP (120 ms tone)
-- PING → $ACK,PONG,00
+`hardware/arduino/endo_twin_uno_bench/endo_twin_uno_bench.ino`
+
+### Mega
+
+Select Arduino Mega 2560 and use the existing:
+
+`hardware/arduino/chrono_pcos_mega_firmware/chrono_pcos_mega_firmware.ino`
 
 ---
 
-## Packet Protocol
+## ESP32 BLE interface
 
-**Enhanced $CP2 (20 Hz, 115200 baud):**
+Device name: **ENDO-TWIN-ESP32**
+
+Service:
+`7f300001-6c12-4f70-9e6b-8e9f7b8b1001`
+
+Notify characteristic:
+`7f300002-6c12-4f70-9e6b-8e9f7b8b1001`
+
+Command characteristic:
+`7f300003-6c12-4f70-9e6b-8e9f7b8b1001`
+
+The notify characteristic sends complete $CP2 lines. Android should preserve the same parser, CRC validation, provenance and missing-data semantics used by the desktop pipeline.
+
+---
+
+## Bring-up and testing
+
+1. Flash ESP32.
+2. Open USB serial at 115200 and verify $CP2 lines.
+3. Confirm the device advertises as **ENDO-TWIN-ESP32**.
+4. Send `WHOAMI` over USB and verify the identity response.
+5. With no finger on MAX30102, verify the PPG-absent status bit instead of fabricated signal.
+6. Place a finger gently on the MAX30102 and verify IR/RED change.
+7. Move the MPU6050 and verify accelerometer/gyro fields.
+8. Verify DS18B20 temperature changes.
+9. Verify GSR only after its module is wired correctly.
+10. Validate packets with the existing `PacketParser` and CRC tests.
+11. Connect Android over BLE and verify notification streaming.
+12. Only after bench validation, package the electronics into the body-worn enclosure.
+
+---
+
+## Protocol
+
 ```
 $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
 ```
 
-- ms: Arduino millis
-- ir, red: PPG raw (0-262143, 18-bit)
-- ax,ay,az: g, gx,gy,gz: dps
-- temp0: skin temp °C, temp1: extra temp or nan
-- gsr: raw 0-1023
-- micRaw, micRms, micPitch: microphone
-- ecg: raw or -1 if absent
-- fsr: raw or -1
-- lux: light or -1
-- roomT, hum, press: BME280 or nan
-- buttons: bitmask
-- status: bitmask (PPG absent, saturated, MPU error, DS18B20 error, GSR saturated, I2C error, low quality, ECG leads off, BME280 error, OLED error, mic low, FSR artifact)
-- crc: XOR of all chars in payload before final comma, hex 2 digits
-
-**Legacy $CP:** older 15-field version still supported by parser.
-
-**CRC:** XOR all characters in payload before final comma.
-
-**Parser:** `src/serial_io/packet_parser.py` handles both, verifies CRC, raises PacketParseError on bad prefix, too few fields, invalid CRC, numeric conversion failed.
+ESP32/UNO do not provide every extended channel, so absent channels are sent as explicit placeholders. Real records must never be silently filled with synthetic measurements.
 
 ---
 
-## Power and Safety
+## Power and safety
 
-- Educational physiological monitoring only, not diagnostic medical device
-- Keep pod on battery or laptop's own USB when on person, never mains
-- LiPo: use protected cell, TP4056 charger, 5V boost, fuse
-- Clean sensors with alcohol, not water
-- If skin irritation, remove
-- No medical decisions from this hardware alone
-
----
-
-## Testing
-
-**Pod:**
-- Upload, open Serial Monitor 115200, should see $CP2 lines at 20 Hz
-- Cover MAX30102 with finger: ir should rise >5000, status bit PPG absent clears
-- Move: motion_index rises
-- Warm finger: temp rises
-
-**Mega Hub:**
-- Same, plus ECG: connect leads, check ecg_raw and quality
-- Relay mode: Nano TX → Mega RX1, Mega USB to PC, dashboard connects to Mega only, should see pod data
-
-**Dashboard:**
-- Connect wearable button → live plots
-- Demo mode → synthetic stream, clearly labelled
-- Scenario load → 6 scenarios
-- Disconnect sensor: should show low quality, not crash, banner instead of guess
-
----
-
-## Software Gracefully Handles Missing Sensors
-
-- If MAX30102 disconnected: ir=0, quality 0, artifact missing, overall quality low, prediction withheld, banner
-- If temp disconnected: temp_c None, quality 0, does not drag other sensors down (mean over PRESENT only)
-- If GSR absent: optional channel, never drags score down
-- Packet corruption: CRC mismatch → PacketParseError, packet discarded, app continues
-- Duplicate packet: timestamp same, handled
-- Delayed packet: stale >6s → artifact stale, quality 0.2
-- Missing packet: no sample, history gap, longitudinal handles missing
-- Noisy PPG: quality heuristic + trained model blended 60/40, noisy → quality low
-- Excessive motion: motion_index >1.5 → quality penalty
-- Reconnection: quality recovers
-
-All tested in `tests/test_hardware_failures.py` and `tests/test_sensor_quality.py`
-
----
-
-## V8.3 Preservation
-
-- V8.1 Nano pod firmware kept, still works
-- V8.1 Mega hub firmware kept, still works
-- V8.1 ESP8266 bridge kept
-- No force every sensor required - software gracefully operates with missing sensors
-- New quality control and longitudinal engine work with whatever sensors present
+- Educational/research prototype only; not a diagnostic medical device.
+- Never connect a body-worn prototype directly to mains.
+- Use a protected battery/power solution and electrically isolated testing.
+- Insulate exposed conductors and strain-relieve sensor wiring.
+- Remove the prototype if skin irritation or heating occurs.
+- Do not base medical decisions on this hardware alone.
