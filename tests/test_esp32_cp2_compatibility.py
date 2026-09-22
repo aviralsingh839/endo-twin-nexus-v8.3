@@ -8,7 +8,7 @@ def make_cp2(status=0):
     payload = "$CP2,1234,10000,9000,0.1,0.2,0.9,0.1,0.2,0.3,nan,nan,450,0,0.0,0.0,-1,-1,-1,nan,nan,nan,0," + str(status)
     return payload + "," + f"{xor_crc_ascii(payload):02X}"
 
-def test_esp32_cp2_is_parser_compatible():
+def test_esp8266_cp2_is_parser_compatible():
     sample = PacketParser(require_crc=True).parse(make_cp2())
     assert sample.ms == 1234
     assert sample.ir == 10000
@@ -24,15 +24,15 @@ def test_cp2_bad_crc_is_rejected():
     except PacketParseError:
         pass
 
-def test_esp32_missing_sensor_semantics_are_preserved():
+def test_esp8266_missing_sensor_semantics_are_preserved():
     # Status bit 3 = DS18B20 error and temp0 remains nan.
     sample = PacketParser(require_crc=True).parse(make_cp2(status=(1 << 3)))
     assert sample.temp_c != sample.temp_c  # NaN
     assert sample.status & (1 << 3)
 
-def test_active_hardware_paths_do_not_reference_legacy_boards():
+def test_active_hardware_paths_match_current_architecture():
     active_files = [
-        REPO / "hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino",
+        REPO / "hardware/esp8266/endo_twin_wearable/endo_twin_wearable.ino",
         REPO / "hardware/arduino/endo_twin_mega_lab/endo_twin_mega_lab.ino",
         REPO / "scripts/build/build_firmware.sh",
         REPO / ".github/workflows/arduino_firmware.yml",
