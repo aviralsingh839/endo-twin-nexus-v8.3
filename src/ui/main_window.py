@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(header)
 
         # Tabs
-        self.tabs = QTabWidget()
+        self.tabs = QTabWidget()\n        self.tabs.setTabPosition(QTabWidget.TabPosition.West)\n        self.tabs.setDocumentMode(True)
         self.tabs.addTab(self._build_overview_tab(), "Overview")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
         self.tabs.addTab(self._build_trends_tab(), "Trends")
