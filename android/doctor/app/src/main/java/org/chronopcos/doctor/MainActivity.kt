@@ -127,8 +127,10 @@ private fun DoctorApp() {
                 } else when (tab) {
                     DoctorTab.Dashboard -> Dashboard(onOpen = { selected = it })
                     DoctorTab.Patients -> Patients(onOpen = { selected = it })
-                    DoctorTab.Models -> ModelPage()
-                    DoctorTab.Hardware -> HardwarePage()
+                    DoctorTab.Live -> HardwarePage()
+                    DoctorTab.Analysis -> ModelPage()
+                    DoctorTab.Reports -> SettingsPage()
+                    DoctorTab.Devices -> HardwarePage()
                     DoctorTab.Mobile -> MobilePage()
                     DoctorTab.Settings -> SettingsPage()
                 }
