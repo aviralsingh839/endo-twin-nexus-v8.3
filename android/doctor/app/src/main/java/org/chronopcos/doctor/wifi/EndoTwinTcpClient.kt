@@ -75,8 +75,12 @@ class EndoTwinTcpClient(private val context: Context) {
                     val frame=line.trim()
                     if(frame.length>4096){ error("CP2 frame exceeded safety limit"); break }
                     withContext(Dispatchers.Main){ onRawPacket?.invoke(frame) }
-                    parser.parse(frame)?.let { sample -> withContext(Dispatchers.Main){ onSample?.invoke(sample) } }
-                        ?: if(frame.startsWith("\$CP2,")) error("Invalid CP2/CRC")
+                    val sample = parser.parse(frame)
+                    if (sample != null) {
+                        withContext(Dispatchers.Main) { onSample?.invoke(sample) }
+                    } else if (frame.startsWith("\$CP2,")) {
+                        error("Invalid CP2/CRC")
+                    }
                 }
                 withContext(Dispatchers.Main){ state=State.DISCONNECTED; onState?.invoke(State.DISCONNECTED) }
             } catch (e:Exception) {
