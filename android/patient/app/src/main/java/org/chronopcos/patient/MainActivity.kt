@@ -413,22 +413,14 @@ private fun TimelineScreen(patientId: String) {
 @Composable
 private fun ConnectionScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val client = remember { org.chronopcos.patient.ble.EndoTwinBleClient(context) }
+    val client = remember { org.chronopcos.patient.wifi.EndoTwinTcpClient(context) }
     var state by remember { mutableStateOf(client.state) }
+    var endpoint by remember { mutableStateOf("192.168.4.1") }
+    var portText by remember { mutableStateOf("7777") }
     var device by remember { mutableStateOf<String?>(null) }
     var packets by remember { mutableStateOf(0) }
     var latest by remember { mutableStateOf("Waiting for a live CP2 frame…") }
     var error by remember { mutableStateOf<String?>(null) }
-
-    val permissions = remember {
-        if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
-        else arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
-    }
-    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
-    ) { granted ->
-        if (granted.values.all { it }) client.scan() else error = "Bluetooth permission not granted."
-    }
 
     DisposableEffect(client) {
         client.onState = { state = it }
@@ -442,12 +434,13 @@ private fun ConnectionScreen() {
     }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("ESP32 Wearable", "LIVE BLE • ENDO-TWIN-ESP32") }
+        item { PageTitle("ESP8266 Wearable", "LIVE Wi-Fi/TCP • ENDO-TWIN-ESP8266") }
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("${state.name}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                    Text(device ?: "No ESP32 discovered yet.")
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ESP8266 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(portText, { portText = it }, label = { Text("TCP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text("${state.name} • ${device ?: "Not connected"}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
                     Text("CP2 packets received: $packets")
                     Text(latest, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -456,22 +449,20 @@ private fun ConnectionScreen() {
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Button(onClick = {
-                    val missing = permissions.any { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
-                    if (missing) permissionLauncher.launch(permissions) else client.scan()
-                }, Modifier.weight(1f)) { Text("Scan ESP32") }
+                Button(onClick = { client.connect(endpoint, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP8266") }
                 OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.ble.EndoTwinBleClient.State.CONNECTED) { Text("PING") }
-                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.ble.EndoTwinBleClient.State.CONNECTED) { Text("WHOAMI") }
+                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("PING") }
+                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("WHOAMI") }
             }
         }
-        item { Text("Notifications are reassembled into newline-terminated CP2 frames and rejected when CRC validation fails.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("The ESP8266 has no BLE; the mobile path uses its Wi-Fi access point and TCP port 7777. CP2 frames are CRC-validated before acceptance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
+
 private fun endpointFor(raw: String, path: String): String {
     val v = raw.trim().trimEnd('/')
     val base = if (v.startsWith("http://") || v.startsWith("https://")) v else "http://$v"
