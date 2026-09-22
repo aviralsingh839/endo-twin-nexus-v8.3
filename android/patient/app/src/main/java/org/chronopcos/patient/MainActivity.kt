@@ -421,7 +421,7 @@ private fun PublicStudyScreen() {
     val scope = rememberCoroutineScope()
     val db = remember {
         Room.databaseBuilder(context, org.chronopcos.patient.data.database.PatientDatabase::class.java, "endo_twin_patient.db")
-            .fallbackToDestructiveMigration().build()
+            .addMigrations(org.chronopcos.patient.data.database.MIGRATION_2_3).build()
     }
     val prefs = remember { context.getSharedPreferences("public_study", Context.MODE_PRIVATE) }
     var consent by remember { mutableStateOf(prefs.getBoolean("consent", false)) }
