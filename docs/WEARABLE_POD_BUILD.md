@@ -1,55 +1,37 @@
-# WEARABLE POD BUILD - V8.3
+# WEARABLE BUILD - ENDO-TWIN V8.7
 
-## Primary Wearable - Arduino Nano Pod
+## Primary wearable: ESP32
 
-Preserved from V8.1, primary wearable implementation in V8.3.
+The project now uses an ESP32 DevKit as the body-worn controller. **No Arduino Nano is required.**
 
-### Components
+### Core BOM
 
-- Arduino Nano (ATmega328P)
-- MAX30102 PPG (I2C, SDA A4, SCL A5, 3.3V)
-- MPU6050 IMU (I2C same bus, address 0x68, 5V)
-- DS18B20 skin temperature (D2, OneWire, 4.7k pull-up)
-- Optional GSR (A0)
-- LEDs Green D8, Yellow D9, Red D10 via 220Ω
-- Buzzer D6
-- Power: 3.7V LiPo + TP4056 + boost, or USB charger
-- Enclosure: small 3D printed pod, wrist strap
-
-### Wiring
-
-See HARDWARE_BUILD_GUIDE.md
+- ESP32 DevKit board
+- MAX30102 PPG sensor
+- MPU6050 IMU
+- DS18B20 temperature sensor + 4.7k resistor
+- GSR module (optional)
+- 3.7V Li-ion/LiPo battery + suitable protected charging solution
+- insulated wires, small enclosure, wrist strap
 
 ### Firmware
 
-`hardware/arduino/chrono_pcos_nano_pod/chrono_pcos_nano_pod.ino`
+`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
-- Samples PPG 50 Hz, IMU 50 Hz, GSR 10 Hz, Temp 1 Hz
-- Sends packet 20 Hz `$CP2` at 115200 baud
-- Channels not present sent as placeholders (-1 analog, nan environment) so dashboard reads pod like Mega
-- Two connection methods:
-  1. Pod → PC: Nano USB straight to laptop, dashboard --port <nano port>
-  2. Pod → Mega → PC: Nano D1 TX → Mega D19 RX1, common GND, power Nano from charger, Mega firmware RELAY_POD_SERIAL1=1, dashboard connects to Mega only
+The ESP32 samples PPG/IMU at 50 Hz, GSR at 10 Hz, temperature at 1 Hz, and publishes a $CP2 packet every 50 ms. BLE is used for Android; USB serial is retained for PC bring-up and diagnostics.
 
-### Commands
+### Android connection
 
-Dashboard sends on same serial:
-- LED,G / LED,Y / LED,R
-- BEEP
-- PING → $ACK,PONG,00
+The wearable advertises as **ENDO-TWIN-ESP32**. Android should scan for the documented service UUID, connect, enable notifications on the data characteristic, and feed complete newline-delimited $CP2 messages into the same validation path used by wired serial. The command characteristic supports PING/WHOAMI and future device-control commands.
 
-### Testing
+### Bench fallback
 
-- Serial Monitor 115200, 20 Hz $CP2 lines
-- Finger on MAX30102: ir >5000
-- Move: motion index
-- Warm: temp
+Use `hardware/arduino/endo_twin_uno_bench/endo_twin_uno_bench.ino` with an Arduino UNO for desk testing. The existing Mega firmware remains the expanded bench/hub platform.
 
-### V8.3 Integration
+### Bring-up order
 
-- Quality control: ir <5000 → quality 0, artifact low_amplitude, finger absent
-- Feature extraction: PPG → HR, HRV, SpO2 educational, pulse amplitude
-- Baseline: learns personal RHR, HRV, temp, GSR, activity
-- Longitudinal: detects persistent changes
-- Shared features: feeds all disease modules
-- Missing sensors: gracefully handled, does not crash
+Flash → verify USB $CP2 → validate parser/CRC → verify BLE advertising → verify Android notification stream → calibrate IMU at rest → validate each sensor independently → only then assemble the body-worn enclosure.
+
+### Safety
+
+Research/educational prototype only. Do not interpret outputs as a diagnosis. Never power a body-worn prototype directly from mains.
