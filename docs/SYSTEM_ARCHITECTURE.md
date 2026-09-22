@@ -3,7 +3,7 @@
 ## Overview
 
 ```
-                SENSOR DATA (Nano Pod, Mega Hub, Demo, Scenario)
+                SENSOR DATA (ESP8266 Pod, ESP32-S3 Pod, Mega Hub, Demo, Scenario)
                      │
                      ▼
             QUALITY CONTROL (value, quality, source, timestamp, artifact)
@@ -192,7 +192,11 @@ Organized with clear labels: REAL, SYNTHETIC, PUBLIC DATASET, USER-ENTERED
 
 ---
 
-## Hardware (`hardware/arduino/`)
+## Hardware
+
+- `hardware/esp8266/endo_twin_sensor_pod`: direct ESP8266 Wi-Fi sensor pod
+- ESP32-S3 sensor pod: higher-capability Wi-Fi option
+- `hardware/arduino/` contains Mega hub and retained legacy firmware
 
 - `chrono_pcos_nano_pod`: wearable pod firmware
 - `chrono_pcos_mega_firmware`: bench hub firmware
