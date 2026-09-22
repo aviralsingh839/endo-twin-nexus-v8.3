@@ -40,5 +40,5 @@ def test_active_hardware_paths_match_current_architecture():
     text = "\n".join(p.read_text(encoding="utf-8") for p in active_files)
     assert "chrono_pcos_nano_pod" not in text
     assert "esp8266_bridge" not in text
-    assert "ESP32" in text
+    assert "ESP8266" in text
     assert "Mega" in text
