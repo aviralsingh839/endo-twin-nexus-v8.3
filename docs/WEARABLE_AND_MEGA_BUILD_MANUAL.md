@@ -52,7 +52,7 @@ Use these as **prototype enclosure targets**, not as the exact dimensions of eve
 
 A 110 × 70 × 30 mm enclosure leaves room for the development board, sensor breakouts, wiring, strain relief and a small protected battery/power section.
 
-**Do not permanently cut the enclosure from an assumed ESP32-S3 board dimension.** ESP32-S3-DevKitC-1 revisions and header arrangements differ; measure the exact board you own and leave clearance around the USB connector and antenna. Espressif provides the official board dimension drawing and notes that both v1.0 and v1.1 exist. citeturn1search0turn1search1
+**Do not permanently cut the enclosure from an assumed ESP32-S3 board dimension.** ESP32-S3-DevKitC-1 revisions and header arrangements differ; measure the exact board you own and leave clearance around the USB connector and antenna. Espressif provides the official board dimension drawing and notes that both v1.0 and v1.1 exist. 
 
 ## Wearable orientation
 
@@ -81,7 +81,7 @@ Use this orientation:
 
 The MAX30102 should face the skin and be mechanically stable. The BH1750 should face the environment rather than the wrist. The BME280 should be exposed to ambient air through vents and should not be buried next to the ESP32 regulator or battery.
 
-The BME280 provides temperature, humidity and pressure. The BH1750 provides ambient illuminance in lux. citeturn2search16turn2search13
+The BME280 provides temperature, humidity and pressure. The BH1750 provides ambient illuminance in lux. 
 
 ---
 
@@ -100,7 +100,7 @@ Requirements:
 - Use nylon/PLA/ABS standoffs or a small internal mounting plate.
 - Do not allow solder joints to touch the enclosure.
 
-The ESP32-S3-DevKitC-1 is designed to be used with jumper wires or mounted on a breadboard/prototype assembly. citeturn2search18
+The ESP32-S3-DevKitC-1 is designed to be used with jumper wires or mounted on a breadboard/prototype assembly. 
 
 ## 3.2 MAX30102
 
@@ -142,7 +142,7 @@ Recommended vent:
 
 The BME280 measures ambient environmental conditions. If it is enclosed beside a warm MCU or battery, its temperature reading can be biased.
 
-Common BME280 I2C addresses are 0x77 and 0x76 depending on the breakout configuration. citeturn2search16
+Common BME280 I2C addresses are 0x77 and 0x76 depending on the breakout configuration. 
 
 ## 3.5 BH1750
 
@@ -155,7 +155,7 @@ Create a clear optical window:
 - sensor face flush or slightly recessed;
 - keep it away from the status LED.
 
-The BH1750 uses I2C; its common address is 0x23, with 0x5C available using the address pin. citeturn2search9turn2search14
+The BH1750 uses I2C; its common address is 0x23, with 0x5C available using the address pin. 
 
 ## 3.6 GSR module
 
@@ -217,7 +217,7 @@ If the GSR module exposes its own excitation/electrode circuitry, follow that mo
 | All sensors | GND | ESP32 GND |
 | I2C sensors | VCC | 3.3 V-compatible supply |
 
-GPIO8/GPIO9 are used as the dedicated I2C bus in the current firmware. The ESP32-S3-DevKitC-1 exposes GPIOs for peripheral connections; consult the exact board revision's official pin layout before final enclosure drilling. citeturn0search0turn1search24
+GPIO8/GPIO9 are used as the dedicated I2C bus in the current firmware. The ESP32-S3-DevKitC-1 exposes GPIOs for peripheral connections; consult the exact board revision's official pin layout before final enclosure drilling. 
 
 ## 5.2 I2C topology
 
@@ -289,7 +289,7 @@ For development:
 
 - USB power is acceptable for bench testing without body electrodes.
 - For body-contact GSR testing, use a suitable battery-powered isolated supply.
-- The ESP32-S3 DevKitC-1 supports USB power as well as 5V/GND or 3V3/GND supply options; do not simultaneously feed conflicting power sources. citeturn0search0
+- The ESP32-S3 DevKitC-1 supports USB power as well as 5V/GND or 3V3/GND supply options; do not simultaneously feed conflicting power sources. 
 
 Do not place an unprotected Li-ion cell directly on the wearable's 3.3V rail.
 
@@ -840,7 +840,7 @@ The two controllers can be tested independently.
 
 1. Do not mix the old ESP8266 pin map with this ESP32-S3 design.
 2. Do not use GPIO numbers from an ordinary ESP32 DevKit for the ESP32-S3.
-3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. citeturn0search3
+3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. 
 4. Keep BME280 thermally isolated from the ESP32 and battery.
 5. Keep BH1750 optically exposed.
 6. Keep GSR electrode wires strain relieved.
