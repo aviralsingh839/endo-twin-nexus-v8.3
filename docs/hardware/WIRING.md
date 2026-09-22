@@ -10,7 +10,7 @@
 | GSR / EDA | analog output A0 |
 | Status LED | D4/GPIO2 |
 
-MAX30102 and MPU6050 share the I2C bus. Do not feed incompatible 5 V signals into ESP8266 GPIO. NodeMCU pin labels differ from raw GPIO numbers; D1=GPIO5, D2=GPIO4, D4=GPIO2 and D6=GPIO12. citeturn0search7
+MAX30102 and MPU6050 share the I2C bus. Do not feed incompatible 5 V signals into ESP8266 GPIO. NodeMCU pin labels differ from raw GPIO numbers; D1=GPIO5, D2=GPIO4, D4=GPIO2 and D6=GPIO12.
 
 ### ESP8266 network
 
