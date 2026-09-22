@@ -61,8 +61,10 @@ private val demoPatients = listOf(
 private enum class DoctorTab(val label: String) {
     Dashboard("Dashboard"),
     Patients("Patients"),
-    Models("Models"),
-    Hardware("Hardware"),
+    Live("Live Monitoring"),
+    Analysis("Analysis"),
+    Reports("Reports"),
+    Devices("Devices"),
     Mobile("Mobile"),
     Settings("Settings")
 }
