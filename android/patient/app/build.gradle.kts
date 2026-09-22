@@ -12,8 +12,8 @@ android {
         applicationId = "org.chronopcos.patient"
         minSdk = 24
         targetSdk = 34
-        versionCode = 87
-        versionName = "8.6.0"
+        versionCode = 88
+        versionName = "8.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
