@@ -172,10 +172,10 @@ class DoctorWindow(QMainWindow):
         tl = QHBoxLayout(top)
         tl.setContentsMargins(18, 8, 18, 8)
         brand2 = QLabel("ENDO-TWIN")
-        brand2.setStyleSheet("color:#ffffff;font-size:16px;font-weight:900;")
+        brand2.setStyleSheet("color:#142b3a;font-size:16px;font-weight:900;")
         tl.addWidget(brand2)
         subtitle = QLabel("Personalized Physiological Modelling Platform")
-        subtitle.setStyleSheet("color:#dbe2fa;font-size:10px;font-weight:650;")
+        subtitle.setStyleSheet("color:#61717d;font-size:10px;font-weight:650;")
         tl.addWidget(subtitle)
         tl.addSpacing(18)
 
@@ -333,7 +333,7 @@ class DoctorWindow(QMainWindow):
         avatar = QLabel((p["pid"][-3:] if p else "000"))
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar.setFixedSize(46, 46)
-        avatar.setStyleSheet("background:#8998e9;color:white;border-radius:11px;font-size:16px;font-weight:900;")
+        avatar.setStyleSheet("background:#0b6670;color:white;border-radius:10px;font-size:16px;font-weight:900;")
         lay.addWidget(avatar)
         lay.addSpacing(9)
 
