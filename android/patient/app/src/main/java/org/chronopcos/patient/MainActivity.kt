@@ -3,6 +3,10 @@
 package org.chronopcos.patient
 
 import android.os.Bundle
+import android.content.Intent
+import android.content.Context
+import androidx.core.content.ContextCompat
+import androidx.room.Room
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -38,12 +42,13 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 import org.chronopcos.patient.ui.theme.EndoTwinTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { EndoTwinTheme { PatientApp("DEMO-001", "Mira") } }
+        setContent { EndoTwinTheme { PatientApp("PUBLIC-PARTICIPANT", "Participant") } }
     }
 }
 
@@ -51,7 +56,7 @@ private enum class PatientTab(val route: String, val label: String) {
     Home("home", "Home"),
     Health("health", "Health"),
     Measure("measure", "Measure"),
-    Timeline("timeline", "Timeline"),
+    Timeline("timeline", "3-Day Study"),
     Connect("connect", "Connect")
 }
 
@@ -76,7 +81,7 @@ private fun PatientApp(currentPatientId: String, alias: String) {
                     },
                     actions = {
                         Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFF33405A)) {
-                            Text("DEMO_DATA • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFDDE3FF), fontWeight = FontWeight.Bold)
+                            Text("PUBLIC TEST • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFDDE3FF), fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(12.dp))
                     },
@@ -120,7 +125,7 @@ private fun PatientApp(currentPatientId: String, alias: String) {
                     composable("home") { HomeScreen(currentPatientId, alias) }
                     composable("health") { HealthScreen(currentPatientId) }
                     composable("measure") { MeasureScreen(currentPatientId) }
-                    composable("timeline") { TimelineScreen(currentPatientId) }
+                    composable("timeline") { PublicStudyScreen() }
                     composable("connect") { ConnectionScreen() }
                 }
             }
@@ -411,6 +416,150 @@ private fun TimelineScreen(patientId: String) {
 }
 
 @Composable
+private fun PublicStudyScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = remember {
+        Room.databaseBuilder(context, org.chronopcos.patient.data.database.PatientDatabase::class.java, "endo_twin_patient.db")
+            .fallbackToDestructiveMigration().build()
+    }
+    val prefs = remember { context.getSharedPreferences("public_study", Context.MODE_PRIVATE) }
+    var consent by remember { mutableStateOf(prefs.getBoolean("consent", false)) }
+    var participantId by remember { mutableStateOf(prefs.getString("participant_id", "") ?: "") }
+    var studyId by remember { mutableStateOf(prefs.getString("study_id", "") ?: "") }
+    var startedAt by remember { mutableStateOf(prefs.getLong("started_at", 0L)) }
+    var plannedEnd by remember { mutableStateOf(prefs.getLong("planned_end", 0L)) }
+    var status by remember { mutableStateOf(prefs.getString("status", "READY") ?: "READY") }
+    var dayCounts by remember { mutableStateOf(listOf(0, 0, 0)) }
+    var validCounts by remember { mutableStateOf(listOf(0, 0, 0)) }
+
+    fun refresh() {
+        if (startedAt <= 0L || participantId.isBlank()) return
+        scope.launch {
+            val counts = mutableListOf<Int>()
+            val valids = mutableListOf<Int>()
+            for (day in 0..2) {
+                val from = startedAt + day * 86_400_000L
+                val to = minOf(System.currentTimeMillis(), from + 86_400_000L)
+                counts += db.patientDao().countRawPackets(participantId, from, to)
+                valids += db.patientDao().countValidPackets(participantId, from, to)
+            }
+            dayCounts = counts
+            validCounts = valids
+        }
+    }
+
+    DisposableEffect(Unit) { onDispose { db.close() } }
+    LaunchedEffect(startedAt, status) { refresh() }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { PageTitle("3-Day Public Test", "Anonymous wearable study • local-only recording") }
+
+        item {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Before starting", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Use only a participant code. Do not enter a name, phone number, address, email, diagnosis, or other identifying information. Raw CP2 packets stay in this app's local Room database.")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = consent, onCheckedChange = {
+                            consent = it
+                            prefs.edit().putBoolean("consent", it).apply()
+                        })
+                        Text("Participant has been informed and agrees to this 3-day research prototype recording.")
+                    }
+                    Text("This is not a medical device or diagnostic test.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        item {
+            Card(shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Study status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Participant: " + if (participantId.isBlank()) "not assigned" else participantId)
+                    Text("Status: " + status)
+                    if (startedAt > 0L) {
+                        val elapsed = ((System.currentTimeMillis() - startedAt).coerceAtLeast(0L) / 86_400_000L).coerceAtMost(2L) + 1L
+                        Text("Day " + elapsed + " of 3 • planned end " + java.text.SimpleDateFormat("dd MMM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(plannedEnd)))
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Button(
+                    onClick = {
+                        val pid = "PUBLIC-" + UUID.randomUUID().toString().replace("-", "").take(8).uppercase()
+                        val sid = "STUDY-" + UUID.randomUUID().toString().replace("-", "").take(8).uppercase()
+                        val start = System.currentTimeMillis()
+                        val end = start + 3L * 86_400_000L
+                        participantId = pid; studyId = sid; startedAt = start; plannedEnd = end; status = "ACTIVE"
+                        prefs.edit().putString("participant_id", pid).putString("study_id", sid).putLong("started_at", start).putLong("planned_end", end).putString("status", "ACTIVE").apply()
+                        scope.launch {
+                            db.patientDao().insertPublicStudy(org.chronopcos.patient.data.database.PublicStudyEntity(sid, pid, start, end, null, true, "ACTIVE"))
+                        }
+                        val intent = Intent(context, org.chronopcos.patient.study.PublicStudyService::class.java).apply {
+                            putExtra(org.chronopcos.patient.study.PublicStudyService.EXTRA_HOST, "192.168.4.1")
+                            putExtra(org.chronopcos.patient.study.PublicStudyService.EXTRA_PORT, 7777)
+                            putExtra(org.chronopcos.patient.study.PublicStudyService.EXTRA_PATIENT_ID, pid)
+                            putExtra(org.chronopcos.patient.study.PublicStudyService.EXTRA_STUDY_ID, sid)
+                        }
+                        ContextCompat.startForegroundService(context, intent)
+                    },
+                    enabled = consent && status != "ACTIVE",
+                    modifier = Modifier.weight(1f)
+                ) { Text("Start 3-Day Test") }
+
+                OutlinedButton(
+                    onClick = {
+                        context.stopService(Intent(context, org.chronopcos.patient.study.PublicStudyService::class.java))
+                        status = "STOPPED"
+                        prefs.edit().putString("status", "STOPPED").apply()
+                    },
+                    enabled = status == "ACTIVE",
+                    modifier = Modifier.weight(1f)
+                ) { Text("Stop") }
+            }
+        }
+
+        item { Text("Timeline", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+
+        items((0..2).toList()) { day ->
+            val total = dayCounts.getOrElse(day) { 0 }
+            val valid = validCounts.getOrElse(day) { 0 }
+            val quality = if (total > 0) valid.toFloat() / total else 0f
+            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("DAY " + (day + 1), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        ProvenanceBadge(if (total > 0) "RECORDED" else "WAITING", if (total > 0) "measured" else "neutral")
+                    }
+                    Text(total.toString() + " CP2 packets • " + valid.toString() + " CRC-valid")
+                    LinearProgressIndicator(progress = { quality }, Modifier.fillMaxWidth())
+                    Text(
+                        if (total == 0) "No recorded packets yet."
+                        else "Packet integrity " + String.format("%.1f%%", quality * 100f) + ". This is acquisition quality, not physiological validity.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("After Day 3", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Export the recorded data to the desktop ENDO-TWIN pipeline. The desktop baseline engine should then calculate personal reference statistics from the collected observations. Three calendar days make the baseline eligible for the project's minimum longitudinal coverage, but do not by themselves establish clinical validity.")
+                }
+            }
+        }
+    }
+}
+ 
+@Composable
 private fun ConnectionScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val client = remember { org.chronopcos.patient.wifi.EndoTwinTcpClient(context) }
@@ -459,7 +608,7 @@ private fun ConnectionScreen() {
                 OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("WHOAMI") }
             }
         }
-        item { Text("The ESP8266 has no BLE; the mobile path uses its Wi-Fi access point and TCP port 7777. CP2 frames are CRC-validated before acceptance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("The ESP32-S3 wearable uses Wi-Fi/TCP on port 7777. CP2 frames are CRC-validated before storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
