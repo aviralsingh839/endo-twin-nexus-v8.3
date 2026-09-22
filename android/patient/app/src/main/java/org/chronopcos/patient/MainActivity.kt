@@ -438,7 +438,7 @@ private fun ConnectionScreen() {
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ESP8266 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ESP32-S3 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(portText, { portText = it }, label = { Text("TCP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Text("${state.name} • ${device ?: "Not connected"}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
                     Text("CP2 packets received: $packets")
@@ -449,7 +449,7 @@ private fun ConnectionScreen() {
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Button(onClick = { client.connect(endpoint, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP8266") }
+                Button(onClick = { client.connect(endpoint, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP32-S3") }
                 OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
             }
         }
