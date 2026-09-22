@@ -25,7 +25,7 @@ Required libraries:
 - DallasTemperature
 - ESP8266 Arduino core
 
-The ESP8266 Arduino platform is installed through Boards Manager or the documented ESP8266 core package. citeturn0search0
+The ESP8266 Arduino platform is installed through Boards Manager or the documented ESP8266 core package.
 
 ## Wiring
 
