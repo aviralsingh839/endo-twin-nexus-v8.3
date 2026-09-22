@@ -85,7 +85,7 @@ private fun DoctorApp() {
                             Text(
                                 if (selected == null) "Doctor research workstation" else "Patient workspace • ${selected!!.id}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFFE0E5F6)
+                                color = Color(0xFFB9C7D2)
                             )
                         }
                     },
@@ -101,7 +101,7 @@ private fun DoctorApp() {
                             Text("DEMO_DATA", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF142B3A), titleContentColor = Color.White)
                 )
             }
         ) { padding ->
@@ -188,7 +188,7 @@ private fun Patients(onOpen: (DemoPatient) -> Unit) {
 
 @Composable
 private fun PatientRow(patient: DemoPatient, onOpen: (DemoPatient) -> Unit) {
-    Card(onClick = { onOpen(patient) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(onClick = { onOpen(patient) }, shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
