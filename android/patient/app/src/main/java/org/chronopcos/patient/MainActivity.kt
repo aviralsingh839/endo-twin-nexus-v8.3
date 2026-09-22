@@ -224,104 +224,78 @@ private fun DemoBanner() {
 
 @Composable
 private fun HomeScreen(patientId: String, alias: String) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("Good to see you, $alias.", "Patient-scoped physiological workspace • $patientId") }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { PageTitle("Public Test Workspace", "Anonymous participant • $patientId") }
         item {
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF28314D))) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Avatar("M", alias)
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Personal baseline", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                        Text("Illustrative completeness • not clinical certainty", style = MaterialTheme.typography.bodySmall, color = Color(0xFFC4CDE5))
-                        LinearProgressIndicator(progress = 0.72f, Modifier.fillMaxWidth(), color = Color(0xFF63D8C3), trackColor = Color(0xFF3D4661))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text("72%", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.ExtraBold)
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("3-day wearable observation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("The participant wears the ESP32-S3 pod during ordinary daily life. The app records timestamped CP2 packets locally and keeps the participant de-identified.")
+                    ProvenanceBadge("REAL ACQUISITION ONLY", "measured")
                 }
             }
         }
-        item { Text("Today's signals", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        item { MetricCard("Heart rate", "88 bpm", "Illustrative resting-window example", "DEMO_DATA", listOf(82f,85f,87f,84f,91f,88f,89f)) }
-        item { MetricCard("HRV • RMSSD", "31 ms", "Pulse-derived feature; not interchangeable with ECG HRV", "DEMO_DATA", listOf(35f,32f,30f,36f,28f,31f,31f)) }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f)) { MetricCard("Skin temperature", "32.7 °C", "Validity-gated skin temperature", "DEMO_DATA", listOf(32.5f,32.7f,32.6f,32.8f,32.7f)) }
-                Box(Modifier.weight(1f)) { MetricCard("Activity", "24%", "Illustrative motion index", "DEMO_DATA", listOf(29f,22f,27f,24f,26f,21f)) }
-            }
-        }
-        item {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF222935))) {
-                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Psychology, null, tint = Color(0xFFA9B7FF))
-                        Spacer(Modifier.width(8.dp))
-                        Text("CHRONO-PCOS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
-                        ProvenanceBadge("RESEARCH MODULE")
-                    }
-                    Text("Disease-specific module inside ENDO-TWIN. A wearable stream alone is not a PCOS diagnostic criterion; disease-model context must use appropriate clinical evidence.")
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        ProvenanceBadge("CLINICAL GATE", "warn")
-                        ProvenanceBadge("VALIDATION: NOT ESTABLISHED", "error")
+            SectionTitle("What happens next", "No synthetic values are shown in the public-test workflow.")
+            listOf(
+                "Start the 3-day study and keep the phone connected to ENDO-TWIN-S3.",
+                "A persistent notification shows that recording is active.",
+                "The app records raw CP2 packets locally and reconnects after temporary Wi-Fi loss.",
+                "After Day 3, export the study and run baseline/longitudinal analysis on the desktop."
+            ).forEachIndexed { i, text ->
+                Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+                        Text((i + 1).toString(), fontWeight = FontWeight.ExtraBold)
+                        Spacer(Modifier.width(12.dp))
+                        Text(text)
                     }
                 }
             }
         }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedButton(onClick = {}, Modifier.weight(1f)) { Text("Symptoms") }
-                OutlinedButton(onClick = {}, Modifier.weight(1f)) { Text("Cycle") }
-                OutlinedButton(onClick = {}, Modifier.weight(1f)) { Text("Reports") }
-            }
-        }
-        item { Text("Research / risk-screening output — not a medical diagnosis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
-    }
-}
-
-@Composable
-private fun HealthScreen(patientId: String) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("My Health", "Longitudinal context, personal baseline and data quality • $patientId") }
-        item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = true, onClick = {}, label = { Text("30 days") })
-                FilterChip(selected = false, onClick = {}, label = { Text("90 days") })
-                FilterChip(selected = false, onClick = {}, label = { Text("All time") })
-            }
-        }
-        item { MetricCard("Personal baseline", "72% complete", "Illustrative coverage only", "DEMO_DATA", listOf(56f,61f,64f,68f,72f)) }
-        item { MetricCard("Recovery context", "UNKNOWN", "No validated recovery model is active", "UNKNOWN") }
-        item {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("How ENDO-TWIN interprets change", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    listOf("Personal baseline", "Repeated measurements + quality", "Persistence / change over time", "Patient-reported or clinical context").forEachIndexed { index, item ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Box(Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF2A4A48)), contentAlignment = Alignment.Center) {
-                                Text("${index + 1}", color = Color(0xFF7DE1C7), fontWeight = FontWeight.Bold)
-                            }
-                            Text(item)
-                        }
-                    }
+            Card(shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Research boundary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("The wearable can provide physiological signals and data-quality information. It does not establish a diagnosis. Three days are an engineering/public-test window, not clinical validation.")
                 }
-            }
-        }
-        item {
-            SectionTitle("Provenance legend", "Source classification stays visible.")
-            Spacer(Modifier.height(7.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("MEASURED","DERIVED","CLINICALLY_ENTERED","PATIENT-REPORTED","IMAGE-DERIVED","MODEL-INFERRED","DEMO_DATA","UNKNOWN").forEach { ProvenanceBadge(it) }
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(title: String, subtitle: String? = null) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+private fun HealthScreen(patientId: String) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { PageTitle("Health", "Personal baseline and longitudinal context • $patientId") }
+        item {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Baseline status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Waiting for the three-day observation window. The baseline is calculated from collected observations rather than a fixed population reference.")
+                    ProvenanceBadge("BASELINE: NOT READY", "warn")
+                }
+            }
+        }
+        item {
+            SectionTitle("Interpretation order", "The system should evaluate these in sequence.")
+            listOf(
+                "Acquisition coverage",
+                "Sensor/packet quality",
+                "Feature extraction",
+                "Personal baseline",
+                "Repeated change across time",
+                "Research-model interpretation"
+            ).forEachIndexed { i, text ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(26.dp).clip(CircleShape).background(Color(0xFF2A4A48)), contentAlignment = Alignment.Center) {
+                        Text((i + 1).toString(), color = Color(0xFF7DE1C7), fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(text)
+                }
+            }
+        }
+        item { Text("No diagnosis is produced by this screen.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
     }
 }
 
