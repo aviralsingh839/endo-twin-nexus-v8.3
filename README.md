@@ -1,6 +1,12 @@
-# ENDO-TWIN V8.6.1 — Current Operating Path
+# ENDO-TWIN NEXUS V8.7 — Current Operating Path
 
-ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is its first disease-specific research module.
+ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is one disease-specific research extension inside it.
+
+## Active hardware
+- **ESP32 = primary wearable**
+- **Arduino Mega 2560 = bench/lab/expanded test controller**
+- **Arduino Nano = legacy only; not required by the current build or runtime**
+- **ESP8266 = legacy only; not an active communication bridge**
 
 ## Start
 ```bash
@@ -13,16 +19,15 @@ ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is i
 ./START.sh patient-pc
 ```
 
-Both workstations ask for **DEMO MODE** or **LIVE SENSOR MODE** before the main interface opens. The selected mode is fixed for that run.
+Both workstations can use **DEMO MODE** or **LIVE SENSOR MODE**. LIVE mode accepts dynamically selected USB serial ports and canonical CRC-checked `$CP/$CP2` packets.
 
-## Live sensor path
-LIVE SENSOR MODE accepts CRC-checked Arduino $CP/$CP2 packets and runs the existing PPG, HRV, IMU, GSR and temperature processing pipeline. Poor-quality pulse data can suppress HR/HRV, and SpO2 is withheld by a stricter quality gate.
+## Live paths
+```
+ESP32 wearable ── USB Serial / BLE ── CP2 ──> Android/Desktop
+Mega lab      ── USB Serial ──────── CP2 ──> Python/Desktop
+```
 
-## Doctor review
-The Doctor Workstation includes:
-**Command Center · Patient Registry · Live Signals · CHRONO-PCOS · Ultrasound · Reports · Mobile Link**
-
-DEMO MODE contains named synthetic review cases with condition/module, synthetic tier, research-risk value, quality and driver text. These are demonstration values, not diagnoses, patient severity assessments or validation metrics.
+The existing signal-processing, quality-gating, local-first storage and provenance architecture is preserved.
 
 ## Android
 ```bash
@@ -30,25 +35,6 @@ DEMO MODE contains named synthetic review cases with condition/module, synthetic
 ./build_apks.sh all
 ```
 
-## Mobile connection
-Doctor Workstation → Mobile Link → endpoint + 6-digit code.
-Patient Android → Connect → Pair → Send latest session.
+Patient and Doctor remain native Kotlin + Compose + Material 3. The ESP32 BLE transport is the active wearable mobile path; DEMO_DATA remains explicitly separated from live data.
 
-The current Android transport is deliberately DEMO_DATA. See the application and live-processing guides for the evidence and security boundaries.
-
----
-
-# ENDO-TWIN — Personalized Physiological Modelling Platform
-### **Sense • Model • Predict • Personalize • Connect**
-
-> **One Sentence: ENDO-TWIN is the platform; CHRONO-PCOS is its first disease-specific model.**
-> **Research Prototype — Not a Medical Device — Not Clinically Validated — Not a Diagnosis**
-
-The historical architecture and preserved PCOS work remain documented below. The current V8.6 workstation experience adds a mode-safe live acquisition surface without turning research signals into clinical claims.
-
-## Website / Research Portal
-The public-facing static research website remains part of the repository at `website/` and is aligned with the current ENDO-TWIN V8.6.1 branding.
-
-```bash
-./START.sh website
-```
+> Research prototype — not a medical device, not clinically validated, not a diagnosis.
