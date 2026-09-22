@@ -1,28 +1,32 @@
-# ENDO-TWIN NEXUS V8.7 — ESP8266 + Mega Connection
+# ENDO-TWIN NEXUS — ESP32-S3 Wearable + Mega Hub
 
-## Active topology
+The active topology is:
 
-### Wearable
-ESP8266 → USB Serial → Desktop
+```
+ESP32-S3 wearable ── Wi-Fi/TCP 7777 ── Android/Desktop
+Mega 2560 lab hub ── USB Serial ─────── Desktop
+```
 
-or
+The two controllers are independent CP2 producers.
 
-ESP8266 → Wi-Fi TCP port 7777 → Android / desktop TCP client
+## Wearable
 
-### Bench/lab
-Arduino Mega 2560 → USB Serial → Desktop
+- ESP32-S3-DevKitC-1
+- MAX30102
+- MPU6050
+- BME280
+- BH1750
+- GSR module + finger electrodes
+- TCP port 7777
 
-The Mega and ESP8266 are independent CP2 producers.
+## Mega
 
-## ESP8266 network
+- Arduino Mega 2560
+- expanded lab sensors and controls
+- USB Serial 115200
 
-- SoftAP SSID: `ENDO-TWIN-ESP8266`
-- Password: `endotwin8266`
-- TCP port: `7777`
-- Default SoftAP address: normally `192.168.4.1`; confirm from serial output.
+For the full physical construction and box measurements, use:
 
-ESP8266 has no BLE. Android therefore uses a TCP socket instead of the previous ESP32 BLE contract.
+`docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`
 
-## Legacy
-
-The previous ESP32 wearable and old ESP8266 bridge are preserved under `hardware/legacy/`.
+The previous ESP8266 wearable is no longer an active build target.
