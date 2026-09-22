@@ -1,8 +1,8 @@
 package org.chronopcos.patient.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -29,7 +29,7 @@ private val ClinicalLightColors = lightColorScheme(
     onSurfaceVariant = Color(0xFF667483),
     outline = Color(0xFFD8E0E8),
     error = Color(0xFFB33A3A),
-    onError = Color(0xFFFFFFFF),
+    onError = Color(0xFFFFFFFF)
 )
 
 private val ClinicalTypography = Typography().run {
@@ -41,7 +41,7 @@ private val ClinicalTypography = Typography().run {
         titleMedium = titleMedium.copy(fontWeight = FontWeight.SemiBold),
         labelLarge = labelLarge.copy(fontWeight = FontWeight.SemiBold),
         bodyLarge = bodyLarge.copy(lineHeight = 24.sp),
-        bodyMedium = bodyMedium.copy(lineHeight = 21.sp),
+        bodyMedium = bodyMedium.copy(lineHeight = 21.sp)
     )
 }
 
