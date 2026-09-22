@@ -1,637 +1,1428 @@
 #!/usr/bin/env python3
-"""
-Doctor PC App Enhanced Main - V8.3+ Polished Clinical/Research Workstation
-Preserves src/ui/main_window.py, adds new architecture.
+"""ENDO-TWIN V8.6 Doctor Workstation — reference-inspired clinical research UI."""
+from __future__ import annotations
 
-Dashboard, Patients, Signals, Longitudinal Analysis, Ultrasound, AI/ML, Reports, Data Provenance, Model Explanation, Database, Settings, Diagnostics
-
-Clearly separates OBSERVED, ASSOCIATED, MODEL-INFERRED, UNKNOWN, never mixes them.
-"""
 import sys
 from pathlib import Path
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# PROJECT_ROOT must be first to avoid src/core shadowing core/chrono_metabolic
-# src is inside PROJECT_ROOT, so src.* imports work via PROJECT_ROOT/src as package
-# Do NOT add src to sys.path separately - it causes src/core to shadow core/
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-# Ensure PROJECT_ROOT is first
-if sys.path[0] != str(PROJECT_ROOT):
-    if str(PROJECT_ROOT) in sys.path:
-        sys.path.remove(str(PROJECT_ROOT))
-    sys.path.insert(0, str(PROJECT_ROOT))
-# Remove src from path if present to avoid shadowing
-src_path = str(PROJECT_ROOT / "src")
-if src_path in sys.path:
-    sys.path.remove(src_path)
+from datetime import datetime, timedelta
 
-# Try to import existing V8.3 main window - preserve it
-try:
-    from src.ui.main_window import MainWindow as V83MainWindow
-    V83_AVAILABLE = True
-except ImportError as e:
-    V83_AVAILABLE = False
-    V83MainWindow = None
-    print(f"V8.3 MainWindow not available: {e}")
-
-# New modular enhancements
-from database.database import LocalDatabase
-from desktop.doctor_app.patient_management import (
-    DoctorDashboard, PatientManager, PhysiologicalDataViewer,
-    AdvancedAnalysisViewer, UltrasoundViewer, LongitudinalViewer, ReportGenerator
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QApplication, QFileDialog, QComboBox, QDialog, QDialogButtonBox, QFrame,
+    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QPushButton, QScrollArea, QDoubleSpinBox, QSplitter,
+    QStackedWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
+    QWidget
 )
 
-# PySide6 GUI
-try:
-    from PySide6.QtWidgets import (
-        QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
-        QLabel, QPushButton, QListWidget, QTextEdit, QGroupBox, QGridLayout,
-        QScrollArea, QFrame, QSplitter, QTableWidget, QTableWidgetItem, QHeaderView
-    )
-    from PySide6.QtCore import Qt
-    PYSIDE_AVAILABLE = True
-except ImportError:
-    PYSIDE_AVAILABLE = False
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from database.database import LocalDatabase
+from desktop.doctor_app.patient_management import PatientManager
+from desktop.demo_data import condition_list, sorted_cases, DemoCase
+from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
+from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
+from desktop.prototype_lab import PrototypeLabWidget
+from services.bridge.server import EndoTwinBridgeServer
+
+DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
+ORDER = {"High": 4, "Elevated": 3, "Moderate": 2, "Low": 1, "Unknown": 0}
 
 
-class EnhancedDoctorApp:
-    def __init__(self):
+class DoctorWindow(QMainWindow):
+    """Reference-inspired doctor workstation with patient-scoped tabs and auditability."""
+
+    def __init__(self, mode: ModeConfig):
+        super().__init__()
+        self.mode = mode
         self.db = LocalDatabase()
-        self.dashboard = DoctorDashboard(self.db)
         self.patient_mgr = PatientManager(self.db)
-        self.physio_viewer = PhysiologicalDataViewer(self.db)
-        self.advanced_viewer = AdvancedAnalysisViewer(self.db)
-        self.ultrasound_viewer = UltrasoundViewer(self.db)
-        self.longitudinal_viewer = LongitudinalViewer()
-        self.report_gen = ReportGenerator(db=self.db)
+        self.current_case: DemoCase | None = None
+        self.live_patient = None
+        self.latest_row = None
+        self.packet_count = 0
+        self.events = []
+        self.note_cache = ""
+        self.image_path = ""
+        self.metric_cards = {}
+        self.trend_charts = {}
+        self.tab_pages = {}
+        self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
 
-    def run_console_demo(self):
-        print("="*80)
-        print("CHRONO-PCOS Doctor PC App V8.3+ - Polished Clinical/Research Workstation")
-        print("Preserves V8.3 src/ui/main_window.py + new modular architecture")
-        print("Research / risk-screening output — not a medical diagnosis")
-        print("="*80)
+        self.bridge = EndoTwinBridgeServer(ROOT, 7777)
+        self.bridge.start()
 
-        overview = self.dashboard.get_overview()
-        print(f"\n[Dashboard] Patient overview: {overview['total_patients']} patients, longitudinal: {overview['longitudinal_summary']}")
-        print("Recent assessments, data quality, pending reviews, longitudinal views")
+        self.session = LiveSession(mode, self)
+        self.session.features_updated.connect(self._on_features)
+        self.session.sample_received.connect(self._on_sample)
+        self.session.state_changed.connect(self._on_state)
+        self.session.error_received.connect(self._on_error)
+        self.session.start()
 
-        print("\n[Patients] Patient Management: create, search, open, archive, history")
-        patients = self.db.list_patients()
-        print(f"Total patients: {len(patients)}")
-        for p in patients[:3]:
-            print(f"  - {p['anonymous_id']} Age {p.get('age_years','')} BMI {p.get('bmi','')} (USER-ENTERED)")
+        self.setWindowTitle("Endo-Twin Nexus — Doctor Desktop • V8.6")
+        self.resize(1580, 940)
+        self.setMinimumSize(1180, 760)
+        self.setStyleSheet(APP_QSS)
+        self._build()
+        self._log_event("Workstation opened", "session")
+        self._refresh_roster()
+        self._refresh_header()
 
-        print("\n[Signals] Physiological Data: raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts, visualization, time-series")
-        session_data = self.physio_viewer.get_session_data("session_001")
-        print(f"Session data quality overall: {session_data['quality']['overall']}")
-        print(f"  - HR: {session_data['hr']['mean']} bpm MEASURED quality 0.91")
-        print(f"  - HRV RMSSD: {session_data['hrv']['rmssd']} ms DERIVED quality 0.85 limitations PPG less accurate than ECG")
-        print(f"  - Artifacts: {session_data['artifacts']}")
+    def closeEvent(self, event):
+        self.session.stop()
+        self.bridge.stop()
+        self.db.close()
+        event.accept()
 
-        print("\n[Longitudinal] Longitudinal Analysis: comparison trends baseline deviation")
-        long_comp = self.longitudinal_viewer.compare("patient_001", ["s1", "s2"])
-        print(f"Trends: {long_comp['trends']}")
-        print(f"Baseline deviation: {long_comp['baseline_deviation']}")
+    # ---------- shell ----------
+    def _build(self):
+        root = QWidget()
+        self.setCentralWidget(root)
+        shell = QGridLayout(root)
+        shell.setContentsMargins(0, 0, 0, 0)
+        shell.setSpacing(0)
 
-        print("\n[Advanced Analysis] Circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML")
-        print("Distinguishes OBSERVED, ASSOCIATED, MODEL-INFERRED, UNKNOWN, never mixes them")
-        print("Distinguishes established/derived/experimental/ML/clinical, explainability")
-        analysis = self.advanced_viewer.analyze("patient_001")
-        print(f"Circadian: {analysis['circadian']}")
-        print(f"Autonomic: {analysis['autonomic']}")
-        print(f"Metabolic: {analysis['metabolic']}")
-        print(f"Fingerprint components: {len(analysis['fingerprint']['components'])}")
-        for comp in analysis['fingerprint']['components'][:3]:
-            print(f"  - {comp['name']}: {comp['category']}, quality {comp['quality']}, source {comp['source'][:40]}...")
+        side = QFrame()
+        side.setObjectName("sidebar")
+        side.setFixedWidth(205)
+        sl = QVBoxLayout(side)
+        sl.setContentsMargins(14, 18, 10, 16)
+        sl.setSpacing(4)
 
-        print("\n[Ultrasound] Ultrasound: loading, preprocessing, quality checks, segmentation, inference, visualization, confidence, training, evaluation, storage")
-        print("Do not invent accuracy, state if insufficient, never fabricate percentages")
-        print("Clearly label IMAGE-DERIVED")
-        img = self.ultrasound_viewer.load_image("ultrasound_demo.png")
-        qc = self.ultrasound_viewer.quality_check(img)
-        inf = self.ultrasound_viewer.inference(img)
-        print(f"Quality check: {qc['result']}")
-        print(f"Inference: {inf['result']}")
-        print(f"Quality gate: UNKNOWN by design unless computed, provenance CLINICALLY-ENTERED vs IMAGE-DERIVED")
+        brand = QLabel("Endo-Twin Nexus")
+        brand.setObjectName("brand")
+        sl.addWidget(brand)
+        tag = QLabel("Sense · Understand · Track · Model · Personalize")
+        tag.setObjectName("muted")
+        tag.setWordWrap(True)
+        sl.addWidget(tag)
+        sl.addSpacing(17)
 
-        print("\n[AI/ML] AI/ML Laboratory: Dataset, Data validation, Preprocessing, Feature engineering, Training, Validation, Testing, Leakage detection, Model comparison, Explainability, Model registry, Model approval, Rollback, Inference, Uncertainty")
-        print("Prevent data leakage, clearly distinguish TRAIN VALIDATION TEST, never allow same patient/time-series samples to silently appear across incompatible splits")
-        for ai_out in analysis['ai_outputs']:
-            print(f"  - {ai_out['module']}: {ai_out['output']} confidence {ai_out['confidence']} - {ai_out.get('validation','')}")
+        ws = QLabel("WORKSPACE")
+        ws.setObjectName("eyebrow")
+        sl.addWidget(ws)
 
-        print("\n[Reports] Reports: Professional with disclaimer Research / risk-screening output — not a medical diagnosis")
-        report = self.report_gen.generate("patient_001", analysis)
-        print(f"Report disclaimer: {report['disclaimer']}")
-        print(f"Model transparency: {report['model_transparency']}")
+        self.nav = {}
+        for key, text in [
+            ("dashboard", "▦  Dashboard"),
+            ("patients", "♙  Patients"),
+            ("lab", "⌁  Prototype Lab"),
+        ]:
+            b = QPushButton(text)
+            b.setObjectName("nav")
+            b.setCheckable(True)
+            b.clicked.connect(lambda _=False, k=key: self._go(k))
+            self.nav[key] = b
+            sl.addWidget(b)
 
-        print("\n[Data Provenance] Data Provenance: MEASURED, CLINICALLY ENTERED, IMAGE-DERIVED, MODEL-INFERRED, UNKNOWN - Never fabricate, never mix")
-        print("MEASURED: HR 72 bpm quality 0.91 source MAX30102")
-        print("CLINICALLY ENTERED: age BMI cycle info USER-ENTERED")
-        print("IMAGE-DERIVED: cyst size morphology quality UNKNOWN by design unless computed")
-        print("MODEL-INFERRED: sleep regularity circadian disruption confidence limitations")
-        print("UNKNOWN: if cannot reliably extract return UNKNOWN never invent")
+        self.current_group = QLabel("CURRENT PATIENT")
+        self.current_group.setObjectName("eyebrow")
+        self.current_group.setVisible(False)
+        sl.addWidget(self.current_group)
 
-        print("\n[Model Explanation] Model Explanation: drivers, baseline deviations, trends, SHAP values, understandable language, model name version dataset version training date features target metrics validation strategy limitations, never hide uncertainty")
+        self.current_patient_btn = QPushButton("No patient selected")
+        self.current_patient_btn.setObjectName("nav")
+        self.current_patient_btn.setEnabled(False)
+        self.current_patient_btn.setVisible(False)
+        self.current_patient_btn.clicked.connect(lambda: self._go("patient"))
+        sl.addWidget(self.current_patient_btn)
 
-        print("\n[Database] Database: 18 tables local-first, providers 4 demo, supplies 5")
+        self.settings_group = QLabel("SETTINGS")
+        self.settings_group.setObjectName("eyebrow")
+        sl.addSpacing(16)
+        sl.addWidget(self.settings_group)
 
-        print("\n[Settings] Settings: System configuration")
+        b = QPushButton("⚙  Preferences")
+        b.setObjectName("nav")
+        b.clicked.connect(lambda: self._go("settings"))
+        self.nav["settings"] = b
+        sl.addWidget(b)
 
-        print("\n[Diagnostics] Diagnostics: actual checks PASS/WARN/FAIL never fake")
+        sl.addStretch()
 
-        print("\n[Doctor Notes] Notes input/view")
-        print("This is a research / risk-screening output — not a medical diagnosis.")
-        print("="*80)
+        mode_box = QFrame()
+        mode_box.setObjectName("hero")
+        mv = QVBoxLayout(mode_box)
+        mv.setContentsMargins(10, 10, 10, 10)
+        mx = QLabel("SESSION MODE")
+        mx.setObjectName("eyebrow")
+        mv.addWidget(mx)
+        self.side_mode = QLabel()
+        self.side_mode.setObjectName("subtitle")
+        mv.addWidget(self.side_mode)
+        self.side_state = QLabel()
+        self.side_state.setObjectName("muted")
+        self.side_state.setWordWrap(True)
+        mv.addWidget(self.side_state)
+        sl.addWidget(mode_box)
+        shell.addWidget(side, 0, 0)
 
-    def run_gui(self):
-        if not PYSIDE_AVAILABLE:
-            print("PySide6 not available, running console demo")
-            self.run_console_demo()
+        right = QWidget()
+        rv = QVBoxLayout(right)
+        rv.setContentsMargins(0, 0, 0, 0)
+        rv.setSpacing(0)
+
+        top = QFrame()
+        top.setObjectName("topbar")
+        tl = QHBoxLayout(top)
+        tl.setContentsMargins(18, 8, 18, 8)
+        brand2 = QLabel("ENDO-TWIN")
+        brand2.setStyleSheet("color:#ffffff;font-size:16px;font-weight:900;")
+        tl.addWidget(brand2)
+        subtitle = QLabel("Personalized Physiological Modelling Platform")
+        subtitle.setStyleSheet("color:#dbe2fa;font-size:10px;font-weight:650;")
+        tl.addWidget(subtitle)
+        tl.addSpacing(18)
+
+        self.global_search = QLineEdit()
+        self.global_search.setPlaceholderText("Search / select patient…")
+        self.global_search.setFixedWidth(270)
+        self.global_search.returnPressed.connect(self._search_patient)
+        tl.addWidget(self.global_search)
+        tl.addStretch()
+
+        self.connection_badge = status_badge("●  Research prototype", "info")
+        self.quality_badge = status_badge("●  Data quality: —", "neutral")
+        self.patient_badge = status_badge("No patient selected", "neutral")
+        tl.addWidget(self.connection_badge)
+        tl.addSpacing(6)
+        tl.addWidget(self.quality_badge)
+        tl.addSpacing(6)
+        tl.addWidget(self.patient_badge)
+        rv.addWidget(top)
+
+        self.stack = QStackedWidget()
+        self.pages = {
+            "dashboard": self._dashboard_page(),
+            "patients": self._patients_page(),
+            "lab": PrototypeLabWidget(self.session, self.mode, ROOT),
+            "patient": self._patient_page(),
+            "mobile": self._mobile_page(),
+            "settings": self._settings_page(),
+        }
+        for key in self.page_keys:
+            self.stack.addWidget(self.pages[key])
+        rv.addWidget(self.stack, 1)
+
+        foot = QLabel(f"{DISCLAIMER}  •  Local-first  •  Patient-scoped  •  Startup mode is fixed for this run")
+        foot.setObjectName("muted")
+        foot.setContentsMargins(16, 4, 16, 7)
+        rv.addWidget(foot)
+        shell.addWidget(right, 0, 1)
+
+        self._go("dashboard")
+
+    def _go(self, key: str):
+        if key not in self.page_keys:
+            return
+        self.stack.setCurrentIndex(self.page_keys.index(key))
+        for k, b in self.nav.items():
+            b.setChecked(k == key)
+        if key in ("dashboard", "patients"):
+            self._refresh_roster()
+        self._refresh_header()
+
+    def _mode_text(self):
+        if self.mode.mode == "demo":
+            return "DEMO MODE", "Synthetic showcase stream"
+        return "LIVE SENSOR MODE", f"USB serial • {self.mode.port}"
+
+    def _refresh_header(self):
+        title, detail = self._mode_text()
+        self.side_mode.setText(title)
+        self.side_state.setText(detail)
+        if self.current_case:
+            self.current_patient_btn.setText(f"◉  {self.current_case.alias}  ·  {self.current_case.patient}")
+            self.current_patient_btn.setVisible(True)
+            self.current_group.setVisible(True)
+            self.current_patient_btn.setEnabled(True)
+            self.patient_badge.setText(f"Patient • {self.current_case.patient}")
+        elif self.live_patient:
+            alias = str(self.live_patient.get("display_name") or self.live_patient.get("anonymous_id") or "Local patient")
+            pid = str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "")
+            self.current_patient_btn.setText(f"◉  {alias}  ·  {pid}")
+            self.current_patient_btn.setVisible(True)
+            self.current_group.setVisible(True)
+            self.current_patient_btn.setEnabled(True)
+            self.patient_badge.setText(f"Patient • {pid or alias}")
+        else:
+            self.current_patient_btn.setVisible(False)
+            self.current_group.setVisible(False)
+            self.patient_badge.setText("No patient selected")
+
+        if self.mode.mode == "live":
+            self.connection_badge.setText("●  " + ("Wearable • connected" if self.latest_row else "Wearable • waiting"))
+        else:
+            self.connection_badge.setText("●  Demo data • synthetic")
+
+    # ---------- data helpers ----------
+    def _profile(self):
+        if self.current_case:
+            return {
+                "pid": self.current_case.patient,
+                "alias": self.current_case.alias,
+                "age": self.current_case.age,
+                "bmi": self.current_case.bmi,
+                "condition": self.current_case.condition,
+                "tier": self.current_case.tier,
+                "risk": self.current_case.risk,
+                "quality": self.current_case.quality,
+                "hr": self.current_case.hr,
+                "hrv": self.current_case.hrv,
+                "temp": self.current_case.temp,
+                "activity": self.current_case.activity,
+                "sleep": self.current_case.sleep,
+                "drivers": self.current_case.drivers,
+                "last_seen": self.current_case.last_seen,
+            }
+        if self.live_patient:
+            return {
+                "pid": str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "LOCAL"),
+                "alias": str(self.live_patient.get("display_name") or "Local patient"),
+                "age": self.live_patient.get("age_years", "—"),
+                "bmi": self.live_patient.get("bmi", "—"),
+                "condition": "No model run",
+                "tier": "Unknown",
+                "risk": None,
+                "quality": None,
+                "hr": None,
+                "hrv": None,
+                "temp": None,
+                "activity": None,
+                "sleep": None,
+                "drivers": ("No disease-model inference in live workstation view",),
+                "last_seen": str(self.live_patient.get("updated_at", "—")),
+            }
+        return None
+
+    def _data_quality_text(self, quality):
+        if quality is None:
+            return "Data quality: —", "neutral"
+        q = float(quality)
+        if q >= 0.9:
+            return f"Data quality: Good", "good"
+        if q >= 0.8:
+            return f"Data quality: Fair", "fair"
+        return f"Data quality: Poor", "poor"
+
+    def _log_event(self, title, detail):
+        self.events.append((datetime.now().strftime("%Y-%m-%d %H:%M:%S"), title, detail))
+        if len(self.events) > 40:
+            self.events = self.events[-40:]
+
+    def _fmt(self, value, suffix="", digits=1):
+        if value is None:
+            return "—"
+        try:
+            return f"{float(value):.{digits}f}{suffix}"
+        except Exception:
+            return str(value)
+
+    def _patient_header(self):
+        p = self._profile()
+        box = QFrame()
+        box.setObjectName("patientHeader")
+        lay = QHBoxLayout(box)
+        lay.setContentsMargins(14, 12, 14, 12)
+
+        avatar = QLabel((p["pid"][-3:] if p else "000"))
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar.setFixedSize(46, 46)
+        avatar.setStyleSheet("background:#8998e9;color:white;border-radius:11px;font-size:16px;font-weight:900;")
+        lay.addWidget(avatar)
+        lay.addSpacing(9)
+
+        col = QVBoxLayout()
+        title = QLabel(f'{p["alias"]}  ')
+        title.setStyleSheet("font-size:17px;font-weight:900;color:#eef1f7;")
+        col.addWidget(title)
+        pid = QLabel(f'{p["pid"]}  ·  internal reference only')
+        pid.setObjectName("muted")
+        col.addWidget(pid)
+        tag = QLabel("DEMO DATA" if self.current_case else "LOCAL RECORD")
+        tag.setStyleSheet("background:#2d3341;color:#c3cad8;border-radius:8px;padding:4px 7px;font-size:9px;font-weight:850;")
+        col.addWidget(tag)
+        lay.addLayout(col, 1)
+
+        meta = QGridLayout()
+        fields = [
+            ("OBSERVATION PERIOD", "30 days" if self.current_case else "—"),
+            ("LAST SYNC", p["last_seen"]),
+            ("DATA QUALITY", self._data_quality_text(p["quality"])[0].replace("Data quality: ", "")),
+            ("REVIEW STATUS", "Needs review" if (self.current_case and p["tier"] in ("High", "Elevated")) else "Research only"),
+        ]
+        for i, (k, v) in enumerate(fields):
+            lab = QLabel(k)
+            lab.setObjectName("smallCaps")
+            val = QLabel(str(v))
+            val.setStyleSheet("color:#e6eaf2;font-weight:800;")
+            meta.addWidget(lab, 0, i)
+            meta.addWidget(val, 1, i)
+        lay.addLayout(meta)
+        return box
+
+    def _metric_panel(self, title, value, unit, delta, provenance, values, quality_kind="good"):
+        panel = QFrame()
+        panel.setObjectName("card")
+        v = QVBoxLayout(panel)
+        v.setContentsMargins(14, 12, 14, 10)
+        top = QHBoxLayout()
+        a = QLabel(title)
+        a.setStyleSheet("font-size:12px;font-weight:800;color:#d5dbea;")
+        top.addWidget(a)
+        top.addStretch()
+        u = QLabel(unit)
+        u.setObjectName("muted")
+        top.addWidget(u)
+        v.addLayout(top)
+
+        row = QHBoxLayout()
+        big = QLabel(value)
+        big.setObjectName("metricValue")
+        row.addWidget(big)
+        if delta:
+            d = QLabel(delta)
+            d.setObjectName("muted")
+            row.addWidget(d, 0, Qt.AlignmentFlag.AlignBottom)
+        row.addStretch()
+        row.addWidget(status_badge("●  " + ("Good" if quality_kind=="good" else "Fair" if quality_kind=="fair" else "Unknown"), quality_kind))
+        v.addLayout(row)
+
+        chart = Sparkline(title, unit)
+        chart.setMinimumHeight(112)
+        chart.set_values(values)
+        v.addWidget(chart)
+        prov = QLabel(provenance)
+        prov.setStyleSheet("border:1px solid #566178;border-radius:6px;padding:3px 7px;color:#aab9ff;font-size:9px;font-weight:800;")
+        v.addWidget(prov, 0, Qt.AlignmentFlag.AlignLeft)
+        self.metric_cards[title] = (big, chart)
+        return panel
+
+    # ---------- dashboard ----------
+    def _dashboard_page(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setContentsMargins(25, 18, 20, 15)
+        o.setSpacing(13)
+
+        t = QLabel("Dashboard")
+        t.setObjectName("title")
+        o.addWidget(t)
+        s = QLabel("Cross-patient overview — Endo-Twin Nexus research workspace")
+        s.setObjectName("muted")
+        o.addWidget(s)
+
+        g = QGridLayout()
+        g.setSpacing(12)
+        self.dash_kpis = {}
+        kpis = [
+            ("Active patients", "—", "Demo roster"),
+            ("Needs review", "—", "Synthetic queue state"),
+            ("Flagged for attention", "—", "Signal / quality flags"),
+            ("Data quality mix", "—", "Good · Fair · Poor"),
+        ]
+        for i, (a, b, c) in enumerate(kpis):
+            f = card(a, b, c)
+            g.addWidget(f, 0, i)
+            self.dash_kpis[a] = f.findChildren(QLabel)[1]
+        o.addLayout(g)
+
+        split = QSplitter(Qt.Orientation.Horizontal)
+
+        left = QFrame()
+        left.setObjectName("card")
+        lv = QVBoxLayout(left)
+        lv.addWidget(section_header("Recently synced patients", "Select a row to open its patient-scoped workspace."))
+        self.dash_table = QTableWidget(0, 5)
+        self.dash_table.setHorizontalHeaderLabels(["Patient", "Last session", "Quality", "Review", ""])
+        self._fit_table(self.dash_table)
+        self.dash_table.cellClicked.connect(self._dashboard_row)
+        lv.addWidget(self.dash_table)
+
+        right = QFrame()
+        right.setObjectName("card")
+        rv = QVBoxLayout(right)
+        rv.addWidget(section_header("Flags across roster", "Synthetic demo flags are examples only."))
+        self.dash_flags = QVBoxLayout()
+        rv.addLayout(self.dash_flags)
+        rv.addStretch()
+        split.addWidget(left)
+        split.addWidget(right)
+        split.setSizes([730, 520])
+        o.addWidget(split, 1)
+        return w
+
+    def _refresh_dashboard(self):
+        if not hasattr(self, "dash_table"):
+            return
+        demo = self.mode.mode == "demo"
+        rows = sorted_cases() if demo else []
+        self.dash_table.setRowCount(0)
+        for c in rows[:6]:
+            r = self.dash_table.rowCount()
+            self.dash_table.insertRow(r)
+            vals = [c.patient, c.last_seen, "Good" if c.quality >= .9 else "Fair" if c.quality >= .8 else "Poor",
+                    "Needs review" if c.tier in ("High","Elevated") else "Reviewed", "›"]
+            for col, val in enumerate(vals):
+                it = QTableWidgetItem(str(val))
+                it.setData(Qt.ItemDataRole.UserRole, c.patient)
+                self.dash_table.setItem(r, col, it)
+
+        for i in reversed(range(self.dash_flags.count())):
+            item = self.dash_flags.takeAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+
+        for c in rows[:5]:
+            f = QFrame()
+            f.setObjectName("soft")
+            h = QHBoxLayout(f)
+            h.setContentsMargins(10, 8, 10, 8)
+            v = QVBoxLayout()
+            who = QLabel(c.patient)
+            who.setStyleSheet("font-weight:850;color:#e7ebf3;")
+            v.addWidget(who)
+            msg = QLabel(" • ".join(c.drivers[:2]))
+            msg.setObjectName("muted")
+            v.addWidget(msg)
+            h.addLayout(v, 1)
+            h.addWidget(pill(c.condition))
+            self.dash_flags.addWidget(f)
+
+        if demo:
+            good = sum(1 for c in rows if c.quality >= .9)
+            fair = sum(1 for c in rows if .8 <= c.quality < .9)
+            poor = sum(1 for c in rows if c.quality < .8)
+            self.dash_kpis["Active patients"].setText(str(len(rows)))
+            self.dash_kpis["Needs review"].setText(str(sum(1 for c in rows if c.tier in ("High","Elevated"))))
+            self.dash_kpis["Flagged for attention"].setText(str(sum(1 for c in rows if len(c.drivers) > 1)))
+            self.dash_kpis["Data quality mix"].setText(f"Good {good}  ·  Fair {fair}  ·  Poor {poor}")
+        else:
+            try:
+                local = self.db.list_patients()
+            except Exception:
+                local = []
+            self.dash_kpis["Active patients"].setText(str(len(local)))
+            self.dash_kpis["Needs review"].setText("UNKNOWN")
+            self.dash_kpis["Flagged for attention"].setText("UNKNOWN")
+            self.dash_kpis["Data quality mix"].setText("UNKNOWN")
+
+    def _dashboard_row(self, row, _col):
+        pid = self.dash_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        self._open_case(pid)
+
+    # ---------- patient creation ----------
+    def _create_patient(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Add Patient")
+        dlg.setModal(True)
+        dlg.setMinimumWidth(520)
+        form = QFormLayout(dlg)
+        form.setContentsMargins(22, 22, 22, 18)
+        form.setSpacing(10)
+
+        name = QLineEdit()
+        name.setPlaceholderText("Optional display name / alias")
+        anon = QLineEdit()
+        anon.setPlaceholderText("Optional anonymous ID; generated if blank")
+
+        age = QDoubleSpinBox()
+        age.setRange(0, 120)
+        age.setDecimals(1)
+        age.setSpecialValueText("Not supplied")
+
+        bmi = QDoubleSpinBox()
+        bmi.setRange(0, 100)
+        bmi.setDecimals(1)
+        bmi.setSpecialValueText("Not supplied")
+
+        form.addRow("Display name", name)
+        form.addRow("Anonymous ID", anon)
+        form.addRow("Age", age)
+        form.addRow("BMI", bmi)
+
+        note = QLabel(
+            "Creates a local patient record for engineering/research testing. "
+            "No disease model is run automatically."
+        )
+        note.setObjectName("muted")
+        note.setWordWrap(True)
+        form.addRow(note)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel |
+            QDialogButtonBox.StandardButton.Ok
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        app = QApplication(sys.argv)
-
-        # If V8.3 main window available, use it as base, else create new
-        if V83_AVAILABLE and V83MainWindow:
-            print("Launching V8.3 existing MainWindow preserved - Polished")
-            try:
-                window = V83MainWindow()
-                window.setWindowTitle("CHRONO-PCOS V8.3+ Doctor PC - Clinical/Research Workstation - Research Prototype - Not Medical Diagnosis")
-                window.resize(1450, 950)
-                window.show()
-                sys.exit(app.exec())
-                return
-            except Exception as e:
-                print(f"V8.3 MainWindow failed to launch: {e}, using enhanced fallback")
-                import traceback
-                traceback.print_exc()
-
-        # Enhanced fallback GUI - Polished Clinical/Research Workstation
-        window = QMainWindow()
-        window.setWindowTitle("CHRONO-PCOS V8.3+ Doctor PC - Clinical/Research Workstation - Research Prototype - Not Medical Diagnosis")
-        window.resize(1450, 950)
-        window.setMinimumSize(1200, 800)
-
-        tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #cbd5e1; background: white; border-radius: 6px; }
-            QTabBar::tab { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 16px; margin-right: 2px; border-top-left-radius: 6px; border-top-right-radius: 6px; font-weight: 600; font-size: 11px; }
-            QTabBar::tab:selected { background: white; border-bottom: 1px solid white; color: #0ea5e9; }
-            QTabBar::tab:hover { background: #e0f2fe; }
-        """)
-
-        # Dashboard tab - polished
-        dash_widget = QWidget()
-        dash_layout = QVBoxLayout(dash_widget)
-        dash_layout.setContentsMargins(16, 16, 16, 16)
-        dash_layout.setSpacing(12)
-
-        header = QLabel("Dashboard - Patient Overview, Recent Assessments, Data Quality, Pending Reviews, Longitudinal Views\nResearch / risk-screening output — not a medical diagnosis")
-        header.setWordWrap(True)
-        header.setStyleSheet("font-size: 13px; font-weight: bold; color: #0f172a; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;")
-        dash_layout.addWidget(header)
-
-        overview = self.dashboard.get_overview()
-        stats_grid = QGridLayout()
-        stats = [
-            (f"Total Patients: {overview['total_patients']}", "Patient overview"),
-            (f"Longitudinal: {overview['longitudinal_summary']}", "Longitudinal tracking"),
-            ("Data Quality: Good/Moderate/Poor summary", "Quality control"),
-            ("Pending Reviews: Sessions needing review", "Review workflow"),
-        ]
-        for i, (text, tooltip) in enumerate(stats):
-            label = QLabel(text)
-            label.setToolTip(tooltip)
-            label.setStyleSheet("font-size: 12px; padding: 10px; background: white; border: 1px solid #e2e8f0; border-radius: 6px;")
-            label.setWordWrap(True)
-            stats_grid.addWidget(label, i // 2, i % 2)
-
-        dash_layout.addLayout(stats_grid)
-        dash_layout.addStretch()
-        tabs.addTab(dash_widget, "📊 Dashboard")
-
-        # Patients tab
-        pm_widget = QWidget()
-        pm_layout = QVBoxLayout(pm_widget)
-        pm_layout.setContentsMargins(16, 16, 16, 16)
-        pm_layout.addWidget(QLabel("Patient Management - Create, Search, Open, Archive, History - Only authorized patients for doctor role"))
-        pm_layout.addWidget(QLabel("Clearly separates OBSERVED, ASSOCIATED, MODEL-INFERRED, UNKNOWN - Never mixes them"))
-
-        pm_list = QListWidget()
-        pm_list.setMinimumHeight(300)
-        patients = self.db.list_patients()
-        if not patients:
-            pm_list.addItem("No authorized patients yet - demo data: Patient P00001 (Demo) Age 22 BMI 23.5, Patient P00002 (Demo) Age 24 BMI 25.1")
-        else:
-            for p in patients[:20]:
-                pm_list.addItem(f"{p['anonymous_id']} - Age {p.get('age_years','')} BMI {p.get('bmi','')} - {p.get('display_name','')} (USER-ENTERED)")
-        pm_layout.addWidget(pm_list)
-
-        btn_layout = QHBoxLayout()
-        btn_layout.addWidget(QPushButton("Create Patient"))
-        btn_layout.addWidget(QPushButton("Search Patient"))
-        btn_layout.addWidget(QPushButton("Open Patient"))
-        btn_layout.addWidget(QPushButton("Archive Patient"))
-        pm_layout.addLayout(btn_layout)
-        tabs.addTab(pm_widget, "👥 Patients")
-
-        # Signals tab
-        phys_widget = QWidget()
-        phys_layout = QVBoxLayout(phys_widget)
-        phys_layout.setContentsMargins(16, 16, 16, 16)
-        phys_layout.addWidget(QLabel("Physiological Signals - Raw/Filtered PPG, HR, HRV, GSR, Motion, Temp, Quality, Artifacts, Visualization, Time-Series"))
-        phys_layout.addWidget(QLabel("OBSERVED: HR 72 bpm MEASURED quality 0.91 source MAX30102, Skin Temp 32.5°C MEASURED quality 0.88 source DS18B20, Activity 35% MEASURED source MPU6050"))
-        phys_layout.addWidget(QLabel("ASSOCIATED: HRV RMSSD 48 ms DERIVED quality 0.85 limitations PPG less accurate than ECG, Activity level classified DERIVED"))
-
-        phys_text = QTextEdit()
-        phys_text.setReadOnly(True)
-        phys_text.setText("""Physiological Data - Time-series visualization would appear here - pyqtgraph
-
-Raw/Filtered PPG: waveform, quality 0.91, source MAX30102, MEASURED
-HR: time-series, mean 72 bpm, MEASURED, quality 0.91
-HRV: RMSSD 48 ms, SDNN 55 ms, pNN50 %, DERIVED, quality 0.85, limitations PPG less accurate than ECG, motion artifacts affect
-GSR: tonic/phasic, quality, MEASURED + DERIVED
-Motion: activity 35%, quality 0.8, MEASURED + DERIVED, limitations wrist activity not whole-body calorimetry
-Temp: skin temp 32.5°C, room temp, slope, quality 0.88, MEASURED + DERIVED, limitations skin temp not core temp affected environment
-Quality: overall 0.85, per channel ppg 0.91 motion 0.8 temp 0.88
-Artifacts: detected 2, details Motion artifact at 12:03 baseline drift at 12:05
-
-System Pipeline Visualization:
-SENSOR → TRANSPORT → PARSING → QUALITY CONTROL → FILTERING → ARTIFACT DETECTION → FEATURE EXTRACTION → TIMESTAMPED STORAGE → PERSONAL BASELINE → LONGITUDINAL CHANGE → RISK LOGIC → MULTIMODAL FUSION → EXPLANATION → REPORT/UI
-""")
-        phys_layout.addWidget(phys_text)
-        tabs.addTab(phys_widget, "📈 Signals")
-
-        # Longitudinal tab
-        long_widget = QWidget()
-        long_layout = QVBoxLayout(long_widget)
-        long_layout.setContentsMargins(16, 16, 16, 16)
-        long_layout.addWidget(QLabel("Longitudinal Analysis - Comparison, Trends, Baseline Deviation, Persistence, Recovery"))
-        long_layout.addWidget(QLabel("Personal Baseline: mean median std MAD rolling confidence min obs circadian context - learns what is normal for individual first"))
-        long_layout.addWidget(QLabel("6 Scenarios: Stable baseline LOW CHANGE SIGNAL, Gradual deviation EARLY CHANGE SIGNAL, Persistent deviation PERSISTENT MULTIMODAL SIGNAL, Temporary disturbance TEMPORARY EVENT, Sensor failure LOW SENSOR CONFIDENCE, Recovery RECOVERY TREND"))
-
-        long_text = QTextEdit()
-        long_text.setReadOnly(True)
-        long_text.setText("""Longitudinal Comparison - Trends, Baseline Deviation
-
-Patient: P12345 Age 22 BMI 23.5 USER-ENTERED
-Sessions: s1 (2026-09-10), s2 (2026-09-15), s3 (2026-09-19)
-
-HR Trend: 70 → 72 → 71 bpm (stable baseline, within normal variation, LOW CHANGE SIGNAL)
-HRV RMSSD Trend: 50 → 48 → 45 ms (gradual deviation, slowly moves away, EARLY CHANGE SIGNAL)
-Activity Trend: 40% → 35% → 30% (persistent deviation, multiple related signals abnormal, PERSISTENT MULTIMODAL SIGNAL)
-Temp Trend: 32.5 → 32.6 → 32.5°C (stable)
-
-Baseline Deviation:
-- HR: +1 bpm from personal baseline mean 71 std 2 - within normal
-- HRV: -5 ms from baseline mean 50 - early change, persistence check rolling windows
-- Activity: -10% from baseline mean 40% - persistent, multimodal check
-
-Recovery: If abnormal returns toward baseline → RECOVERY TREND
-
-Data Provenance:
-- MEASURED: HR 72 bpm quality 0.91 source MAX30102
-- DERIVED: HRV RMSSD 48 ms quality 0.85 source PPG-derived limitations PPG less accurate than ECG
-- MODEL-INFERRED: circadian disruption pattern moderate confidence 0.68
-- UNKNOWN: if cannot reliably extract return UNKNOWN never invent
-""")
-        long_layout.addWidget(long_text)
-        tabs.addTab(long_widget, "📊 Longitudinal")
-
-        # Ultrasound tab
-        us_widget = QWidget()
-        us_layout = QVBoxLayout(us_widget)
-        us_layout.setContentsMargins(16, 16, 16, 16)
-        us_layout.addWidget(QLabel("Ultrasound - Loading, Preprocessing, Quality Checks, Segmentation, Inference, Visualization, Confidence, Training, Evaluation, Storage"))
-        us_layout.addWidget(QLabel("Clearly label IMAGE-DERIVED - Do not claim clinically validated unless actually is - Quality gate UNKNOWN by design unless computed"))
-
-        us_text = QTextEdit()
-        us_text.setReadOnly(True)
-        us_text.setText("""Ultrasound Analysis - Research Pipeline
-
-1. Image Import: image path format size check, metadata, label REAL/SYNTHETIC/DEMO
-2. Image Preview: preview, metadata, shape
-3. Image Metadata: path, shape, quality check pending, source, label
-4. Preprocessing: resize normalize denoise
-5. Region/Structure Analysis: cyst detection morphology volume if model available
-6. Feature Extraction: cyst size mm volume cc morphology quality source confidence provenance
-7. Model Inference: requires trained model if insufficient state insufficient never fabricate percentages confidence None unless computed model accuracy not established without validation dataset
-8. Result Visualization: overlay confidence map image-derived features
-9. Uncertainty: confidence None unless computed quality score UNKNOWN by design unless computed limitations never hard-code fake confidence percentages
-10. Provenance: source image → preprocessing → detected features → quality → uncertainty CLINICALLY-ENTERED vs IMAGE-DERIVED distinction fusion weight 0.20
-11. Export/Report: storage ultrasound_records table patient_id image_path cyst_size_mm volume_cc morphology quality source confidence notes created_at label REAL/SYNTHETIC/DEMO report with IMAGE-DERIVED label
-
-Quality gate: UNKNOWN by design unless computed, provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20
-If insufficient training data state insufficient never fabricate percentages
-Inference requires trained model if not available state insufficient
-Do not claim clinically validated unless actually is
-If existing model exists use it if not build infrastructure without fabricating performance
-Safety: ultrasound analysis research not diagnosis requires clinical evaluation Rotterdam requires ultrasound + clinical
-""")
-        us_layout.addWidget(us_text)
-        tabs.addTab(us_widget, "🩻 Ultrasound")
-
-        # AI/ML tab
-        ai_widget = QWidget()
-        ai_layout = QVBoxLayout(ai_widget)
-        ai_layout.setContentsMargins(16, 16, 16, 16)
-        ai_layout.addWidget(QLabel("AI/ML Laboratory - Real Research Interface - Dataset, Validation, Preprocessing, Training, Testing, Leakage Detection, Model Registry, Explainability, Uncertainty"))
-        ai_layout.addWidget(QLabel("Prevent data leakage, clearly distinguish TRAIN VALIDATION TEST, never allow same patient/time-series samples to silently appear across incompatible splits"))
-
-        analysis = self.advanced_viewer.analyze("demo_patient")
-        ai_text = QTextEdit()
-        ai_text.setReadOnly(True)
-        ai_text.setText(f"""AI/ML Laboratory - Research Interface
-
-Dataset:
-- Public: PCOS_data.csv 541 rows PUBLIC DATASET, wrist_ppg_during_exercise s1-s9
-- Synthetic: 10 subjects 30 days 6 scenarios 60 days wrist_ppg SYNTHETIC clearly labelled SYNTHETIC never label synthetic as clinical never mix REAL/SYNTHETIC silently
-- Clinical: USER-ENTERED age BMI cycle info glucose BP if entered, ultrasound structured features with provenance
-- Labeling: REAL SYNTHETIC SIMULATED PUBLIC DATASET USER-ENTERED MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN never mix silently
-
-Data Validation:
-- Check missing data impossible values flatline excessive noise motion artifacts packet corruption stale data
-- Bad data must not silently become model input
-
-Preprocessing:
-- Filtering bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median GSR lowpass tonic highpass phasic
-- Baseline removal PPG drift GSR tonic/phasic temp baseline
-- Artifact detection motion MPU6050 correlation PPG amplitude HR outlier GSR jumps quality 0-1 per channel source labeling
-- Missing handling short gaps interpolation quality penalty long gaps mark missing not fabricate
-
-Feature Engineering:
-- Established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050 GSR raw
-- Derived HRV RMSSD SDNN pNN50 resting HR GSR tonic lowpass phasic highpass activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio
-- Experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV+GSR metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation
-
-Training:
-- ModelTrainer input features quality scores dataset public 541 rows synthetic cohort 10 subjects 30 days 6 scenarios 60 days split subject-level not row-level avoid leakage validation 12 categories engineering vs clinical separation no fabricated accuracy state if insufficient
-- Metrics accuracy precision recall F1 AUC classification MAE regression never fabricate percentages
-
-Validation:
-- ModelEvaluator metrics, Train/Validation/Test split, leakage detection subject-level validation where appropriate, avoid data leakage longitudinal subjects split at SUBJECT level, clearly separate ENGINEERING VALIDATION implemented from CLINICAL VALIDATION NOT ESTABLISHED
-
-Testing:
-- Subject-level validation, reproducibility, hardware failure tests, noisy data, missing sensor handling, multimodal fusion, disease module isolation
-
-Leakage Detection:
-- Never allow same patient/time-series samples to silently appear across incompatible splits, subject-level split not row-level
-
-Model Comparison:
-- PCOSModule vs SleepModule vs CardiometabolicModule vs AutonomicModule, each with consistent API name version required_features optional_features predict explain confidence limitations returns structured research signals never DISEASE DETECTED
-
-Explainability:
-- ShapExplainer feature drivers SHAP values understandable language, why system generated signal drivers baseline deviations trends, model name version dataset version training date features target metrics validation strategy limitations never hide uncertainty manufacture confidence training results
-
-Model Registry:
-- Model name, version, dataset version, training date, features, target, metrics, validation strategy, limitations, model approval, rollback, inference, uncertainty, ModelTrainer ModelEvaluator MultimodalFusion ShapExplainer
-
-Current Analysis:
-Circadian: {analysis['circadian']}
-Autonomic: {analysis['autonomic']}
-Metabolic: {analysis['metabolic']}
-Fingerprint: {len(analysis['fingerprint']['components'])} components
-AI Outputs:
-""")
-        for ai_out in analysis['ai_outputs']:
-            ai_text.append(f"  - {ai_out['module']}: {ai_out['output']} confidence {ai_out['confidence']} - {ai_out.get('validation','')}")
-        ai_layout.addWidget(ai_text)
-        tabs.addTab(ai_widget, "🧠 AI/ML")
-
-        # Reports tab
-        rep_widget = QWidget()
-        rep_layout = QVBoxLayout(rep_widget)
-        rep_layout.setContentsMargins(16, 16, 16, 16)
-        rep_layout.addWidget(QLabel("Reports - Professional with Research / risk-screening output — not a medical diagnosis, Model transparency name/version/input/data quality/confidence/features/limitations never hide uncertainty"))
-
-        report = self.report_gen.generate("demo_patient", analysis)
-        rep_text = QTextEdit()
-        rep_text.setReadOnly(True)
-        rep_text.setText(f"""Professional Report
-
-Patient: demo_patient (DEMO)
-Generated: now
-Disclaimer: {report['disclaimer']}
-
-Model Transparency:
-Models used: {report['model_transparency']['models_used']}
-Input data: {report['model_transparency']['input_data']}
-Data quality: {report['model_transparency']['data_quality']}
-Confidence: {report['model_transparency']['confidence']}
-Features: {report['model_transparency']['features']}
-Limitations: {report['model_transparency']['limitations']}
-
-Data Provenance:
-MEASURED: HR 72 bpm quality 0.91 source MAX30102
-CLINICALLY ENTERED: age BMI cycle info USER-ENTERED
-IMAGE-DERIVED: cyst size morphology quality UNKNOWN by design unless computed provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20
-MODEL-INFERRED: sleep regularity circadian disruption confidence 0.68 limitations not polysomnography
-UNKNOWN: if cannot reliably extract return UNKNOWN never invent
-
-Clearly separate MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN never present inference as measured fact
-
-Safety: Research prototype not replacement for professional medical evaluation, avoid definitive diagnosis medication prescriptions treatment as orders unsupported claims fabricated stats encourage professional consultation Rotterdam criteria required for PCOS diagnosis requires clinician ultrasound + clinical
-""")
-        rep_layout.addWidget(rep_text)
-        rep_layout.addWidget(QPushButton("Generate Report"))
-        rep_layout.addWidget(QPushButton("Export PDF (if supported)"))
-        tabs.addTab(rep_widget, "📄 Reports")
-
-        # Data Provenance tab
-        prov_widget = QWidget()
-        prov_layout = QVBoxLayout(prov_widget)
-        prov_layout.setContentsMargins(16, 16, 16, 16)
-        prov_layout.addWidget(QLabel("Data Provenance - MEASURED, CLINICALLY ENTERED, IMAGE-DERIVED, MODEL-INFERRED, UNKNOWN - Never fabricate, never mix"))
-
-        prov_text = QTextEdit()
-        prov_text.setReadOnly(True)
-        prov_text.setText("""Data Provenance - Clearly Distinguish
-
-MEASURED:
-- HR 72 bpm quality 0.91 source MAX30102 PPG IR+RED peak detection
-- Skin Temp 32.5°C quality 0.88 source DS18B20 direct
-- Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level quality 0.8 source MPU6050 accelerometer + gyroscope
-- GSR raw gsr_raw quality source GSR direct
-- Category: ESTABLISHED_MEASUREMENT
-
-CLINICALLY ENTERED:
-- Age 22 years, BMI 23.5, cycle length 28 days, irregularity regular, symptoms irregular_cycle mild, notes free text
-- Glucose, BP if entered, clinical variables
-- Source: USER-ENTERED label, minimal data collection no unnecessary personal info
-- Category: CLINICALLY ENTERED
-
-IMAGE-DERIVED:
-- Cyst size mm, volume cc, morphology, quality, source, confidence, notes
-- Ultrasound image path format size check, preprocessing resize normalize denoise, quality checks blur exposure anatomy visibility quality score UNKNOWN by design unless computed provenance CLINICALLY-ENTERED vs IMAGE-DERIVED, segmentation cyst detection morphology if model available, inference requires trained model if insufficient state insufficient never fabricate percentages confidence None unless computed visualization overlay confidence map storage ultrasound_records table
-- Quality gate UNKNOWN by design, provenance distinction, fusion weight 0.20
-- Category: IMAGE-DERIVED, UNKNOWN by design unless computed
-
-MODEL-INFERRED:
-- Sleep regularity 75%, circadian disruption pattern moderate, sleep duration/timing/regularity day/night activity, from HR/HRV 24h pattern + activity model-inferred experimental
-- HRV RMSSD 48 ms SDNN 55 ms pNN50 % derived from HR time series limitations PPG less accurate than ECG
-- GSR tonic lowpass derived phasic highpass derived activity level classified derived temp slope derivative derived pulse amplitude SpO2 IR/RED ratio derived
-- Circadian rhythm sleep-wake estimation HR/HRV 24h pattern model-inferred experimental limitations not polysomnography
-- Autonomic regulation HRV+GSR experimental, metabolic multimodal HR HRV activity temp GSR hypothesized metabolic regulation experimental not clinical
-- Chrono-metabolic fingerprint combination circadian autonomic variability activity temp metabolic longitudinal experimental research not diagnosis
-- Longitudinal trend deviation from personal baseline experimental requires history
-- PCOS associated risk low/moderate/high NOT diagnosis clinical validation NOT ESTABLISHED, sleep circadian disruption, cardiometabolic risk signal, autonomic regulation signal, model name/version/input/data quality/confidence/features/limitations never hide uncertainty
-- Category: DERIVED_FEATURE, EXPERIMENTAL_RESEARCH, MODEL-INFERRED, confidence, limitations
-
-UNKNOWN:
-- If feature cannot be reliably extracted return UNKNOWN never invent, never fabricate measurements diagnoses clinical validation medical certainty, quality score UNKNOWN by design unless computed, inference requires trained model if insufficient state insufficient never fabricate percentages confidence None unless computed
-
-Never fabricate measurements, diagnoses, clinical validation, or medical certainty
-Clearly distinguish MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN
-Never mix them
-""")
-        prov_layout.addWidget(prov_text)
-        tabs.addTab(prov_widget, "🔍 Provenance")
-
-        # Model Explanation tab
-        expl_widget = QWidget()
-        expl_layout = QVBoxLayout(expl_widget)
-        expl_layout.setContentsMargins(16, 16, 16, 16)
-        expl_layout.addWidget(QLabel("Model Explanation - Drivers, Baseline Deviations, Trends, SHAP Values, Understandable Language"))
-
-        expl_text = QTextEdit()
-        expl_text.setReadOnly(True)
-        expl_text.setText("""Model Explanation - Why System Generated Signal
-
-PCOSModule v8.3.0:
-- Name: PCOSModule
-- Version: v8.3.0
-- Required Features: age, BMI, cycle info, HR, HRV, activity, temp
-- Optional Features: glucose, GSR, ultrasound structured features
-- Predict: pcos_associated_risk low/moderate/high NOT diagnosis
-- Explain: drivers HRV RMSSD 48 ms (parasympathetic activity lower values may indicate autonomic dysregulation research signal), activity level 35% (wrist activity not whole-body calorimetry), skin temp 32.5°C (skin temp not core temp affected environment)
-- Confidence: 0.75 (model output not clinical certainty)
-- Limitations: Engineering validation only clinical validation NOT ESTABLISHED small datasets synthetic labeled SYNTHETIC not replacement for professional evaluation, PPG-derived HRV less accurate than ECG motion artifacts affect, skin temp not core temp affected environment, wrist activity not whole-body calorimetry, sleep-wake from wrist PPG model-inferred not polysomnography requires validation, metabolic signal experimental research not clinical metabolic measurement requires validation, chrono-metabolic fingerprint experimental research not diagnosis, ultrasound quality UNKNOWN by design unless computed inference requires trained model if insufficient state insufficient never fabricate percentages provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20
-- Dataset: public PCOS_data.csv 541 rows wrist_ppg synthetic cohort 10 subjects 30 days 6 scenarios 60 days
-- Training Date: 2026-09-19
-- Features: HRV RMSSD, activity level, skin temp
-- Target: pcos_associated_risk low/moderate/high
-- Metrics: accuracy precision recall F1 AUC if classification MAE if regression never fabricate percentages if insufficient state insufficient
-- Validation Strategy: subject-level split not row-level avoid leakage 12 categories engineering vs clinical separation
-
-SleepModule v8.3.0:
-- Name: SleepModule
-- Version: v8.3.0
-- Predict: circadian_disruption_pattern moderate, sleep regularity 75%
-- Explain: drivers HR/HRV circadian variation 24h pattern analysis, activity day/night, sleep timing/duration/regularity
-- Confidence: 0.68
-- Limitations: Sleep-wake from wrist PPG model-inferred not polysomnography requires validation
-
-CardiometabolicModule v8.3.0:
-- Predict: cardiometabolic_risk_signal moderate
-- Explain: drivers resting HR, HRV, activity, BMI, age, BP if entered, glucose if entered, sleep, temp, longitudinal changes
-- Never claims diabetes/hypertension/CVD diagnosis
-
-AutonomicModule v8.3.0:
-- Predict: autonomic_regulation_signal moderate
-- Explain: uses HRV, resting HR, GSR, activity, sleep, temp, explainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE, not mental-health diagnosis
-
-Fusion:
-- MultimodalFusion combines module outputs confidence weighted quality no hard-coded fake confidence, preserves provenance source image → preprocessing → detected features → quality → uncertainty, if feature cannot be reliably extracted return UNKNOWN never invent
-
-Explainability:
-- ShapExplainer feature drivers SHAP values if available understandable language, why system generated signal drivers baseline deviations trends
-
-Model Transparency:
-- Model name, version, dataset version, training date, features, target, metrics, validation strategy, limitations, never hide uncertainty manufacture confidence training results, never invent model metrics if no trained model exists show Model not trained rather than fake accuracy
-
-Uncertainty:
-- Confidence model output not clinical certainty, quality scores 0-1 per channel, artifact flags, reason codes, limitations, model transparency
-""")
-        expl_layout.addWidget(expl_text)
-        tabs.addTab(expl_widget, "💡 Explanation")
-
-        # Database tab
-        db_widget = QWidget()
-        db_layout = QVBoxLayout(db_widget)
-        db_layout.setContentsMargins(16, 16, 16, 16)
-        db_layout.addWidget(QLabel("Database - Local-first SQLite 18 Tables - No cloud upload, privacy-focused"))
-        db_layout.addWidget(QLabel(f"Path: {self.db.db_path} - Providers: {len(self.db.list_providers())} demo - Supplies: {len(self.db.list_supplies())}"))
-
-        db_text = QTextEdit()
-        db_text.setReadOnly(True)
-        db_text.setText(f"""Database - 18 Tables
-
-Tables:
-- users: user_id, username UNIQUE, password_hash, role patient/doctor/admin
-- patients: patient_id, anonymous_id PXXXXX, display_name, age, BMI
-- profiles: USER-ENTERED
-- symptoms: structured logging
-- cycles: dates/length/irregularity/symptoms/notes not diagnosis
-- sensor_sessions: session_id, source, label REAL/SIMULATED/DEMO
-- ppg_data, hrv_data, gsr_data, motion_data, temperature_data, sensor_quality
-- ultrasound_records: image_path, cyst_size, volume, morphology, quality, source, confidence, label REAL/SYNTHETIC/DEMO, provenance CLINICALLY-ENTERED vs IMAGE-DERIVED
-- model_results: module_name, version, signal, level, confidence, data_quality, clinical_validation NOT ESTABLISHED
-- analysis_results: fingerprint_json
-- reports: report_type, content_text, file_path
-- doctor_notes: patient_id, doctor_id, note_text
-- providers: 4 demo providers clearly marked demo - {self.db.list_providers()[0]['name'] if self.db.list_providers() else 'none'}
-- supplies: 5 supplies
-- audit_records, patient_doctor_access
-
-Demo providers: {len(self.db.list_providers())} demo clearly marked demo verification_status demo is_demo 1 never falsely label real doctor/clinic verified
-Supplies: {len(self.db.list_supplies())} no prescription sales
-
-Methods: create_user authenticate create_patient get_patient list_patients search log_symptom log_cycle create_session list_providers search_providers get_nearby_providers list_supplies create_report add_doctor_note grant_access check_access export import backup
-
-Data Portability: controlled export/import/backup/restore/encrypted package deliberate sharing not automatic
-""")
-        db_layout.addWidget(db_text)
-        tabs.addTab(db_widget, "🗄 Database")
-
-        # Diagnostics tab
-        diag_widget = QWidget()
-        diag_layout = QVBoxLayout(diag_widget)
-        diag_layout.setContentsMargins(16, 16, 16, 16)
-        diag_layout.addWidget(QLabel("Diagnostics - Actual Checks Never Fake PASS/WARN/FAIL"))
-
-        diag_text = QTextEdit()
-        diag_text.setReadOnly(True)
-        # Run diagnostics
-        import io
-        from contextlib import redirect_stdout
-        f = io.StringIO()
         try:
-            with redirect_stdout(f):
-                print("Checking Python... PASS")
-                print("Checking .venv... PASS" if (PROJECT_ROOT / ".venv").exists() else "FAIL")
-                print("Checking Database... PASS 4 providers")
-                print("Checking Scientific Core... PASS RealtimeFeatureExtractor")
-                print("Checking AI Models... PASS PCOS, Sleep")
-                print("Checking Doctor PC... PASS main_enhanced.py")
-                print("Checking Patient... PASS main.py")
-                print("Checking Website... PASS index.html")
-                print("Checking Care Discovery... PASS CareDiscoveryEngine")
-                print("Checking Chrono-Metabolic... PASS Fingerprint engine")
-                print("Checking Android Patient APK... WARN APK not built, PC demo available")
-                print("Checking Android Doctor APK... WARN APK not built, PC demo available")
-        except Exception as e:
-            print(f"Diagnostics error: {e}", file=f)
-        diag_text.setText(f.getvalue())
-        diag_layout.addWidget(diag_text)
-        tabs.addTab(diag_widget, "⚙ Diagnostics")
+            patient_id = self.db.create_patient(
+                display_name=name.text().strip() or None,
+                anonymous_id=anon.text().strip() or None,
+                age_years=float(age.value()) if age.value() else None,
+                bmi=float(bmi.value()) if bmi.value() else None,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Add Patient", f"Could not create patient:\n{exc}")
+            return
 
-        window.setCentralWidget(tabs)
-        window.show()
-        sys.exit(app.exec())
+        self._log_event("Patient created", patient_id)
+        self._refresh_roster()
+        self._open_case("LOCAL::" + patient_id)
 
+    # ---------- patients ----------
+    def _patients_page(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setContentsMargins(25, 18, 20, 15)
+        o.setSpacing(11)
+        t = QLabel("Patients")
+        t.setObjectName("title")
+        o.addWidget(t)
+        s = QLabel("Patient roster with search, condition filtering, research-risk sorting and quality context.")
+        s.setObjectName("muted")
+        o.addWidget(s)
 
-if __name__ == '__main__':
-    app = EnhancedDoctorApp()
-    # Try GUI, fallback to console
-    try:
-        if PYSIDE_AVAILABLE:
-            app.run_gui()
+        bar = QHBoxLayout()
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search patient / alias / module…")
+        self.search.textChanged.connect(self._refresh_roster)
+        bar.addWidget(self.search, 1)
+
+        self.cond = QComboBox()
+        self.cond.addItems(condition_list())
+        self.cond.currentTextChanged.connect(self._refresh_roster)
+        bar.addWidget(self.cond)
+
+        self.sorter = QComboBox()
+        self.sorter.addItems(["Priority", "Risk", "Condition"])
+        self.sorter.currentTextChanged.connect(self._refresh_roster)
+        bar.addWidget(self.sorter)
+
+        add = QPushButton("+ Add Patient")
+        add.setObjectName("primary")
+        add.clicked.connect(self._create_patient)
+        bar.addWidget(add)
+        o.addLayout(bar)
+
+        note = QLabel("DEMO MODE values are synthetic UI examples only — not diagnoses, not clinical severity scores, and not validation metrics.")
+        note.setObjectName("warning")
+        note.setWordWrap(True)
+        o.addWidget(note)
+
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(
+            ["Patient", "Alias", "Condition / module", "Tier*", "Research risk*", "Quality", "Last update"]
+        )
+        self._fit_table(self.table)
+        self.table.cellClicked.connect(self._select_row)
+        o.addWidget(self.table, 1)
+        return w
+
+    def _fit_table(self, table):
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.verticalHeader().setVisible(False)
+
+    def _refresh_roster(self):
+        if not hasattr(self, "table"):
+            return
+        demo = self.mode.mode == "demo"
+        self.table.setRowCount(0)
+        q = self.search.text().lower()
+        cond = self.cond.currentText() if demo else "All"
+        sk = self.sorter.currentText().lower() if demo else "priority"
+
+        if demo:
+            rows = sorted_cases(
+                cond,
+                "risk" if sk == "risk" else "condition" if sk == "condition" else "priority",
+            )
+            for c in rows:
+                if q and q not in f"{c.patient} {c.alias} {c.condition}".lower():
+                    continue
+                r = self.table.rowCount()
+                self.table.insertRow(r)
+                vals = [
+                    c.patient, c.alias, c.condition, c.tier, f"{c.risk:.0f}%",
+                    f"{c.quality*100:.0f}%", c.last_seen
+                ]
+                for col, val in enumerate(vals):
+                    it = QTableWidgetItem(str(val))
+                    if col == 0:
+                        it.setData(Qt.ItemDataRole.UserRole, c.patient)
+                    self.table.setItem(r, col, it)
+
+        try:
+            local = self.db.list_patients()
+        except Exception:
+            local = []
+        for p in local:
+            pid = str(p.get("patient_id", ""))
+            anon = str(p.get("anonymous_id") or pid)
+            alias = str(p.get("display_name") or anon)
+            searchable = f"{pid} {anon} {alias}"
+            if q and q not in searchable.lower():
+                continue
+            if demo and cond != "All":
+                continue
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            vals = [
+                anon, alias, "Local patient", "Unknown",
+                "UNKNOWN", "UNKNOWN", p.get("updated_at", "—")
+            ]
+            for col, val in enumerate(vals):
+                it = QTableWidgetItem(str(val))
+                if col == 0:
+                    it.setData(Qt.ItemDataRole.UserRole, "LOCAL::" + pid)
+                self.table.setItem(r, col, it)
+
+        self._refresh_dashboard()
+
+    def _select_row(self, row, _col):
+        pid = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        self._open_case(pid)
+
+    def _search_patient(self):
+        q = self.global_search.text().strip().lower()
+        if not q:
+            return
+        if self.mode.mode == "demo":
+            hit = next((c for c in sorted_cases() if q in f"{c.patient} {c.alias} {c.condition}".lower()), None)
+            if hit:
+                self._open_case(hit.patient)
         else:
-            app.run_console_demo()
-    except Exception as e:
-        print(f"Failed to run GUI: {e}")
-        import traceback
-        traceback.print_exc()
-        print("\nFalling back to console demo:")
-        app.run_console_demo()
+            try:
+                local = self.db.list_patients()
+            except Exception:
+                local = []
+            hit = next((p for p in local if q in str(p).lower()), None)
+            if hit:
+                self._open_case(str(hit.get("patient_id") or hit.get("anonymous_id")))
+
+    # ---------- patient workspace ----------
+    def _patient_page(self):
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(24, 15, 20, 14)
+        outer.setSpacing(9)
+
+        self.patient_header_host = QVBoxLayout()
+        outer.addLayout(self.patient_header_host)
+
+        self.patient_tabs = QComboBox()
+        self.patient_tabs.setObjectName("patientTabs")
+        self.patient_tab_names = [
+            "Overview", "Timeline", "Sensor data", "Trends", "Ultrasound",
+            "AI / Models", "Clinical inputs", "Reports", "Notes", "Provenance", "Audit"
+        ]
+        # A compact tab row using QPushButtons is more stable across Qt styles.
+        tabrow = QHBoxLayout()
+        self.tab_buttons = {}
+        for name in self.patient_tab_names:
+            b = QPushButton(name)
+            b.setObjectName("tab")
+            b.setCheckable(True)
+            b.clicked.connect(lambda _=False, n=name: self._show_patient_tab(n))
+            tabrow.addWidget(b)
+            self.tab_buttons[name] = b
+        tabrow.addStretch()
+        outer.addLayout(tabrow)
+
+        self.patient_stack = QStackedWidget()
+        outer.addWidget(self.patient_stack, 1)
+        return page
+
+    def _rebuild_patient_header(self):
+        while self.patient_header_host.count():
+            item = self.patient_header_host.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        p = self._profile()
+        if not p:
+            box = QFrame()
+            box.setObjectName("patientHeader")
+            lay = QVBoxLayout(box)
+            lay.addWidget(QLabel("No patient selected"))
+            lay.addWidget(QLabel("Choose a patient from the Dashboard or Patients screen."))
+            self.patient_header_host.addWidget(box)
+            return
+
+        self.patient_header_host.addWidget(self._patient_header())
+
+        alert = QHBoxLayout()
+        if self.current_case:
+            text = f"{p['tier']} synthetic research-screening tier • research risk {p['risk']:.0f}%"
+            alert.addWidget(pill(text, "#2b274c", "#b7a8ff"))
+        else:
+            alert.addWidget(pill("LIVE SESSION • model output not run", "#2a2a38", "#b9bfd2"))
+        alert.addStretch()
+        box = QWidget()
+        box.setLayout(alert)
+        self.patient_header_host.addWidget(box)
+
+    def _show_patient_tab(self, name):
+        for n, b in self.tab_buttons.items():
+            b.setChecked(n == name)
+        idx = next((i for i, n in enumerate(self.patient_tab_names) if n == name), 0)
+        self.patient_stack.setCurrentIndex(idx)
+
+    def _build_patient_tabs(self):
+        while self.patient_stack.count():
+            old = self.patient_stack.widget(0)
+            self.patient_stack.removeWidget(old)
+            old.deleteLater()
+
+        builders = {
+            "Overview": self._patient_overview,
+            "Timeline": self._patient_timeline,
+            "Sensor data": self._patient_sensor,
+            "Trends": self._patient_trends,
+            "Ultrasound": self._patient_ultrasound,
+            "AI / Models": self._patient_models,
+            "Clinical inputs": self._patient_clinical,
+            "Reports": self._patient_reports,
+            "Notes": self._patient_notes,
+            "Provenance": self._patient_provenance,
+            "Audit": self._patient_audit,
+        }
+        for name in self.patient_tab_names:
+            self.patient_stack.addWidget(builders[name]())
+        self._show_patient_tab("Overview")
+
+    def _patient_overview(self):
+        p = self._profile()
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setSpacing(12)
+
+        if not p:
+            o.addWidget(card("Patient workspace", "Select a patient", "All patient-scoped panels remain blank until a patient is selected."))
+            o.addStretch()
+            return w
+
+        charts = QGridLayout()
+        charts.setSpacing(12)
+        if self.current_case:
+            chart_sets = {
+                "Heart rate": [p["hr"] + d for d in (-4,-2,2,4,-1,1,3,-3,0,2,-2,1,4)],
+                "HRV (RMSSD)": [p["hrv"] + d for d in (3,-2,5,-4,2,6,-3,1,-1,4,-2,3)],
+                "Sleep duration": [p["sleep"] + d/10 for d in (-4,2,-1,3,0,-2,2,-3,1)],
+            }
+            meta = [("Heart rate", self._fmt(p["hr"], " bpm", 2), "−3.2 vs 7d ago", "MEASURED"),
+                    ("HRV (RMSSD)", self._fmt(p["hrv"], " ms", 2), "−2.1 vs 7d ago", "DERIVED"),
+                    ("Sleep duration", self._fmt(p["sleep"], " h", 1), "Longitudinal self-report context", "PATIENT-REPORTED")]
+            kinds = ["good", "fair", "fair" if p["sleep"] < 6.5 else "good"]
+        else:
+            live = self.latest_row or {}
+            chart_sets = {}
+            meta = [
+                ("Heart rate", self._fmt(live.get("hr_bpm"), " bpm", 1), "Live processed stream", "MEASURED"),
+                ("HRV (RMSSD)", self._fmt(live.get("rmssd_ms"), " ms", 1), "Beat-to-beat derived feature", "DERIVED"),
+                ("Skin temperature", self._fmt(live.get("skin_temp_c"), " °C", 1), "Validity-gated", "MEASURED"),
+            ]
+            kinds = ["good", "good", "good"]
+
+        for i, ((name, val, delta, prov), kind) in enumerate(zip(meta, kinds)):
+            values = chart_sets.get(name, []) if 'chart_sets' in locals() else []
+            if not values and self.latest_row:
+                seed = self.latest_row.get({"Heart rate":"hr_bpm","HRV (RMSSD)":"rmssd_ms","Skin temperature":"skin_temp_c"}.get(name, ""), None)
+                values = [seed] if seed is not None else []
+            f = self._metric_panel(name, val, "", delta, prov, values, kind)
+            charts.addWidget(f, 0, i)
+
+        o.addLayout(charts)
+
+        split = QGridLayout()
+        insight = QFrame()
+        insight.setObjectName("card")
+        iv = QVBoxLayout(insight)
+        iv.addWidget(section_header("Latest insight", "Evidence boundary stays visible next to any model-facing narrative."))
+        if self.current_case:
+            iv.addWidget(pill("Synthetic research-screening example", "#4b2d27", "#f29a83"))
+            iv.addWidget(QLabel(
+                "The case contains synthetic demo patterns only. Drivers: " +
+                " • ".join(p["drivers"])
+            ))
+            iv.addWidget(QLabel(
+                "Research risk is synthetic UI data and is not a diagnosis, validated probability, or clinical severity score."
+            ))
+        else:
+            iv.addWidget(pill("LIVE SESSION • no disease-model result", "#2a2e3c", "#b7c0d2"))
+            iv.addWidget(QLabel("Live sensor processing can expose measurements and derived features; it does not by itself establish a disease-model result."))
+        warn = QLabel(f"◷  {DISCLAIMER}  Clinical validation: NOT ESTABLISHED")
+        warn.setObjectName("warning")
+        warn.setWordWrap(True)
+        iv.addWidget(warn)
+        split.addWidget(insight, 0, 0)
+
+        activity = QFrame()
+        activity.setObjectName("card")
+        av = QVBoxLayout(activity)
+        av.addWidget(section_header("Recent activity", "Patient-scoped events"))
+        events = self._patient_events()
+        for date, title, detail in events[:4]:
+            line = QLabel(f"<b>{date}</b><br><span style='color:#dde2ec'>{title}</span><br><span style='color:#8e98ad'>{detail}</span>")
+            line.setWordWrap(True)
+            av.addWidget(line)
+            sep = QFrame()
+            sep.setFrameShape(QFrame.Shape.HLine)
+            sep.setStyleSheet("color:#30394b;")
+            av.addWidget(sep)
+        split.addWidget(activity, 0, 1)
+        split.setColumnStretch(0, 1)
+        split.setColumnStretch(1, 1)
+        o.addLayout(split)
+        return w
+
+    def _patient_events(self):
+        p = self._profile()
+        if not p:
+            return []
+        if self.current_case:
+            return [
+                ("Today", "Sync received", "system • " + p["pid"]),
+                ("Yesterday", "Research screening example loaded", "local workstation"),
+                ("2 days ago", "Synthetic demo case viewed", "doctor workstation"),
+                ("3 days ago", "Observation period updated", "demo data"),
+            ]
+        return [
+            ("Now", "Live session", self.mode.port),
+            ("Today", "Patient record opened", "local database"),
+            ("—", "Disease model", "not run"),
+        ]
+
+    def _patient_timeline(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setSpacing(10)
+        box = QFrame()
+        box.setObjectName("card")
+        b = QVBoxLayout(box)
+        b.addWidget(section_header("Full event timeline", "Chronological patient-scoped activity"))
+        for date, title, detail in self._patient_events() + [("Earlier", "Patient record created", "local database")]:
+            row = QHBoxLayout()
+            dot = QLabel("◉")
+            dot.setStyleSheet("color:#9aaeff;font-size:16px;")
+            row.addWidget(dot)
+            col = QVBoxLayout()
+            d = QLabel(str(date))
+            d.setObjectName("muted")
+            col.addWidget(d)
+            tx = QLabel(title)
+            tx.setStyleSheet("font-weight:850;color:#e7ebf3;")
+            col.addWidget(tx)
+            de = QLabel(detail)
+            de.setObjectName("muted")
+            de.setWordWrap(True)
+            col.addWidget(de)
+            row.addLayout(col, 1)
+            b.addLayout(row)
+        o.addWidget(box)
+        return w
+
+    def _patient_sensor(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        banner = QFrame()
+        banner.setObjectName("hero")
+        bv = QVBoxLayout(banner)
+        bv.addWidget(QLabel("Provenance is preserved per stream"))
+        bv.addWidget(QLabel("Every value below carries a MEASURED or DERIVED boundary. Nothing here is model-inferred."))
+        o.addWidget(banner)
+
+        specs = [
+            ("Heart rate", "hr_bpm", "bpm", "MEASURED"),
+            ("Heart rate variability", "rmssd_ms", "ms (RMSSD)", "DERIVED"),
+            ("GSR / EDA", "gsr_tonic", "µS proxy", "MEASURED"),
+            ("Skin temperature", "skin_temp_c", "°C", "MEASURED"),
+        ]
+        for title, key, unit, prov in specs:
+            panel = QFrame()
+            panel.setObjectName("card")
+            v = QVBoxLayout(panel)
+            head = QHBoxLayout()
+            head.addWidget(QLabel(title))
+            head.addStretch()
+            head.addWidget(status_badge(prov, "measured" if prov=="MEASURED" else "derived"))
+            v.addLayout(head)
+            chart = Sparkline(title, unit)
+            if self.current_case:
+                base = {
+                    "hr_bpm": self.current_case.hr,
+                    "rmssd_ms": self.current_case.hrv,
+                    "gsr_tonic": 18.0 + self.current_case.activity/3,
+                    "skin_temp_c": self.current_case.temp,
+                }[key]
+                offsets = [((i * 7) % 9) - 4 for i in range(28)]
+                chart.set_values([base + o * (0.08 if key=="skin_temp_c" else 1.0) for o in offsets])
+            elif self.latest_row and self.latest_row.get(key) is not None:
+                chart.set_values([float(self.latest_row[key])])
+            v.addWidget(chart)
+            o.addWidget(panel)
+        return w
+
+    def _patient_trends(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("Trends", "Longitudinal plots are descriptive. Pattern interpretation requires validated methodology and context."))
+        grid = QGridLayout()
+        names = [
+            ("Heart rate", "bpm", "hr_bpm"),
+            ("HRV / RMSSD", "ms", "rmssd_ms"),
+            ("Activity", "%", "activity_level"),
+            ("Skin temperature", "°C", "skin_temp_c"),
+        ]
+        for i, (name, unit, key) in enumerate(names):
+            panel = QFrame()
+            panel.setObjectName("card")
+            v = QVBoxLayout(panel)
+            top = QHBoxLayout()
+            top.addWidget(QLabel(name))
+            top.addStretch()
+            top.addWidget(QLabel(unit))
+            v.addLayout(top)
+            chart = Sparkline(name, unit)
+            if self.current_case:
+                p = self.current_case
+                base = {"hr_bpm": p.hr, "rmssd_ms": p.hrv, "activity_level": p.activity, "skin_temp_c": p.temp}[key]
+                pattern = [0, 2, -1, 4, 1, -3, 2, -2, 3, 0, -4, 2, 1, -1, 4, -2, 0, 3]
+                scale = 0.07 if key == "skin_temp_c" else 1.0
+                chart.set_values([base + x * scale for x in pattern])
+            elif self.latest_row and self.latest_row.get(key) is not None:
+                chart.set_values([float(self.latest_row[key])])
+            v.addWidget(chart)
+            grid.addWidget(panel, i//2, i%2)
+        o.addLayout(grid)
+        return w
+
+    def _patient_ultrasound(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        hero = QFrame()
+        hero.setObjectName("hero")
+        h = QHBoxLayout(hero)
+        left = QVBoxLayout()
+        left.addWidget(QLabel("Ultrasound evidence"))
+        status = QLabel("IMAGE-DERIVED • source required")
+        status.setObjectName("muted")
+        left.addWidget(status)
+        self.image_status = QLabel("No validated image attached")
+        self.image_status.setStyleSheet("font-size:18px;font-weight:850;color:#eef2f7;")
+        left.addWidget(self.image_status)
+        load = QPushButton("Attach image")
+        load.setObjectName("primary")
+        load.clicked.connect(self._attach_image)
+        left.addWidget(load)
+        h.addLayout(left, 1)
+        self.image_preview = QLabel("UNKNOWN")
+        self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_preview.setMinimumSize(260, 190)
+        self.image_preview.setStyleSheet("background:#161b25;border:1px solid #3a4457;border-radius:10px;color:#7f8a9e;font-weight:800;")
+        h.addWidget(self.image_preview)
+        o.addWidget(hero)
+
+        g = QGridLayout()
+        fields = [
+            ("Image status", "UNKNOWN", "No validated image attached"),
+            ("Follicle count", "UNKNOWN", "Not estimated by this workstation"),
+            ("Ovarian morphology", "UNKNOWN", "No unsupported anatomical inference"),
+            ("Source", "IMAGE-DERIVED", "Provenance retained only when an image is supplied"),
+        ]
+        for i, (a, b, c) in enumerate(fields):
+            g.addWidget(card(a, b, c), 0, i)
+        o.addLayout(g)
+        warn = QLabel("The workstation intentionally does not invent anatomy, follicle counts or PCOS morphology. A future validated imaging model must document cohort split, uncertainty and provenance.")
+        warn.setObjectName("warning")
+        warn.setWordWrap(True)
+        o.addWidget(warn)
+        o.addStretch()
+        return w
+
+    def _attach_image(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Attach ultrasound image", str(ROOT), "Images (*.png *.jpg *.jpeg *.bmp *.webp)")
+        if not path:
+            return
+        pix = QPixmap(path)
+        if pix.isNull():
+            QMessageBox.warning(self, "Ultrasound", "Could not load that image.")
+            return
+        self.image_path = path
+        self.image_preview.setPixmap(pix.scaled(420, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.image_status.setText(Path(path).name)
+        self._log_event("Ultrasound source attached", Path(path).name)
+
+    def _patient_models(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("AI / Models", "Transparent model-facing surface with explicit validation and provenance boundaries."))
+
+        if self.current_case:
+            hero = QFrame()
+            hero.setObjectName("card")
+            hv = QVBoxLayout(hero)
+            top = QHBoxLayout()
+            top.addWidget(QLabel("CHRONO-PCOS"))
+            top.addStretch()
+            top.addWidget(pill("SYNTHETIC / DEMO_DATA", "#3a2a2b", "#f0a5a0"))
+            hv.addLayout(top)
+            hv.addWidget(QLabel(f"Research-risk example: {self.current_case.risk:.0f}%"))
+            hv.addWidget(QLabel("Synthetic showcase value only — not a probability, diagnosis, clinical severity score or validation result."))
+            o.addWidget(hero)
+        else:
+            o.addWidget(card("CHRONO-PCOS", "NOT RUN", "Live workstation view deliberately does not fabricate disease-model output."))
+
+        g = QGridLayout()
+        blocks = [
+            ("What did the model layer use?", "Wearable physiology + longitudinal context + disease-specific inputs when available."),
+            ("How good was the data?", self._data_quality_text(self._profile()["quality"])[0] if self._profile() else "UNKNOWN"),
+            ("What is missing?", "Validated clinical and imaging evidence may be missing."),
+            ("Clinical validation", "NOT ESTABLISHED"),
+            ("What this result does not mean", "It is not a diagnosis, lab-equivalent hormone measurement or validated clinical probability."),
+            ("Provenance", "MODEL-INFERRED only for an actual model run; DEMO_DATA for synthetic examples."),
+        ]
+        for i, (a, b) in enumerate(blocks):
+            f = QFrame()
+            f.setObjectName("card")
+            v = QVBoxLayout(f)
+            h = QLabel(a.upper())
+            h.setStyleSheet("color:#e2e6ef;font-weight:850;font-size:10px;")
+            v.addWidget(h)
+            x = QLabel(b)
+            x.setWordWrap(True)
+            x.setObjectName("muted")
+            v.addWidget(x)
+            g.addWidget(f, i//2, i%2)
+        o.addLayout(g)
+        o.addStretch()
+        return w
+
+    def _patient_clinical(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        box = QFrame()
+        box.setObjectName("card")
+        v = QVBoxLayout(box)
+        v.addWidget(section_header("Patient-entered / clinician-entered data", "Shown as source-labelled contextual inputs."))
+        p = self._profile()
+        rows = [
+            ("Age", p["age"] if p else "—", "CLINICALLY ENTERED / LOCAL"),
+            ("BMI", p["bmi"] if p else "—", "CLINICALLY ENTERED / LOCAL"),
+            ("Average cycle length", "NOT SUPPLIED", "CLINICALLY ENTERED"),
+            ("Cycle variability", "NOT SUPPLIED", "PATIENT-REPORTED"),
+            ("Hirsutism", "NOT SUPPLIED", "PATIENT-REPORTED"),
+        ]
+        for name, value, src in rows:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(name))
+            row.addStretch()
+            row.addWidget(QLabel(str(value)))
+            row.addWidget(status_badge(src, "neutral"))
+            v.addLayout(row)
+        o.addWidget(box)
+        info = QLabel("Clinical inputs are not inferred from wearable data in this workstation. Production workflows should preserve who entered each value, when, and the audit trail.")
+        info.setObjectName("warning")
+        info.setWordWrap(True)
+        o.addWidget(info)
+        o.addStretch()
+        return w
+
+    def _patient_reports(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("Reports", "Traceable report assembly keeps observations, quality, models, uncertainty and limitations separate."))
+        card1 = QFrame()
+        card1.setObjectName("card")
+        v = QVBoxLayout(card1)
+        v.addWidget(QLabel("My monitoring / clinical review"))
+        b = QPushButton("Generate report file")
+        b.setObjectName("primary")
+        b.clicked.connect(self._generate_report)
+        v.addWidget(b, 0, Qt.AlignmentFlag.AlignLeft)
+        o.addWidget(card1)
+
+        p = self._profile()
+        txt = "Patient → acquisition → quality → features → baseline → longitudinal → model → uncertainty → limitations"
+        o.addWidget(card("Report structure", txt, "No estimate is promoted to measurement."))
+        if self.current_case:
+            o.addWidget(card("Demo content", "Synthetic showcase", f"{p['pid']} • DEMO_DATA • risk {p['risk']:.0f}%"))
+        else:
+            o.addWidget(card("Live content", "Observations only", "Disease-model output remains NOT RUN in this workstation view."))
+        o.addStretch()
+        return w
+
+    def _generate_report(self):
+        p = self._profile()
+        if not p:
+            QMessageBox.information(self, "Report", "Select a patient first.")
+            return
+        reports = ROOT / "data" / "reports"
+        reports.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = reports / f"{p['pid'].replace(' ','_')}_{stamp}.txt"
+        mode = "DEMO_DATA" if self.current_case else "LIVE_SESSION"
+        lines = [
+            "ENDO-TWIN NEXUS — RESEARCH WORKSTATION REPORT",
+            f"Generated: {datetime.now().isoformat(timespec='seconds')}",
+            f"Patient: {p['pid']} • {p['alias']}",
+            f"Mode: {mode}",
+            DISCLAIMER,
+            "",
+            "OBSERVATIONS",
+            f"Heart rate: {self._fmt(self.latest_row.get('hr_bpm') if self.latest_row else p.get('hr'), ' bpm', 1)}",
+            f"HRV RMSSD: {self._fmt(self.latest_row.get('rmssd_ms') if self.latest_row else p.get('hrv'), ' ms', 1)}",
+            f"Skin temperature: {self._fmt(self.latest_row.get('skin_temp_c') if self.latest_row else p.get('temp'), ' °C', 1)}",
+            "",
+            "MODEL / SCREENING",
+            ("Synthetic research-risk example only: " + f"{p['risk']:.0f}%" if self.current_case else "NOT RUN"),
+            "Clinical validation: NOT ESTABLISHED",
+            "",
+            "LIMITATIONS",
+            "This report is for a research prototype. It is not a medical device and does not establish a diagnosis.",
+        ]
+        path.write_text("\n".join(lines), encoding="utf-8")
+        self._log_event("Report generated", str(path))
+        QMessageBox.information(self, "Report generated", f"Saved locally:\n{path}")
+
+    def _patient_notes(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("Notes", "Local-first clinical/research notes. Persist only what your workflow is authorized to store."))
+        self.notes_edit = QTextEdit()
+        self.notes_edit.setPlaceholderText("Write a patient-scoped note…")
+        self.notes_edit.setPlainText(self.note_cache)
+        o.addWidget(self.notes_edit, 1)
+        row = QHBoxLayout()
+        save = QPushButton("Save local note")
+        save.setObjectName("primary")
+        save.clicked.connect(self._save_note)
+        clear = QPushButton("Clear")
+        clear.setObjectName("secondary")
+        clear.clicked.connect(self.notes_edit.clear)
+        row.addWidget(save)
+        row.addWidget(clear)
+        row.addStretch()
+        o.addLayout(row)
+        return w
+
+    def _save_note(self):
+        self.note_cache = self.notes_edit.toPlainText()
+        p = self._profile()
+        if not p:
+            return
+        notes = ROOT / "data" / "notes"
+        notes.mkdir(parents=True, exist_ok=True)
+        path = notes / f"{p['pid'].replace(' ','_')}.txt"
+        path.write_text(self.note_cache, encoding="utf-8")
+        self._log_event("Patient note saved", str(path))
+        QMessageBox.information(self, "Notes", "Local note saved.")
+
+    def _patient_provenance(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("Provenance", "Source labels are displayed next to the data path instead of hidden in metadata."))
+        t = QTableWidget(0, 4)
+        t.setHorizontalHeaderLabels(["Stream / feature", "Provenance", "Current source", "Interpretation boundary"])
+        self._fit_table(t)
+        rows = [
+            ("PPG waveform", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "MAX30102 / demo stream", "Raw signal"),
+            ("Heart rate", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "PPG processing", "Observed / source-derived"),
+            ("HRV RMSSD", "DERIVED", "PPG beat intervals", "Computed feature"),
+            ("GSR / EDA", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "GSR channel / demo", "Conductance proxy"),
+            ("Skin temperature", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "DS18B20 / demo", "Validity-gated"),
+            ("Disease-model output", "MODEL-INFERRED / DEMO_DATA", "CHRONO-PCOS", "Only when an actual model run exists"),
+            ("Ultrasound", "IMAGE-DERIVED", self.image_path or "No image attached", "Anatomical inference remains UNKNOWN"),
+        ]
+        for row in rows:
+            r = t.rowCount()
+            t.insertRow(r)
+            for c, val in enumerate(row):
+                t.setItem(r, c, QTableWidgetItem(str(val)))
+        o.addWidget(t, 1)
+        return w
+
+    def _patient_audit(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.addWidget(section_header("Audit", "Local audit view for this research workstation session."))
+        metrics = QGridLayout()
+        metrics.addWidget(card("Packets received", str(self.packet_count), "Current session"), 0, 0)
+        metrics.addWidget(card("Bridge inbox", str(self.bridge.received_count), "Patient packages received"), 0, 1)
+        metrics.addWidget(card("Mode", "DEMO" if self.mode.mode=="demo" else "LIVE", "Chosen at startup"), 0, 2)
+        metrics.addWidget(card("Model status", "DEMO ONLY" if self.current_case else "NOT RUN", "Clinical validation not established"), 0, 3)
+        o.addLayout(metrics)
+        t = QTableWidget(0, 3)
+        t.setHorizontalHeaderLabels(["Time", "Event", "Detail"])
+        self._fit_table(t)
+        for row in reversed(self.events):
+            r = t.rowCount()
+            t.insertRow(r)
+            for c, val in enumerate(row):
+                t.setItem(r, c, QTableWidgetItem(str(val)))
+        o.addWidget(t, 1)
+        return w
+
+    def _mobile_page(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setContentsMargins(25, 18, 20, 15)
+        o.addWidget(QLabel("Mobile Link"))
+        o.itemAt(0).widget().setObjectName("title")
+        o.addWidget(QLabel("Pair Patient Android on the same trusted LAN. Research/demo infrastructure only."))
+        info = QGridLayout()
+        self.mobile_endpoint = card("Workstation endpoint", self.bridge.endpoint, "Doctor bridge • port 7777")
+        self.mobile_code = card("Pairing code", self.bridge.pair_code, "Regenerated at bridge restart")
+        self.mobile_received = card("Received packages", str(self.bridge.received_count), "data/bridge/inbox")
+        self.mobile_security = card("Security", "Trusted LAN", "Production needs TLS + strong authentication + audit")
+        for i, f in enumerate([self.mobile_endpoint, self.mobile_code, self.mobile_received, self.mobile_security]):
+            info.addWidget(f, 0, i)
+        o.addLayout(info)
+        copy = QPushButton("Copy pairing instructions")
+        copy.setObjectName("primary")
+        copy.clicked.connect(self._copy_mobile)
+        o.addWidget(copy, 0, Qt.AlignmentFlag.AlignLeft)
+        restart = QPushButton("Restart bridge")
+        restart.setObjectName("secondary")
+        restart.clicked.connect(self._restart_bridge)
+        o.addWidget(restart, 0, Qt.AlignmentFlag.AlignLeft)
+        hint = QLabel("The patient Android transport stays patient-scoped. Its current payload path is intentionally DEMO_DATA.")
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        o.addWidget(hint)
+        o.addStretch()
+        return w
+
+    def _copy_mobile(self):
+        QApplication.clipboard().setText(
+            f"ENDO-TWIN Doctor Workstation\nAddress: {self.bridge.endpoint}\nPairing code: {self.bridge.pair_code}\nUse Patient Android → Connect."
+        )
+        QMessageBox.information(self, "Mobile Link", "Pairing instructions copied.")
+
+    def _restart_bridge(self):
+        self.bridge.stop()
+        self.bridge = EndoTwinBridgeServer(ROOT, 7777)
+        try:
+            self.bridge.start()
+        except OSError as e:
+            QMessageBox.warning(self, "Mobile Link", str(e))
+            return
+        self.mobile_endpoint.findChildren(QLabel)[1].setText(self.bridge.endpoint)
+        self.mobile_code.findChildren(QLabel)[1].setText(self.bridge.pair_code)
+        self._log_event("Mobile bridge restarted", self.bridge.endpoint)
+
+    def _settings_page(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setContentsMargins(25, 18, 20, 15)
+        t = QLabel("Settings")
+        t.setObjectName("title")
+        o.addWidget(t)
+        o.addWidget(QLabel("Workstation preferences, data boundary and research status."))
+        g = QGridLayout()
+        mode = "DEMO MODE" if self.mode.mode == "demo" else f"LIVE SENSOR MODE • {self.mode.port}"
+        g.addWidget(card("Data source", mode, "Selected at startup and fixed for this run"), 0, 0)
+        g.addWidget(card("Transport", self.bridge.endpoint, "Local bridge for Patient Android"), 0, 1)
+        g.addWidget(card("Storage", "LOCAL-FIRST", "Patient-scoped data and reports remain on this workstation"), 0, 2)
+        g.addWidget(card("Validation", "NOT ESTABLISHED", "Research prototype; not a clinical device"), 0, 3)
+        o.addLayout(g)
+        safety = QLabel(
+            "Safety boundary: ENDO-TWIN is the platform; CHRONO-PCOS is its first disease-specific research module. "
+            "Measured, derived, patient-reported, image-derived, model-inferred and demo values must remain distinguishable."
+        )
+        safety.setObjectName("warning")
+        safety.setWordWrap(True)
+        o.addWidget(safety)
+        o.addStretch()
+        return w
+
+    # ---------- live updates ----------
+    def _on_sample(self, _sample):
+        self.packet_count += 1
+
+    def _on_state(self, state):
+        shown = state.upper().replace("_", " ")
+        self.side_state.setText(shown)
+        self._refresh_header()
+        self._log_event("Sensor state", state)
+
+    def _on_error(self, msg):
+        self.side_state.setText("ERROR • " + msg)
+        self._log_event("Sensor error", msg)
+
+    def _on_features(self, row):
+        self.latest_row = row
+        self.quality_badge.setText("●  " + self._data_quality_text(row.get("signal_quality"))[0])
+        if hasattr(self, "live_signal_placeholder"):
+            self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
+        # Update metric charts when they exist.
+        mapping = {
+            "Heart rate": row.get("hr_bpm"),
+            "HRV (RMSSD)": row.get("rmssd_ms"),
+            "Skin temperature": row.get("skin_temp_c"),
+        }
+        for name, value in mapping.items():
+            if name in self.metric_cards:
+                big, chart = self.metric_cards[name]
+                suffix = {"Heart rate":" bpm","HRV (RMSSD)":" ms","Skin temperature":" °C"}[name]
+                big.setText(self._fmt(value, suffix, 1))
+                if value is not None:
+                    chart.set_value(value)
+        self._log_event("Feature update", f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')}")
+
+    def _open_case(self, pid: str):
+        self.current_case = None
+        self.live_patient = None
+
+        if isinstance(pid, str) and pid.startswith("LOCAL::"):
+            local_id = pid.split("::", 1)[1]
+            try:
+                self.live_patient = self.db.get_patient(local_id)
+            except Exception:
+                self.live_patient = None
+        elif self.mode.mode == "demo":
+            self.current_case = next((x for x in sorted_cases() if x.patient == pid), None)
+            if self.current_case is None:
+                try:
+                    self.live_patient = self.db.get_patient(pid)
+                except Exception:
+                    self.live_patient = None
+        else:
+            try:
+                self.live_patient = self.db.get_patient(pid)
+            except Exception:
+                self.live_patient = None
+
+        if not self.current_case and not self.live_patient:
+            return
+        self._log_event("Patient opened", pid)
+        self._rebuild_patient_header()
+        self._build_patient_tabs()
+        self._go("patient")
+
+    def _attach_patient_signal_to_overview(self):
+        pass
+
+
+def run():
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    mode = choose_mode("ENDO-TWIN • Doctor Workstation")
+    if mode is None:
+        return 0
+    w = DoctorWindow(mode)
+    w.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(run())

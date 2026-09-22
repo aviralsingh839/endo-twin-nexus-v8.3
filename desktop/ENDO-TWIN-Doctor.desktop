@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ENDO-TWIN Doctor Workstation
+Comment=Patient-scoped doctor research workstation
+Exec=bash -c 'cd "$(dirname -- "%k")/.." && ./START.sh doctor'
+Icon=applications-medical
+Terminal=false
+Type=Application
+Categories=Science;MedicalSoftware;
+StartupNotify=true

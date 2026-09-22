@@ -1,4 +1,4 @@
-"""Global configuration for ENDO-TWIN V8.4.
+"""Global configuration for ENDO-TWIN V8.6.
 
 Conservative defaults - this is an educational research prototype,
 not a medical device.
@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import List
 
 # V8.4 branding
-APP_VERSION = "8.4.0"
-APP_VERSION_LABEL = "V8.4, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
+APP_VERSION = "8.6.1"
+APP_VERSION_LABEL = "V8.6.1, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
 APP_NAME = "ENDO-TWIN"
 APP_TAGLINE = "Understand your physiological patterns over time."
 # Disease-specific module identity remains separate from the general platform name.
@@ -43,7 +43,7 @@ BASELINE_CONFIDENCE_MIN_OBS = 30
 FEATURE_LOG_INTERVAL_S = 10.0
 
 # Sampling targets
-PPG_FS_HZ = 50.0
+PPG_FS_HZ = 50.0  # Sensor-core default; desktop live packet processing overrides to 20 Hz
 IMU_FS_HZ = 50.0
 GSR_FS_HZ = 10.0
 TEMP_FS_HZ = 1.0
@@ -113,7 +113,7 @@ class UserProfile:
     glucose_mg_dl: float | None = None
     glucose_context: str = "unknown"
     time_since_meal_min: float | None = None
-    # V8.3 additions
+    # V8.6 additions
     sex: str | None = None  # for module gating, optional
     smoking_status: str | None = None
     family_history: List[str] = field(default_factory=list)

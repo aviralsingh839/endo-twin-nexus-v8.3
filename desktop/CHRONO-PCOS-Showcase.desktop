@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=CHRONO-PCOS Full Showcase
-Comment=17 Steps Science-Fair Demonstration - Integrated Ecosystem
-Exec=bash -c 'SCRIPT_DIR="$(cd -- "$(dirname -- "%k")" && pwd)"; PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"; bash "$PROJECT_ROOT/launchers/FULL_SHOWCASE.sh"'
-Icon=applications-education
-Terminal=false
-Type=Application
-Categories=Science;Education;

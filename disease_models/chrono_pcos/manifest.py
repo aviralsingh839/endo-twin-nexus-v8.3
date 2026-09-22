@@ -8,9 +8,9 @@ from src.endo_twin.models.disease_model_interface import DiseaseModelManifest, D
 
 CHRONO_PCOS_MANIFEST = DiseaseModelManifest(
     name="chrono_pcos",
-    version="8.3+",
+    version="8.6.1",
     display_name="CHRONO-PCOS",
-    description="PCOS/PCOD risk pre-screening research module - first disease-specific implementation on ENDO-TWIN platform. Combines physiological sensing, chrono-metabolic fingerprinting, ultrasound, and AI/ML for research risk signals, NOT diagnosis.",
+    description="PCOS/PCOD disease-specific research-context module - first disease-specific implementation on ENDO-TWIN platform. Combines physiological sensing, longitudinal context, clinical inputs, and optional imaging evidence for exploratory research signals; not diagnosis.",
     category=DiseaseModelCategory.ENDOCRINE,
     author="ENDO-TWIN Research - Class 11 Research Innovation",
     required_features=["heart_rate", "hrv_rmssd", "activity_level", "skin_temp_c"],

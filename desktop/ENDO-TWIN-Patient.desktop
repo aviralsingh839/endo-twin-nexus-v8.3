@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ENDO-TWIN Patient Workstation
+Comment=Single-patient local research workstation
+Exec=bash -c 'cd "$(dirname -- "%k")/.." && ./START.sh patient-pc'
+Icon=smartphone
+Terminal=false
+Type=Application
+Categories=Science;MedicalSoftware;
+StartupNotify=true

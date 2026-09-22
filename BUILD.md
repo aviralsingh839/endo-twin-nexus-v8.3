@@ -1,53 +1,40 @@
-# ENDO-TWIN V8.4 Build Guide
+# ENDO-TWIN V8.6 — Build & Run
 
-## Fast path
+## Canonical launcher
+```bash
+./START.sh
+```
 
-### Patient APK
+## Workstations
+```bash
+./START.sh doctor
+./START.sh patient-pc
+```
 
-    cd android/patient
-    ./gradlew assembleDebug
+At startup, choose **DEMO MODE** or **LIVE SENSOR MODE**. The choice is fixed for the session.
 
-Output:
+## Android
+```bash
+./setup_android.sh
+./build_apks.sh all
+```
 
-    android/patient/app/build/outputs/apk/debug/app-debug.apk
+Outputs are copied to `DIST/android/`.
 
-### Doctor APK
+## Live USB sensor
+Connect the Arduino and choose LIVE SENSOR MODE. The workstation reads the existing CRC-protected `$CP/$CP2` protocol and processes the received stream. The firmware's internal sensor sampling rate is not confused with the approximately 20 Hz PC packet rate.
 
-    cd android/doctor
-    ./gradlew assembleDebug
+## Mobile bridge
+Doctor Workstation: port **7777**.
+Patient Workstation: port **7778**.
 
-Output:
+The current phone transport path remains DEMO_DATA and is not a replacement for clinically validated acquisition or secure production health infrastructure.
 
-    android/doctor/app/build/outputs/apk/debug/app-debug.apk
+## Website / Research Portal
+The static research website is preserved at `website/index.html`.
 
-## One-command project checks
-
-    ./START.sh health
-    ./START.sh test
-
-## Build all native Android apps
-
-    ./START.sh build-gradle
-
-The launcher only reports an APK when a real APK file was produced.
-
-## Toolchain
-
-The native apps use Gradle + Android Gradle Plugin + Kotlin + Jetpack Compose + Room.
-
-The repository includes a Gradle wrapper for both apps, so a globally installed Gradle executable is not required.
-
-For local Android development use a JDK 17 environment and an Android SDK containing API 34/build tools 34.0.0.
-
-## CI artifacts
-
-Every push/PR runs the Python quality gate and builds both debug APKs in GitHub Actions. Successful runs publish:
-
-- endo-twin-patient-debug
-- endo-twin-doctor-debug
-
-as workflow artifacts.
-
-## Scientific non-negotiables
-
-A build is not considered complete merely because it compiles. The system must preserve provenance, uncertainty, patient scope, demo separation, and the research-only status of disease-model output.
+Launch it from the main menu with **Website / Research Portal**, or directly:
+```bash
+./START.sh website
+```
+The launcher is available at `LAUNCH/WEBSITE.sh` and `launchers/WEBSITE.sh` for compatibility with the existing project layout.
