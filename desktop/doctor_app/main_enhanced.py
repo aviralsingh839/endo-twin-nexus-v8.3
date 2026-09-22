@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
+from collections import deque
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -49,6 +50,7 @@ class DoctorWindow(QMainWindow):
         self.image_path = ""
         self.metric_cards = {}
         self.trend_charts = {}
+        self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
         self.tab_pages = {}
         self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
 
@@ -975,8 +977,13 @@ class DoctorWindow(QMainWindow):
     def _patient_trends(self):
         w = QWidget()
         o = QVBoxLayout(w)
-        o.addWidget(section_header("Trends", "Longitudinal plots are descriptive. Pattern interpretation requires validated methodology and context."))
+        o.setSpacing(12)
+        o.addWidget(section_header(
+            "Physiological trends",
+            "Continuous observations and derived features. Gaps indicate unavailable or quality-gated data; they are not imputed."
+        ))
         grid = QGridLayout()
+        grid.setSpacing(12)
         names = [
             ("Heart rate", "bpm", "hr_bpm"),
             ("HRV / RMSSD", "ms", "rmssd_ms"),
@@ -987,22 +994,27 @@ class DoctorWindow(QMainWindow):
             panel = QFrame()
             panel.setObjectName("card")
             v = QVBoxLayout(panel)
+            v.setContentsMargins(14, 12, 14, 12)
             top = QHBoxLayout()
-            top.addWidget(QLabel(name))
+            title = QLabel(name)
+            title.setStyleSheet("font-size:13px;font-weight:850;color:#e7ebf3;")
+            top.addWidget(title)
             top.addStretch()
-            top.addWidget(QLabel(unit))
+            top.addWidget(status_badge("LIVE" if self.mode.mode == "live" else "DEMO", "measured" if self.mode.mode == "live" else "info"))
             v.addLayout(top)
             chart = Sparkline(name, unit)
-            if self.current_case:
+            chart.setMinimumHeight(230)
+            values = list(self.metric_history.get(key, []))
+            if not values and self.current_case:
                 p = self.current_case
                 base = {"hr_bpm": p.hr, "rmssd_ms": p.hrv, "activity_level": p.activity, "skin_temp_c": p.temp}[key]
-                pattern = [0, 2, -1, 4, 1, -3, 2, -2, 3, 0, -4, 2, 1, -1, 4, -2, 0, 3]
+                pattern = [0, 2, -1, 4, 1, -3, 2, -2, 3, 0, -4, 2, 1, -1, 4, -2, 0, 3, 1, -2, 3, 0]
                 scale = 0.07 if key == "skin_temp_c" else 1.0
-                chart.set_values([base + x * scale for x in pattern])
-            elif self.latest_row and self.latest_row.get(key) is not None:
-                chart.set_values([float(self.latest_row[key])])
-            v.addWidget(chart)
-            grid.addWidget(panel, i//2, i%2)
+                values = [base + x * scale for x in pattern]
+            chart.set_values(values)
+            v.addWidget(chart, 1)
+            self.trend_charts[key] = chart
+            grid.addWidget(panel, i // 2, i % 2)
         o.addLayout(grid)
         return w
 
@@ -1365,6 +1377,16 @@ class DoctorWindow(QMainWindow):
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
         # Update metric charts when they exist.
+        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
+        for key, value in history_map.items():
+            if value is not None:
+                try:
+                    self.metric_history[key].append(float(value))
+                except (TypeError, ValueError):
+                    pass
+            if key in self.trend_charts:
+                self.trend_charts[key].set_values(list(self.metric_history[key]))
+
         mapping = {
             "Heart rate": row.get("hr_bpm"),
             "HRV (RMSSD)": row.get("rmssd_ms"),
