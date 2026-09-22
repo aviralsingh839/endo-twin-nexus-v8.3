@@ -57,6 +57,17 @@ data class TimelineEntity(
     val createdAt: Long
 )
 
+@Entity(tableName = "public_studies")
+data class PublicStudyEntity(
+    @PrimaryKey val studyId: String,
+    val participantId: String,
+    val startedAt: Long,
+    val plannedEndAt: Long,
+    val endedAt: Long? = null,
+    val consentAcknowledged: Boolean = false,
+    val status: String = "ACTIVE"
+)
+
 @Entity(tableName = "raw_sensor_packets")
 data class RawSensorPacketEntity(
     @PrimaryKey val packetId: String,
@@ -116,11 +127,32 @@ interface PatientDao {
 
     @Query("SELECT * FROM raw_sensor_packets WHERE patientId = :patientId ORDER BY receivedAt DESC")
     suspend fun getRawPackets(patientId: String): List<RawSensorPacketEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPublicStudy(study: PublicStudyEntity)
+
+    @Query("SELECT * FROM public_studies ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getLatestPublicStudy(): PublicStudyEntity?
+
+    @Query("UPDATE public_studies SET endedAt=:endedAt, status=:status WHERE studyId=:studyId")
+    suspend fun finishPublicStudy(studyId: String, endedAt: Long, status: String)
+
+    @Query("SELECT COUNT(*) FROM raw_sensor_packets WHERE patientId=:patientId AND receivedAt BETWEEN :from AND :to")
+    suspend fun countRawPackets(patientId: String, from: Long, to: Long): Int
+
+    @Query("SELECT COUNT(*) FROM raw_sensor_packets WHERE patientId=:patientId AND receivedAt BETWEEN :from AND :to AND crcValid=1")
+    suspend fun countValidPackets(patientId: String, from: Long, to: Long): Int
+
+    @Query("SELECT MIN(receivedAt) FROM raw_sensor_packets WHERE patientId=:patientId AND receivedAt BETWEEN :from AND :to")
+    suspend fun firstPacketAt(patientId: String, from: Long, to: Long): Long?
+
+    @Query("SELECT MAX(receivedAt) FROM raw_sensor_packets WHERE patientId=:patientId AND receivedAt BETWEEN :from AND :to")
+    suspend fun lastPacketAt(patientId: String, from: Long, to: Long): Long?
 }
 
 @Database(
-    entities = [PatientEntity::class, MeasurementEntity::class, TimelineEntity::class, ReportEntity::class, RawSensorPacketEntity::class],
-    version = 2,
+    entities = [PatientEntity::class, MeasurementEntity::class, TimelineEntity::class, ReportEntity::class, RawSensorPacketEntity::class, PublicStudyEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class PatientDatabase : RoomDatabase() {
