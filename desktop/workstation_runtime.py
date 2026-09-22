@@ -35,7 +35,7 @@ class ModeDialog(QDialog):
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","ESP32 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP8266 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)
@@ -62,13 +62,13 @@ class ModeDialog(QDialog):
         ports=ArduinoReader.available_ports()
         self.port.clear(); self.port.addItems(ports)
         if cur and cur in ports: self.port.setCurrentText(cur)
-        self.port_status.setText(f"USB serial devices found: {len(ports)}" if ports else "No USB serial device detected. Connect the ESP32 or Mega and click Auto-detect USB.")
+        self.port_status.setText(f"USB serial devices found: {len(ports)}" if ports else "No USB serial device detected. Connect the ESP8266 or Mega and click Auto-detect USB.")
 
     def auto_detect_port(self):
         ports=ArduinoReader.available_ports()
         self.port.clear(); self.port.addItems(ports)
         if not ports:
-            self.port_status.setText("No USB serial device detected. Connect the ESP32 or Mega and click Auto-detect USB.")
+            self.port_status.setText("No USB serial device detected. Connect the ESP8266 or Mega and click Auto-detect USB.")
             return
         # Prefer the normal Linux/macOS USB-serial names, then Windows COM ports.
         preferred=[p for p in ports if "/ttyACM" in p or "/ttyUSB" in p or p.upper().startswith("COM")]
