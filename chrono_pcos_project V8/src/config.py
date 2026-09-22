@@ -25,7 +25,7 @@ SERIAL_TIMEOUT_S = 0.2
 RECONNECT_RETRY_S = 3.0
 STALE_DATA_TIMEOUT_S = 6.0
 
-# ESP8266 Wi-Fi bridge default port.
+# ESP32-S3 Wi-Fi bridge default port.
 WIFI_BRIDGE_DEFAULT_PORT = 7777
 
 # Baseline calibration defaults.
