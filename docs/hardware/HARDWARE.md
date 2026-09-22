@@ -31,7 +31,7 @@ Transport:
 - USB and TCP both carry newline-terminated canonical CP2 packets
 - ESP8266 has no BLE; Android uses Wi-Fi/TCP
 
-The default wiring assumes a NodeMCU 1.0 / ESP-12E style board. NodeMCU labels D1/D2/D4/D6 map to GPIO5/4/2/12. citeturn0search7
+The default wiring assumes a NodeMCU 1.0 / ESP-12E style board. NodeMCU labels D1/D2/D4/D6 map to GPIO5/4/2/12.
 
 ## Bench/lab controller — Mega 2560
 
