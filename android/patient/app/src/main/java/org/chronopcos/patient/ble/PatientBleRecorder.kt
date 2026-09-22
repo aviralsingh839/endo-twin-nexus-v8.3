@@ -26,7 +26,7 @@ class PatientBleRecorder(context: Context, private val patientId: String) {
             recorded += values.map { item ->
                 val type = item.first; val value = item.second; val unit = item.third
                 MeasurementEntity(
-                    measurementId = sessionId + "_" + sample.ms + "_" + type,
+                    measurementId = sessionId + "_" + now + "_" + type,
                     patientId = patientId, type = type, value = value, unit = unit,
                     timestamp = now, quality = 1.0, provenance = "MEASURED",
                     source = "ESP32", isDemo = false, createdAt = now
