@@ -87,7 +87,7 @@ private fun PatientApp(currentPatientId: String, alias: String) {
                         }
                         Spacer(Modifier.width(12.dp))
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF142B3A), titleContentColor = Color.White)
                 )
             },
             bottomBar = {
@@ -156,7 +156,7 @@ private fun Avatar(initial: String, label: String) {
 @Composable
 private fun PageTitle(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.displaySmall)
+        Text(title, style = MaterialTheme.typography.headlineSmall)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -195,7 +195,7 @@ private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: 
 
 @Composable
 private fun MetricCard(title: String, value: String, detail: String, provenance: String, trend: List<Float> = emptyList()) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -229,7 +229,7 @@ private fun HomeScreen(patientId: String, alias: String) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { PageTitle("Public Test Workspace", "Anonymous participant • $patientId") }
         item {
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("3-day wearable observation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("The participant wears the ESP32-S3 pod during ordinary daily life. The app records timestamped CP2 packets locally and keeps the participant de-identified.")
@@ -255,7 +255,7 @@ private fun HomeScreen(patientId: String, alias: String) {
             }
         }
         item {
-            Card(shape = RoundedCornerShape(16.dp)) {
+            Card(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Research boundary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("The wearable can provide physiological signals and data-quality information. It does not establish a diagnosis. Three days are an engineering/public-test window, not clinical validation.")
