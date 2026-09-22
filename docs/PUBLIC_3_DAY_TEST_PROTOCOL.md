@@ -217,3 +217,24 @@ Before giving the pod to another volunteer:
 - verify the export contains only the selected study.
 
 Room supports explicit migration paths for schema changes; the current app adds a non-destructive 2→3 migration for the public-study table so existing patient data is not intentionally discarded during this feature update. 
+
+
+## Android → Desktop handoff
+
+After Day 3, use the Android app's **Export CSV** button. The export contains only the selected participant's locally recorded CP2 packets.
+
+On the desktop:
+
+```bash
+python scripts/import_public_study.py /path/to/STUDY-XXXXXXXX.csv --participant PUBLIC-XXXXXXXX
+```
+
+Then open the desktop application and use:
+
+1. **3-Day Public Test → Load Into Analysis**
+2. **Baseline → Capture Baseline**
+3. **Trends → inspect Day 1 / Day 2 / Day 3**
+4. **Data Quality → inspect sensor quality**
+5. **Report → generate the research report**
+
+The importer is offline-only. It verifies CP2 CRC before processing packets and labels imported feature rows as REAL / PUBLIC_3_DAY.
