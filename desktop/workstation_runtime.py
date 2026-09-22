@@ -246,11 +246,11 @@ class Sparkline(QWidget):
         for frac in (0.25,0.5,0.75):
             p.drawLine(r.left(),r.top()+int(r.height()*frac),r.right(),r.top()+int(r.height()*frac))
         if not self.values:
-            p.setPen(QColor("#7890a0")); p.drawText(r,Qt.AlignmentFlag.AlignCenter,"Waiting for signal…"); return
+            p.setPen(QColor("#7890a0")); p.drawText(r,Qt.AlignmentFlag.AlignCenter,"No valid observations yet"); return
         vals=list(self.values); lo=min(vals); hi=max(vals); span=max(hi-lo,1e-6); path=QPainterPath()
         for i,v in enumerate(vals):
             x=r.left()+r.width()*i/max(1,len(vals)-1); y=r.bottom()-r.height()*(v-lo)/span
             path.moveTo(x,y) if i==0 else path.lineTo(x,y)
         p.setPen(QPen(QColor(self.line),2)); p.drawPath(path)
         p.setPen(QColor("#eaf2f7")); p.drawText(r.left()+8,r.top()+18,f"{self.label}  {self.unit}")
-        p.setPen(QColor("#91a7b7")); p.drawText(r.right()-110,r.top()+18,f"{vals[-1]:.1f}")
+        p.setPen(QColor("#91a7b7")); p.drawText(r.right()-145,r.top()+18,f"Latest  {vals[-1]:.1f}")
