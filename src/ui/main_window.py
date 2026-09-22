@@ -270,7 +270,8 @@ class MainWindow(QMainWindow):
         finish = QPushButton("Finish Study")
         refresh = QPushButton("Refresh Timeline")
         export = QPushButton("Export Study CSV")
-        for w in (start, finish, refresh, export): row.addWidget(w)
+        load = QPushButton("Load Into Analysis")
+        for w in (start, finish, refresh, export, load): row.addWidget(w)
         layout.addLayout(row)
         self.public_study_status = QLabel("No public study active.")
         self.public_study_status.setWordWrap(True)
@@ -330,6 +331,7 @@ class MainWindow(QMainWindow):
         finish.clicked.connect(finish_study)
         refresh.clicked.connect(refresh_view)
         export.clicked.connect(export_study)
+        load.clicked.connect(self._load_public_study_features)
         refresh_view()
         return tab
 
@@ -967,12 +969,62 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
 
+    def _load_public_study_features(self):
+        study = self.public_study.study
+        if not study:
+            self.public_study_status.setText("No public study selected.")
+            return
+        df = self.history_store.features_for_session(study.session_id)
+        if df.empty:
+            self.public_study_status.setText("The study has no imported feature rows yet. Import the Android CSV first.")
+            return
+        rows = []
+        for _, r in df.iterrows():
+            def num(name, default=None):
+                v = r.get(name, default)
+                try:
+                    return float(v) if v is not None else default
+                except (TypeError, ValueError):
+                    return default
+            rows.append(FeatureVector(
+                timestamp_s=float(r["ts"]),
+                hr_bpm=num("hr"),
+                rmssd_ms=num("rmssd"),
+                spo2_pct=num("spo2"),
+                skin_temp_c=num("skin_temp"),
+                gsr_tonic=num("gsr"),
+                motion_index=num("motion", 0.0),
+                activity_level=num("activity", 0.0),
+                stress_index=num("stress", 0.0),
+                sleep_probability=num("sleep_prob", 0.0),
+                circadian_stability_index=num("circadian", 50.0),
+                signal_quality=num("signal_quality", 0.0),
+            ))
+        self.feature_history = rows
+        self.baseline_status.setText(f"Loaded {len(rows):,} imported public-study feature rows for {study.participant_id}.")
+        self.public_study_status.setText(f"Loaded {len(rows):,} rows into desktop analysis.")
+        self._update_vital_cards(rows[-1])
+        self._update_risk()
+
     def _capture_baseline(self):
-        success = self.extractor.capture_baseline()
-        if success:
-            self.baseline_status.setText(f"Baseline captured! Confidence {self.baseline_engine.baseline.confidence:.2f}, {self.baseline_engine.baseline.days_covered} days, {len(self.baseline_engine.baseline.stats)} metrics")
-        else:
-            self.baseline_status.setText(f"Baseline failed: {self.extractor.last_capture_error}")
+        try:
+            if self.public_study.study and self.feature_history:
+                self.baseline_engine.capture_from_features(self.feature_history)
+                self.baseline_status.setText(
+                    f"Baseline captured from public study. Confidence {self.baseline_engine.baseline.confidence:.2f}, "
+                    f"{self.baseline_engine.baseline.days_covered} days, {len(self.baseline_engine.baseline.stats)} metrics"
+                )
+                return
+            success = self.extractor.capture_baseline()
+            if success:
+                self.baseline_status.setText(
+                    f"Baseline captured! Confidence {self.baseline_engine.baseline.confidence:.2f}, "
+                    f"{self.baseline_engine.baseline.days_covered} days, {len(self.baseline_engine.baseline.stats)} metrics"
+                )
+            else:
+                self.baseline_status.setText(f"Baseline failed: {self.extractor.last_capture_error}")
+        except Exception as e:
+            self.baseline_status.setText(f"Baseline failed: {e}")
 
     def _clinical_changed(self):
         # Update profile
