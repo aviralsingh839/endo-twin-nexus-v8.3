@@ -5,7 +5,7 @@ from src.serial_io.packet_parser import PacketParser, PacketParseError, xor_crc_
 REPO = Path(__file__).resolve().parents[1]
 
 def make_cp2(status=0):
-    payload = "$CP2,1234,10000,9000,0.1,0.2,0.9,0.1,0.2,0.3,32.5,nan,450,0,0.0,0.0,-1,-1,-1,nan,nan,nan,0," + str(status)
+    payload = "$CP2,1234,10000,9000,0.1,0.2,0.9,0.1,0.2,0.3,nan,nan,450,0,0.0,0.0,-1,-1,-1,nan,nan,nan,0," + str(status)
     return payload + "," + f"{xor_crc_ascii(payload):02X}"
 
 def test_esp32_cp2_is_parser_compatible():
