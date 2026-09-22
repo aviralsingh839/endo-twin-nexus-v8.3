@@ -1,8 +1,20 @@
-# ENDO-TWIN V8.6 — Build & Run
+# ENDO-TWIN NEXUS V8.7 — Build & Run
 
 ## Canonical launcher
 ```bash
 ./START.sh
+```
+
+## Active firmware
+ESP32 primary wearable:
+`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+
+Arduino Mega bench/lab:
+`hardware/arduino/endo_twin_mega_lab/endo_twin_mega_lab.ino`
+
+Build:
+```bash
+./scripts/build/build_firmware.sh
 ```
 
 ## Workstations
@@ -11,30 +23,15 @@
 ./START.sh patient-pc
 ```
 
-At startup, choose **DEMO MODE** or **LIVE SENSOR MODE**. The choice is fixed for the session.
+Choose LIVE SENSOR MODE and select the discovered serial port. The same CP2 packet format is used by ESP32 and Mega; the desktop parser remains the single canonical parser.
 
 ## Android
 ```bash
 ./setup_android.sh
+./build_apks.sh patient
+./build_apks.sh doctor
 ./build_apks.sh all
 ```
 
-Outputs are copied to `DIST/android/`.
-
-## Live USB sensor
-Connect the Arduino and choose LIVE SENSOR MODE. The workstation reads the existing CRC-protected `$CP/$CP2` protocol and processes the received stream. The firmware's internal sensor sampling rate is not confused with the approximately 20 Hz PC packet rate.
-
-## Mobile bridge
-Doctor Workstation: port **7777**.
-Patient Workstation: port **7778**.
-
-The current phone transport path remains DEMO_DATA and is not a replacement for clinically validated acquisition or secure production health infrastructure.
-
-## Website / Research Portal
-The static research website is preserved at `website/index.html`.
-
-Launch it from the main menu with **Website / Research Portal**, or directly:
-```bash
-./START.sh website
-```
-The launcher is available at `LAUNCH/WEBSITE.sh` and `launchers/WEBSITE.sh` for compatibility with the existing project layout.
+## Safety
+Use battery/isolation appropriate for body-worn experiments, verify sensor logic voltage, and keep all research outputs clearly separate from clinical diagnosis.
