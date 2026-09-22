@@ -111,8 +111,8 @@ private fun DoctorApp() {
                         Spacer(Modifier.height(10.dp))
                         NavIcon(Icons.Outlined.Dashboard, "Dashboard", tab == DoctorTab.Dashboard) { selected = null; tab = DoctorTab.Dashboard }
                         NavIcon(Icons.Outlined.People, "Patients", tab == DoctorTab.Patients) { tab = DoctorTab.Patients }
-                        NavIcon(Icons.Outlined.AutoGraph, "Models", tab == DoctorTab.Models) { tab = DoctorTab.Models }
-                        NavIcon(Icons.Outlined.Sensors, "Hardware", tab == DoctorTab.Hardware) { tab = DoctorTab.Hardware }
+                        NavIcon(Icons.Outlined.MonitorHeart, "Live Monitoring", tab == DoctorTab.Live) { tab = DoctorTab.Live }\n                        NavIcon(Icons.Outlined.AutoGraph, "Analysis", tab == DoctorTab.Analysis) { tab = DoctorTab.Analysis }\n                        NavIcon(Icons.Outlined.Description, "Reports", tab == DoctorTab.Reports) { tab = DoctorTab.Reports }\n                        NavIcon(Icons.Outlined.Sensors, "Devices", tab == DoctorTab.Devices) { tab = DoctorTab.Devices }
+                        
                         NavIcon(Icons.Outlined.Link, "Mobile", tab == DoctorTab.Mobile) { tab = DoctorTab.Mobile }
                         NavIcon(Icons.Outlined.Settings, "Settings", tab == DoctorTab.Settings) { tab = DoctorTab.Settings }
                     }
