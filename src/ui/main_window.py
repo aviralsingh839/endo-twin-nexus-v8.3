@@ -308,29 +308,42 @@ class MainWindow(QMainWindow):
             study = self.public_study.study
             if not study:
                 self.public_study_status.setText("No public study active. Start a new anonymous 3-day test.")
-                self.public_study_timeline.setText("DAY 1  • waiting\nDAY 2  • waiting\nDAY 3  • waiting")
+                self.public_study_timeline.setText("DAY 1  • waiting
+DAY 2  • waiting
+DAY 3  • waiting")
                 return
             elapsed = min(3.0, study.elapsed_days)
             self.public_study_status.setText(
-                f"Participant: {study.participant_id}   |   Study: {study.study_id}\n"
-                f"Status: {study.status}   |   Elapsed: {elapsed:.2f}/3.00 days\n"
+                f"Participant: {study.participant_id}   |   Study: {study.study_id}
+"
+                f"Status: {study.status}   |   Elapsed: {elapsed:.2f}/3.00 days
+"
                 "REAL acquisition is stored separately from DEMO/SYNTHETIC data."
             )
             rows = self.public_study.daily_summary()
             lines = []
             for idx, day in enumerate(rows[-3:], 1):
                 lines.append(
-                    f"DAY {idx}  {day['day']}\n"
-                    f"  Samples: {day['samples']:,}\n"
+                    f"DAY {idx}  {day['day']}
+"
+                    f"  Samples: {day['samples']:,}
+"
                     f"  Quality: {day['quality']:.0%}"
                 )
-                if day.get("hr") is not None: lines[-1] += f"\n  HR median: {day['hr']:.1f} bpm"
-                if day.get("rmssd") is not None: lines[-1] += f"\n  HRV RMSSD median: {day['rmssd']:.1f} ms"
-                if day.get("gsr") is not None: lines[-1] += f"\n  GSR median: {day['gsr']:.1f}"
-                if day.get("activity") is not None: lines[-1] += f"\n  Activity mean: {day['activity']:.1f}"
-                lines[-1] += "\n  Acquisition quality ≠ clinical validity."
+                if day.get("hr") is not None: lines[-1] += f"
+  HR median: {day['hr']:.1f} bpm"
+                if day.get("rmssd") is not None: lines[-1] += f"
+  HRV RMSSD median: {day['rmssd']:.1f} ms"
+                if day.get("gsr") is not None: lines[-1] += f"
+  GSR median: {day['gsr']:.1f}"
+                if day.get("activity") is not None: lines[-1] += f"
+  Activity mean: {day['activity']:.1f}"
+                lines[-1] += "
+  Acquisition quality ≠ clinical validity."
             while len(lines) < 3: lines.append(f"DAY {len(lines)+1}  • waiting for recorded data")
-            self.public_study_timeline.setText("\n\n".join(lines))
+            self.public_study_timeline.setText("
+
+".join(lines))
 
         def start_study():
             if not consent.isChecked():
@@ -368,9 +381,11 @@ class MainWindow(QMainWindow):
         root = QVBoxLayout(content)
 
         info = QLabel(
-            "Personal Baseline Engine V8.3\n"
+            "Personal Baseline Engine V8.3
+"
             "Learns what is normal for THIS person: mean, median, std, robust MAD, rolling baseline, confidence, "
-            "minimum observations, seasonal/circadian context.\n"
+            "minimum observations, seasonal/circadian context.
+"
             "CURRENT vs PERSONAL BASELINE -> normalized deviation (z-score, % change)"
         )
         info.setWordWrap(True)
@@ -405,9 +420,11 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(tab)
 
         info = QLabel(
-            "Longitudinal Engine - Heart of V8.3\n"
+            "Longitudinal Engine - Heart of V8.3
+"
             "Rolling windows, persistence detection, trend detection, change-point detection, recovery detection, "
-            "missing-data handling, confidence scoring.\n"
+            "missing-data handling, confidence scoring.
+"
             "ONE ABNORMAL -> weak signal, REPEATED CHANGE -> stronger, MULTIPLE FEATURES -> multimodal, "
             "PERSISTENT + GOOD QUALITY -> higher confidence"
         )
@@ -435,7 +452,9 @@ class MainWindow(QMainWindow):
         # PCOS
         pcos_tab = QWidget()
         pcos_layout = QVBoxLayout(pcos_tab)
-        pcos_info = QLabel("MODULE A - PCOS / Reproductive-Metabolic Risk\nPCOS-associated physiological and clinical risk signals (not 'wearable detects PCOS')\nDistinguishes: clinical variables, wearable physiology, ultrasound, combined/fused")
+        pcos_info = QLabel("MODULE A - PCOS / Reproductive-Metabolic Risk
+PCOS-associated physiological and clinical risk signals (not 'wearable detects PCOS')
+Distinguishes: clinical variables, wearable physiology, ultrasound, combined/fused")
         pcos_info.setWordWrap(True)
         pcos_layout.addWidget(pcos_info)
         self.pcos_text = QTextEdit()
@@ -446,7 +465,10 @@ class MainWindow(QMainWindow):
         # Sleep
         sleep_tab = QWidget()
         sleep_layout = QVBoxLayout(sleep_tab)
-        sleep_info = QLabel("MODULE B - Sleep / Circadian Health\nUses activity, HR, HRV, temp, sleep duration/timing/regularity, day/night pattern\nOutputs: sleep regularity signal, circadian disruption signal, recovery signal, persistent deviation\nLanguage: 'sleep-related risk signal' or 'circadian disruption pattern' (not diagnosis)")
+        sleep_info = QLabel("MODULE B - Sleep / Circadian Health
+Uses activity, HR, HRV, temp, sleep duration/timing/regularity, day/night pattern
+Outputs: sleep regularity signal, circadian disruption signal, recovery signal, persistent deviation
+Language: 'sleep-related risk signal' or 'circadian disruption pattern' (not diagnosis)")
         sleep_info.setWordWrap(True)
         sleep_layout.addWidget(sleep_info)
         self.sleep_text = QTextEdit()
@@ -457,7 +479,10 @@ class MainWindow(QMainWindow):
         # Cardiometabolic
         cardio_tab = QWidget()
         cardio_layout = QVBoxLayout(cardio_tab)
-        cardio_info = QLabel("MODULE C - Cardiometabolic Risk (research-oriented)\nFeatures: resting HR, HRV, activity, BMI, age, BP if entered, glucose if entered, sleep, temp, longitudinal\nOutputs: cardiometabolic risk signal, reduced activity trend, elevated RHR trend, metabolic flag\nNever claims diabetes/hypertension/CVD diagnosis")
+        cardio_info = QLabel("MODULE C - Cardiometabolic Risk (research-oriented)
+Features: resting HR, HRV, activity, BMI, age, BP if entered, glucose if entered, sleep, temp, longitudinal
+Outputs: cardiometabolic risk signal, reduced activity trend, elevated RHR trend, metabolic flag
+Never claims diabetes/hypertension/CVD diagnosis")
         cardio_info.setWordWrap(True)
         cardio_layout.addWidget(cardio_info)
         self.cardio_text = QTextEdit()
@@ -468,7 +493,10 @@ class MainWindow(QMainWindow):
         # Autonomic
         auto_tab = QWidget()
         auto_layout = QVBoxLayout(auto_tab)
-        auto_info = QLabel("MODULE D - Autonomic / Stress Regulation\nUses HRV, resting HR, GSR, activity, sleep, temp\nExplainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE\nNot a mental-health diagnosis")
+        auto_info = QLabel("MODULE D - Autonomic / Stress Regulation
+Uses HRV, resting HR, GSR, activity, sleep, temp
+Explainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE
+Not a mental-health diagnosis")
         auto_info.setWordWrap(True)
         auto_layout.addWidget(auto_info)
         self.autonomic_text = QTextEdit()
@@ -479,12 +507,15 @@ class MainWindow(QMainWindow):
         # Future
         future_tab = QWidget()
         future_layout = QVBoxLayout(future_tab)
-        future_info = QLabel("Future Modules - Not Implemented\nThese modules require appropriate dataset, validated features, scientifically defensible labels.\nMarked as 'Future research module - not implemented' and not generating fake data.")
+        future_info = QLabel("Future Modules - Not Implemented
+These modules require appropriate dataset, validated features, scientifically defensible labels.
+Marked as 'Future research module - not implemented' and not generating fake data.")
         future_info.setWordWrap(True)
         future_layout.addWidget(future_info)
         self.future_text = QTextEdit()
         self.future_text.setReadOnly(True)
-        self.future_text.setText("\n".join([f"- {m}: Future research module - not implemented" for m in GLOBAL_REGISTRY.list_future()]))
+        self.future_text.setText("
+".join([f"- {m}: Future research module - not implemented" for m in GLOBAL_REGISTRY.list_future()]))
         future_layout.addWidget(self.future_text)
         tabs.addTab(future_tab, "Future Modules")
 
@@ -495,7 +526,9 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact\nDetects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data\nBad data must not silently become model input.")
+        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact
+Detects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data
+Bad data must not silently become model input.")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -516,7 +549,9 @@ class MainWindow(QMainWindow):
         content = QWidget()
         root = QVBoxLayout(content)
 
-        info = QLabel("Clinical Inputs - Manual measurements (USER-ENTERED)\nBMI, BP, glucose, cycle info, age, etc.\nClearly labelled as USER-ENTERED, not MEASURED")
+        info = QLabel("Clinical Inputs - Manual measurements (USER-ENTERED)
+BMI, BP, glucose, cycle info, age, etc.
+Clearly labelled as USER-ENTERED, not MEASURED")
         info.setWordWrap(True)
         root.addWidget(info)
 
@@ -585,7 +620,10 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Ultrasound - Periodic clinical imaging\nProvenance preserved: source image -> preprocessing -> detected features -> quality -> uncertainty\nIf feature cannot be reliably extracted: return UNKNOWN, never invent.\nFeatures labelled as CLINICALLY-ENTERED or IMAGE-DERIVED")
+        info = QLabel("Ultrasound - Periodic clinical imaging
+Provenance preserved: source image -> preprocessing -> detected features -> quality -> uncertainty
+If feature cannot be reliably extracted: return UNKNOWN, never invent.
+Features labelled as CLINICALLY-ENTERED or IMAGE-DERIVED")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -613,7 +651,9 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Explainability - Every risk signal explains main contributing factors\nDrivers: e.g. resting HR increased from baseline, HRV decreased, sleep regularity decreased, activity decreased\nThen: 'These changes are not specific to one disease and should not be interpreted as a diagnosis.'")
+        info = QLabel("Explainability - Every risk signal explains main contributing factors
+Drivers: e.g. resting HR increased from baseline, HRV decreased, sleep regularity decreased, activity decreased
+Then: 'These changes are not specific to one disease and should not be interpreted as a diagnosis.'")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -627,7 +667,8 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Report Generation - Research report with limitations and recommendation: 'Discuss relevant findings with qualified healthcare professional.'\nIncludes: subject ID, observation period, sensor data, data quality, personal baseline, longitudinal changes, disease signals, contributing factors, ultrasound if available, clinical inputs, limitations")
+        info = QLabel("Report Generation - Research report with limitations and recommendation: 'Discuss relevant findings with qualified healthcare professional.'
+Includes: subject ID, observation period, sensor data, data quality, personal baseline, longitudinal changes, disease signals, contributing factors, ultrasound if available, clinical inputs, limitations")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -650,36 +691,63 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Validation - Engineering vs Clinical\nTests: baseline accuracy, trend detection, persistence, recovery, missing sensor handling, noisy data, multimodal fusion, disease module isolation, subject-level validation, reproducibility")
+        info = QLabel("Validation - Engineering vs Clinical
+Tests: baseline accuracy, trend detection, persistence, recovery, missing sensor handling, noisy data, multimodal fusion, disease module isolation, subject-level validation, reproducibility")
         info.setWordWrap(True)
         layout.addWidget(info)
 
         self.validation_text = QTextEdit()
         self.validation_text.setReadOnly(True)
         self.validation_text.setText(
-            "CHRONO-TWIN NEXUS V8.3 Validation Status\n"
-            "========================================\n\n"
-            "Engineering Validation:\n"
-            "- Personal baseline: mean, median, std, MAD, rolling, confidence, min obs, circadian context - IMPLEMENTED\n"
-            "- Longitudinal engine: rolling windows, persistence, trend, change-point, recovery, missing handling, confidence - IMPLEMENTED\n"
-            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
-            "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED\n"
-            "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED\n"
-            "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
-            "- Synthetic longitudinal data with 6 scenarios - IMPLEMENTED\n"
-            "- Multimodal fusion with provenance - IMPLEMENTED\n"
-            "- Explainability - IMPLEMENTED\n"
-            "- Subject-level validation (no leakage) - IMPLEMENTED\n"
-            "- Data honesty: REAL, SYNTHETIC, PUBLIC, USER-ENTERED labelled - IMPLEMENTED\n\n"
-            "Clinical Validation: NOT ESTABLISHED\n"
-            "- All modules are research-only signals\n"
-            "- No diagnostic claims\n"
-            "- Requires ethics-approved prospective study\n"
-            "- Model confidence vs data quality vs clinical validation separated\n\n"
-            "Hardware:\n"
-            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
-            "- Mega Hub: expanded experimental sensors - PRESERVED\n"
-            "- Software gracefully handles missing sensors - IMPLEMENTED\n"
+            "CHRONO-TWIN NEXUS V8.3 Validation Status
+"
+            "========================================
+
+"
+            "Engineering Validation:
+"
+            "- Personal baseline: mean, median, std, MAD, rolling, confidence, min obs, circadian context - IMPLEMENTED
+"
+            "- Longitudinal engine: rolling windows, persistence, trend, change-point, recovery, missing handling, confidence - IMPLEMENTED
+"
+            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED
+"
+            "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED
+"
+            "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED
+"
+            "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED
+"
+            "- Synthetic longitudinal data with 6 scenarios - IMPLEMENTED
+"
+            "- Multimodal fusion with provenance - IMPLEMENTED
+"
+            "- Explainability - IMPLEMENTED
+"
+            "- Subject-level validation (no leakage) - IMPLEMENTED
+"
+            "- Data honesty: REAL, SYNTHETIC, PUBLIC, USER-ENTERED labelled - IMPLEMENTED
+
+"
+            "Clinical Validation: NOT ESTABLISHED
+"
+            "- All modules are research-only signals
+"
+            "- No diagnostic claims
+"
+            "- Requires ethics-approved prospective study
+"
+            "- Model confidence vs data quality vs clinical validation separated
+
+"
+            "Hardware:
+"
+            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1
+"
+            "- Mega Hub: expanded experimental sensors - PRESERVED
+"
+            "- Software gracefully handles missing sensors - IMPLEMENTED
+"
         )
         layout.addWidget(self.validation_text)
 
@@ -909,7 +977,11 @@ class MainWindow(QMainWindow):
             # Overview signal labels
             if name in self.signal_labels:
                 self.signal_labels[name].setText(
-                    f"{result.signal}\nLevel: {result.level}\nConf: {result.confidence:.2f}\nQuality: {result.data_quality:.2f}\n{result.explanation[:150]}..."
+                    f"{result.signal}
+Level: {result.level}
+Conf: {result.confidence:.2f}
+Quality: {result.data_quality:.2f}
+{result.explanation[:150]}..."
                 )
                 # Color by level
                 if result.level == "high":
@@ -962,7 +1034,9 @@ class MainWindow(QMainWindow):
 
             # Data quality tab
             self.quality_text.setText(
-                context.summary_text() + "\n\n" + self.explanation_engine.explain_fusion(fusion_result)
+                context.summary_text() + "
+
+" + self.explanation_engine.explain_fusion(fusion_result)
             )
 
             # Explanation tab
@@ -974,18 +1048,27 @@ class MainWindow(QMainWindow):
 
             # Baseline tab details
             self.baseline_details.setText(
-                f"Baseline has data: {self.baseline_engine.has_baseline}\n"
-                f"Confidence: {self.baseline_engine.baseline.confidence:.2f}\n"
-                f"Quality: {self.baseline_engine.baseline.quality:.2f}\n"
-                f"Days covered: {self.baseline_engine.baseline.days_covered}\n"
-                f"Samples: {self.baseline_engine.baseline.samples}\n"
-                f"Metrics: {list(self.baseline_engine.baseline.stats.keys())}\n\n"
-                + "\n".join([f"{k}: median {v.median:.1f}, std {v.std:.1f}, conf {v.confidence:.2f}" for k, v in self.baseline_engine.baseline.stats.items()])
+                f"Baseline has data: {self.baseline_engine.has_baseline}
+"
+                f"Confidence: {self.baseline_engine.baseline.confidence:.2f}
+"
+                f"Quality: {self.baseline_engine.baseline.quality:.2f}
+"
+                f"Days covered: {self.baseline_engine.baseline.days_covered}
+"
+                f"Samples: {self.baseline_engine.baseline.samples}
+"
+                f"Metrics: {list(self.baseline_engine.baseline.stats.keys())}
+
+"
+                + "
+".join([f"{k}: median {v.median:.1f}, std {v.std:.1f}, conf {v.confidence:.2f}" for k, v in self.baseline_engine.baseline.stats.items()])
             )
             if self.baseline_engine.has_baseline and self.feature_history:
                 comp = self.baseline_engine.compare_current_vs_baseline(self.feature_history[-1])
                 self.baseline_comparison.setText(
-                    "\n".join([f"{k}: current {v.get('current')} vs baseline {v.get('baseline_median')} -> {v.get('deviation_pct')}%, z={v.get('zscore')}, status {v.get('status')}" for k, v in comp.items()])
+                    "
+".join([f"{k}: current {v.get('current')} vs baseline {v.get('baseline_median')} -> {v.get('deviation_pct')}%, z={v.get('zscore')}, status {v.get('status')}" for k, v in comp.items()])
                 )
 
         except Exception as e:
@@ -1097,12 +1180,17 @@ class MainWindow(QMainWindow):
                 "timestamp_s": time.time(),
             }
             self.ultrasound_text.setText(
-                f"Ultrasound (CLINICALLY-ENTERED)\n"
-                f"Cyst size: {size} mm\n"
-                f"Quality: 0.85\n"
-                f"Provenance: CLINICALLY-ENTERED\n"
+                f"Ultrasound (CLINICALLY-ENTERED)
+"
+                f"Cyst size: {size} mm
+"
+                f"Quality: 0.85
+"
+                f"Provenance: CLINICALLY-ENTERED
+"
                 f"Note: Image-derived features are UNKNOWN by design until validated labelled dataset exists. "
-                f"This entry is clinically-entered structured feature.\n"
+                f"This entry is clinically-entered structured feature.
+"
             )
 
     def _generate_report(self):
@@ -1147,7 +1235,8 @@ class MainWindow(QMainWindow):
             f"--- Disease Module Signals ---",
         ])
         for name, result in self.module_results.items():
-            lines.append(f"\n[{name.upper()}] {result.signal} ({result.level})")
+            lines.append(f"
+[{name.upper()}] {result.signal} ({result.level})")
             lines.append(f"  Confidence: {result.confidence:.2f}, Data quality: {result.data_quality:.2f}, Validation: {result.clinical_validation}")
             lines.append(f"  Explanation: {result.explanation}")
             lines.append(f"  Drivers: {', '.join([d.get('description', '') for d in result.drivers[:2]])}")
@@ -1184,7 +1273,8 @@ class MainWindow(QMainWindow):
             f"{'='*60}",
         ])
 
-        report = "\n".join(lines)
+        report = "
+".join(lines)
         self.report_text.setText(report)
 
     def _save_report(self):
