@@ -10,25 +10,24 @@ Run from the repository root:
 
 The applications remain native **Kotlin + Jetpack Compose + Material 3** with Java 17.
 
-## ESP32 BLE
+## ESP8266 TCP
 
-Both Patient and Doctor Android applications use the ESP32 wearable BLE contract:
-- scan
-- identify `ENDO-TWIN-ESP32`
-- filter by the ENDO-TWIN service UUID
-- connect and discover services
-- subscribe to notifications
-- reassemble newline-delimited CP2 frames from fragmented notifications
+Both Patient and Doctor Android applications use the ESP8266 Wi-Fi/TCP path:
+- join the `ENDO-TWIN-ESP8266` access point or the configured network
+- default host `192.168.4.1`
+- TCP port `7777`
+- connect to the ESP8266 TCP stream
+- reassemble newline-delimited CP2 frames
 - validate CP2 CRC
 - parse measurements
-- show LIVE BLE state
+- show LIVE TCP state
 - send `PING` / `WHOAMI`
 
-Android 12+ uses Bluetooth scan/connect permissions. Older Android versions retain the required compatibility permissions.
+The ESP8266 does not provide BLE.
 
 ## Modes
 
-DEMO data is deterministic and visibly labelled. LIVE BLE and LIVE USB are never populated with synthetic sensor values.
+DEMO data is deterministic and visibly labelled. LIVE TCP and LIVE USB are never populated with synthetic sensor values.
 
 ## Build output
 
