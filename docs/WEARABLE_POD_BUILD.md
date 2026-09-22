@@ -1,55 +1,68 @@
-# WEARABLE POD BUILD - V8.3
+# ENDO-TWIN NEXUS V8.7 — ESP32 Wearable Build
 
-## Primary Wearable - Arduino Nano Pod
+The **ESP32 is the primary wearable**. This document is the practical build guide for the active wearable.
 
-Preserved from V8.1, primary wearable implementation in V8.3.
+## Bill of materials
 
-### Components
+- ESP32 development board
+- MAX30102
+- MPU6050
+- DS18B20
+- GSR module
+- status LED + resistor
+- breadboard / prototype wiring
+- suitable regulated battery supply for body-worn testing
 
-- Arduino Nano (ATmega328P)
-- MAX30102 PPG (I2C, SDA A4, SCL A5, 3.3V)
-- MPU6050 IMU (I2C same bus, address 0x68, 5V)
-- DS18B20 skin temperature (D2, OneWire, 4.7k pull-up)
-- Optional GSR (A0)
-- LEDs Green D8, Yellow D9, Red D10 via 220Ω
-- Buzzer D6
-- Power: 3.7V LiPo + TP4056 + boost, or USB charger
-- Enclosure: small 3D printed pod, wrist strap
+The Arduino Mega is a separate bench/lab controller; it is not required for the wearable.
 
-### Wiring
+## Firmware
 
-See HARDWARE_BUILD_GUIDE.md
+`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
-### Firmware
+Required Arduino libraries:
+- SparkFun MAX3010x Pulse and Proximity Sensor Library
+- Adafruit MPU6050
+- Adafruit Unified Sensor
+- OneWire
+- DallasTemperature
+- ESP32 BLE support from the Arduino-ESP32 core
 
-`hardware/arduino/chrono_pcos_nano_pod/chrono_pcos_nano_pod.ino`
+## Wiring
 
-- Samples PPG 50 Hz, IMU 50 Hz, GSR 10 Hz, Temp 1 Hz
-- Sends packet 20 Hz `$CP2` at 115200 baud
-- Channels not present sent as placeholders (-1 analog, nan environment) so dashboard reads pod like Mega
-- Two connection methods:
-  1. Pod → PC: Nano USB straight to laptop, dashboard --port <nano port>
-  2. Pod → Mega → PC: Nano D1 TX → Mega D19 RX1, common GND, power Nano from charger, Mega firmware RELAY_POD_SERIAL1=1, dashboard connects to Mega only
+- MAX30102 SDA → GPIO21, SCL → GPIO22
+- MPU6050 SDA → GPIO21, SCL → GPIO22
+- DS18B20 DATA → GPIO18, 4.7 kΩ to 3.3 V
+- GSR analog output → GPIO34
+- status LED → GPIO2
 
-### Commands
+Check each sensor breakout's allowed logic voltage before connection.
 
-Dashboard sends on same serial:
-- LED,G / LED,Y / LED,R
-- BEEP
-- PING → $ACK,PONG,00
+## Flash
 
-### Testing
+Use `arduino-cli compile` / `arduino-cli upload` with an ESP32 target such as `esp32:esp32:esp32`. The repository build helper compiles the canonical firmware.
 
-- Serial Monitor 115200, 20 Hz $CP2 lines
-- Finger on MAX30102: ir >5000
-- Move: motion index
-- Warm: temp
+## Serial validation
 
-### V8.3 Integration
+115200 baud. A working device produces:
 
-- Quality control: ir <5000 → quality 0, artifact low_amplitude, finger absent
-- Feature extraction: PPG → HR, HRV, SpO2 educational, pulse amplitude
-- Baseline: learns personal RHR, HRV, temp, GSR, activity
-- Longitudinal: detects persistent changes
-- Shared features: feeds all disease modules
-- Missing sensors: gracefully handled, does not crash
+```
+$CP2,...,<CRC>
+$CP2,...,<CRC>
+...
+```
+
+Send `PING` and expect `$ACK,PONG,00`. Send `WHOAMI` and expect `$ACK,WHOAMI,ENDO-TWIN-ESP32`.
+
+## BLE validation
+
+Scan for **ENDO-TWIN-ESP32**, filter by service UUID, connect, subscribe to the notify characteristic, then reconstruct newline-terminated CP2 frames from notification chunks. The command characteristic accepts `PING`, `WHOAMI` and LED commands.
+
+## Physical test sequence
+
+1. Verify the I2C bus and sensor breakout voltages.
+2. Verify MAX30102 presence; a finger should raise IR readings.
+3. Verify MPU6050 movement changes acceleration/gyro values.
+4. Verify DS18B20 returns a plausible temperature.
+5. Verify GSR produces a changing ADC value.
+6. Confirm CRC-valid CP2 packets.
+7. Run the Prototype Lab acceptance test.
