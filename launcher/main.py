@@ -382,13 +382,13 @@ if PYSIDE_AVAILABLE:
             for key, info in statuses.items():
                 st = info['status']
                 if st == 'PASS':
-                    icon = "🟢"
+                    icon = ""
                     color = "#10b981"
                 elif st == 'WARN':
-                    icon = "🟡"
+                    icon = ""
                     color = "#f59e0b"
                 else:
-                    icon = "🔴"
+                    icon = ""
                     color = "#ef4444"
                 card = QFrame()
                 card.setMinimumSize(200, 60)
@@ -446,52 +446,52 @@ if PYSIDE_AVAILABLE:
             ])
 
             add_category("SCIENCE", "Scientific Core - Research Engine", [
-                ("🧬 Scientific Core\nMain Dashboard", "Sensor Quality, Signal Processing, Feature Extraction, Baseline, Longitudinal, Disease Modules, Fusion", "SCIENTIFIC_CORE"),
-                ("🚀 Full Showcase\n16 Steps Demo", "Complete science-fair demonstration with NEXT/SKIP/EXIT, real operations, DEMO/SIMULATED labeled", "FULL_SHOWCASE"),
-                ("🧠 AI/ML Laboratory\nDisease Modules", "PCOS, Sleep, Cardiometabolic, Autonomic risk signals only, confidence, limitations, NOT ESTABLISHED", "AI_ML"),
-                ("🩻 Ultrasound\nResearch Pipeline", "Loading, preprocessing, quality checks, segmentation, inference, visualization, no invented accuracy", "ULTRASOUND"),
-                ("🕐 Chrono-Metabolic\nFingerprinting", "Circadian, autonomic, variability, activity, temp, metabolic, longitudinal with provenance", "CHRONO_METABOLIC"),
-                ("📈 Signal Processing\nFiltering & Features", "Filtering, baseline removal, artifact detection, missing handling, quality control, feature extraction", "SIGNAL_PROCESSING"),
+                (" Scientific Core\nMain Dashboard", "Sensor Quality, Signal Processing, Feature Extraction, Baseline, Longitudinal, Disease Modules, Fusion", "SCIENTIFIC_CORE"),
+                (" Full Showcase\n16 Steps Demo", "Complete science-fair demonstration with NEXT/SKIP/EXIT, real operations, DEMO/SIMULATED labeled", "FULL_SHOWCASE"),
+                (" AI/ML Laboratory\nDisease Modules", "PCOS, Sleep, Cardiometabolic, Autonomic risk signals only, confidence, limitations, NOT ESTABLISHED", "AI_ML"),
+                (" Ultrasound\nResearch Pipeline", "Loading, preprocessing, quality checks, segmentation, inference, visualization, no invented accuracy", "ULTRASOUND"),
+                (" Chrono-Metabolic\nFingerprinting", "Circadian, autonomic, variability, activity, temp, metabolic, longitudinal with provenance", "CHRONO_METABOLIC"),
+                (" Signal Processing\nFiltering & Features", "Filtering, baseline removal, artifact detection, missing handling, quality control, feature extraction", "SIGNAL_PROCESSING"),
             ])
 
             add_category("CARE & ACCESS", "Care Discovery - FIND CARE", [
-                ("📍 Care Finder\nDoctors, Clinics, Labs, Supplies", "FIND CARE map/list distance/specialty/address/hours/services/contact/directions/verification OSM no API key, demo clearly marked", "CARE_FINDER"),
+                (" Care Finder\nDoctors, Clinics, Labs, Supplies", "FIND CARE map/list distance/specialty/address/hours/services/contact/directions/verification OSM no API key, demo clearly marked", "CARE_FINDER"),
             ])
 
             add_category("DATA & REPORTS", "Data Management - Local-First", [
-                ("🗄 Database\n18 Tables Local-First", "SQLite 18 tables, users, patients, profiles, symptoms, cycles, sensor sessions, PPG/HRV/GSR/motion/temp/quality, ultrasound, model_results, reports, providers, supplies, audit, access", "DATABASE"),
-                ("📄 Reports\nProfessional", "Professional reports with Research / risk-screening output — not a medical diagnosis, model transparency", "REPORTS"),
-                ("💾 Backup / Restore", "Export patient data, import, backup SQLite, encrypted package, deliberate sharing not automatic", "DATABASE"),
+                (" Database\n18 Tables Local-First", "SQLite 18 tables, users, patients, profiles, symptoms, cycles, sensor sessions, PPG/HRV/GSR/motion/temp/quality, ultrasound, model_results, reports, providers, supplies, audit, access", "DATABASE"),
+                (" Reports\nProfessional", "Professional reports with Research / risk-screening output — not a medical diagnosis, model transparency", "REPORTS"),
+                (" Backup / Restore", "Export patient data, import, backup SQLite, encrypted package, deliberate sharing not automatic", "DATABASE"),
             ])
 
             add_category("ENDO-TWIN CORE - GENERAL PLATFORM", "General Platform - Personalized Physiological Modelling - No PCOS Assumptions", [
-                ("🧬 ENDO-TWIN Core\nGeneral Platform", "ENDO-TWIN CORE - General platform, CHRONO-PCOS first disease-specific model - General physiological monitoring, general patient data, general measurements, general longitudinal tracking, general personal baseline, general signal processing, general multimodal fusion, general AI/ML infrastructure, general reports, general patient/doctor workflows - No PCOS-specific assumptions - Patient, Observation, Measurement, SensorReading, Signal, Feature, Baseline, TimelineEvent, LongitudinalSeries, Model, Prediction, Explanation, Uncertainty, Provenance, Report", "ENDO_TWIN"),
-                ("🗄 ENDO-TWIN Database\nGeneral + Multi-Patient", "ENDO-TWIN DB - General physiological data: patients, measurements, signals, features, baselines, timeline_events, symptoms, clinical_observations, imaging, model_runs, predictions, reports, audit_events, provenance - Disease-specific data references disease_model_id + patient_id - stable IDs foreign keys patient-scoped no cross-contamination DEMO-001/002/003 isolation HR 72/78/68", "DATABASE"),
-                ("🧩 Disease Models\nPlugin Architecture", "Disease Models plugin system - DiseaseModel interface: name, version, description, required_features, analyze(), explain(), generate_report(), validate_input(), get_uncertainty(), get_limitations() - CHRONO-PCOS implements interface, future models same interface, core does NOT depend directly on CHRONO-PCOS - ENDO-TWIN is platform, CHRONO-PCOS first model - extensible architecture", "ENDO_TWIN"),
+                (" ENDO-TWIN Core\nGeneral Platform", "ENDO-TWIN CORE - General platform, CHRONO-PCOS first disease-specific model - General physiological monitoring, general patient data, general measurements, general longitudinal tracking, general personal baseline, general signal processing, general multimodal fusion, general AI/ML infrastructure, general reports, general patient/doctor workflows - No PCOS-specific assumptions - Patient, Observation, Measurement, SensorReading, Signal, Feature, Baseline, TimelineEvent, LongitudinalSeries, Model, Prediction, Explanation, Uncertainty, Provenance, Report", "ENDO_TWIN"),
+                (" ENDO-TWIN Database\nGeneral + Multi-Patient", "ENDO-TWIN DB - General physiological data: patients, measurements, signals, features, baselines, timeline_events, symptoms, clinical_observations, imaging, model_runs, predictions, reports, audit_events, provenance - Disease-specific data references disease_model_id + patient_id - stable IDs foreign keys patient-scoped no cross-contamination DEMO-001/002/003 isolation HR 72/78/68", "DATABASE"),
+                (" Disease Models\nPlugin Architecture", "Disease Models plugin system - DiseaseModel interface: name, version, description, required_features, analyze(), explain(), generate_report(), validate_input(), get_uncertainty(), get_limitations() - CHRONO-PCOS implements interface, future models same interface, core does NOT depend directly on CHRONO-PCOS - ENDO-TWIN is platform, CHRONO-PCOS first model - extensible architecture", "ENDO_TWIN"),
             ])
 
             add_category("CHRONO-PCOS - FIRST DISEASE MODEL", "First Disease-Specific Model on ENDO-TWIN Platform - Preserved Original Functionality", [
-                ("🧬 CHRONO-PCOS\nFirst Disease Model", "CHRONO-PCOS - First disease-specific model on ENDO-TWIN platform - PCOS/PCOD risk pre-screening research module - Combines physiological sensing, chrono-metabolic fingerprinting, ultrasound, AI/ML for research risk signals NOT diagnosis - Preserved original PCOS functionality: PCOS features, PCOS risk logic, PCOS model, PCOS-specific ultrasound, Chrono-Metabolic PCOS interpretation, PCOS-specific reports - General functionality in ENDO-TWIN Core, PCOS-specific in CHRONO-PCOS - disease_models/chrono_pcos/", "ENDO_TWIN"),
-                ("🕐 Chrono-Metabolic\nPCOS Interpretation", "Chrono-Metabolic PCOS interpretation - General chrono-metabolic fingerprinting in ENDO-TWIN Core, PCOS-specific interpretation in CHRONO-PCOS - Circadian + Autonomic + Metabolic context + Longitudinal patterns → Chrono-Metabolic representation → PCOS research interpretation - experimental research not diagnosis", "CHRONO_METABOLIC"),
-                ("🩻 Ultrasound\nPCOS-Specific", "PCOS-specific ultrasound analysis - General imaging in ENDO-TWIN Core, PCOS-specific in CHRONO-PCOS - Pipeline IMAGE IMPORT → VALIDATION → PREPROCESSING → IMAGE ANALYSIS → FEATURE EXTRACTION → MODEL → UNCERTAINTY → REPORT - Every result labelled IMAGE-DERIVED - Quality gate UNKNOWN by design - Provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20 - Rotterdam criteria requires clinician", "ULTRASOUND"),
+                (" CHRONO-PCOS\nFirst Disease Model", "CHRONO-PCOS - First disease-specific model on ENDO-TWIN platform - PCOS/PCOD risk pre-screening research module - Combines physiological sensing, chrono-metabolic fingerprinting, ultrasound, AI/ML for research risk signals NOT diagnosis - Preserved original PCOS functionality: PCOS features, PCOS risk logic, PCOS model, PCOS-specific ultrasound, Chrono-Metabolic PCOS interpretation, PCOS-specific reports - General functionality in ENDO-TWIN Core, PCOS-specific in CHRONO-PCOS - disease_models/chrono_pcos/", "ENDO_TWIN"),
+                (" Chrono-Metabolic\nPCOS Interpretation", "Chrono-Metabolic PCOS interpretation - General chrono-metabolic fingerprinting in ENDO-TWIN Core, PCOS-specific interpretation in CHRONO-PCOS - Circadian + Autonomic + Metabolic context + Longitudinal patterns → Chrono-Metabolic representation → PCOS research interpretation - experimental research not diagnosis", "CHRONO_METABOLIC"),
+                (" Ultrasound\nPCOS-Specific", "PCOS-specific ultrasound analysis - General imaging in ENDO-TWIN Core, PCOS-specific in CHRONO-PCOS - Pipeline IMAGE IMPORT → VALIDATION → PREPROCESSING → IMAGE ANALYSIS → FEATURE EXTRACTION → MODEL → UNCERTAINTY → REPORT - Every result labelled IMAGE-DERIVED - Quality gate UNKNOWN by design - Provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20 - Rotterdam criteria requires clinician", "ULTRASOUND"),
             ])
 
             add_category("ANDROID NATIVE KOTLIN", "Native Kotlin + Jetpack Compose - Material 3 - Never Fake APK", [
-                ("📱 Patient Android\nNative Kotlin+Compose", "Patient Android - Kotlin + Jetpack Compose Material 3 Navigation ViewModel Repository Room DataStore Coroutines Clean Architecture - Single patient only never global list CURRENT PATIENT stable ID HOME MY HEALTH MEASUREMENTS TIMELINE SYMPTOMS CYCLE ULTRASOUND RESULTS REPORTS DOCTOR SHARING FIND CARE EDUCATION SETTINGS", "PATIENT_ANDROID"),
-                ("📱 Doctor Android\nNative Kotlin Multi-Patient", "Doctor Android - Kotlin + Compose multi-patient Dashboard Patients Recent Activity Pending Review Reports Settings Patient List Search/Filter/Sort/Open/Archive/Create Patient Profile Tabs OVERVIEW/TIMELINE/PHYSIOLOGY/SENSORS/ULTRASOUND/AI/MODELS/CLINICAL/REPORTS/NOTES/PROVENANCE/AUDIT - DEMO-001 cannot see DEMO-002 database level", "DOCTOR_ANDROID"),
-                ("📦 Build Patient APK\nNative Kotlin Workflow", "Check prerequisites Java Kotlin Gradle SDK NDK, build native APK via gradlew assembleDebug to DIST/android/CHRONO-PCOS-Patient.apk dist/android/, fallback to Kivy buildozer, logs/build_patient_apk.log honest reporting", "BUILD_PATIENT_APK"),
-                ("📦 Build Doctor APK\nNative Kotlin Multi-Patient", "Check prerequisites, build native multi-patient APK to DIST/android/CHRONO-PCOS-Doctor.apk, logs/build_doctor_apk.log honest reporting no fake success, multi-patient safety DEMO-001/002/003", "BUILD_DOCTOR_APK"),
-                ("📦 Build All APKs\nNative Wrapper", "Build both Patient and Doctor native Kotlin APKs, check-only mode, lists DIST/android/ dist/android/, explains real build requires SDK/NDK/Gradle, never fake APK", "BUILD_ALL_APKS"),
+                (" Patient Android\nNative Kotlin+Compose", "Patient Android - Kotlin + Jetpack Compose Material 3 Navigation ViewModel Repository Room DataStore Coroutines Clean Architecture - Single patient only never global list CURRENT PATIENT stable ID HOME MY HEALTH MEASUREMENTS TIMELINE SYMPTOMS CYCLE ULTRASOUND RESULTS REPORTS DOCTOR SHARING FIND CARE EDUCATION SETTINGS", "PATIENT_ANDROID"),
+                (" Doctor Android\nNative Kotlin Multi-Patient", "Doctor Android - Kotlin + Compose multi-patient Dashboard Patients Recent Activity Pending Review Reports Settings Patient List Search/Filter/Sort/Open/Archive/Create Patient Profile Tabs OVERVIEW/TIMELINE/PHYSIOLOGY/SENSORS/ULTRASOUND/AI/MODELS/CLINICAL/REPORTS/NOTES/PROVENANCE/AUDIT - DEMO-001 cannot see DEMO-002 database level", "DOCTOR_ANDROID"),
+                (" Build Patient APK\nNative Kotlin Workflow", "Check prerequisites Java Kotlin Gradle SDK NDK, build native APK via gradlew assembleDebug to DIST/android/CHRONO-PCOS-Patient.apk dist/android/, fallback to Kivy buildozer, logs/build_patient_apk.log honest reporting", "BUILD_PATIENT_APK"),
+                (" Build Doctor APK\nNative Kotlin Multi-Patient", "Check prerequisites, build native multi-patient APK to DIST/android/CHRONO-PCOS-Doctor.apk, logs/build_doctor_apk.log honest reporting no fake success, multi-patient safety DEMO-001/002/003", "BUILD_DOCTOR_APK"),
+                (" Build All APKs\nNative Wrapper", "Build both Patient and Doctor native Kotlin APKs, check-only mode, lists DIST/android/ dist/android/, explains real build requires SDK/NDK/Gradle, never fake APK", "BUILD_ALL_APKS"),
             ])
 
             add_category("PUBLIC", "Public & Documentation - Serious Scientific Innovation Platform", [
-                ("🌐 Website\nScientific Site", "Public website serious modern scientific, HOME PROBLEM SOLUTION HOW IT WORKS HARDWARE PHYSIOLOGY CHRONO-METABOLIC AI/ML ULTRASOUND DIGITAL TWIN ENDO-TWIN PATIENT PLATFORM DOCTOR PLATFORM ANDROID DATABASE & PRIVACY REPORTING CARE DISCOVERY VERSION HISTORY RESEARCH SAFETY LIMITATIONS ROADMAP DEMO DOCUMENTATION CONTACT", "WEBSITE"),
-                ("📚 Documentation\n25 Docs + Guides + ENDO-TWIN", "25 docs 01_PROJECT_OVERVIEW to 25_RESEARCH_METHODOLOGY, Garuda Launch Guide, Showcase Guide, Android Build Guide, ENDO_TWIN_ARCHITECTURE, DATABASE, ARCHITECTURE, INSTALLATION, BUILD_GUIDE, TROUBLESHOOTING, TESTING_REPORT", "WEBSITE"),
+                (" Website\nScientific Site", "Public website serious modern scientific, HOME PROBLEM SOLUTION HOW IT WORKS HARDWARE PHYSIOLOGY CHRONO-METABOLIC AI/ML ULTRASOUND DIGITAL TWIN ENDO-TWIN PATIENT PLATFORM DOCTOR PLATFORM ANDROID DATABASE & PRIVACY REPORTING CARE DISCOVERY VERSION HISTORY RESEARCH SAFETY LIMITATIONS ROADMAP DEMO DOCUMENTATION CONTACT", "WEBSITE"),
+                (" Documentation\n25 Docs + Guides + ENDO-TWIN", "25 docs 01_PROJECT_OVERVIEW to 25_RESEARCH_METHODOLOGY, Garuda Launch Guide, Showcase Guide, Android Build Guide, ENDO_TWIN_ARCHITECTURE, DATABASE, ARCHITECTURE, INSTALLATION, BUILD_GUIDE, TROUBLESHOOTING, TESTING_REPORT", "WEBSITE"),
             ])
 
             add_category("SYSTEM", "System & Setup - Garuda Linux Ready", [
-                ("⚙ Diagnostics\nSystem Check ENDO-TWIN", "Check Garuda/Linux, Python, .venv, Dependencies, Database V8.3, ENDO-TWIN DB DEMO-001/002/003 isolation, Scientific Core V8.3, ENDO-TWIN Core, AI/ML, Model Registry, Ultrasound, Doctor PC, Patient Kivy Legacy, Patient Native Kotlin, Doctor Native Kotlin, Android APKs Native+Legacy, Website, Care Discovery, Chrono-Metabolic, Provenance, Build Scripts, Multi-Patient Safety PASS/WARN/FAIL never fake", "DIAGNOSTICS"),
-                ("🔧 Setup Garuda\nEnvironment Setup", "Detect project root, check Linux/Python, create .venv, install requirements, set permissions, create logs DIST/android dist/android, run diagnostics", "SETUP"),
+                (" Diagnostics\nSystem Check ENDO-TWIN", "Check Garuda/Linux, Python, .venv, Dependencies, Database V8.3, ENDO-TWIN DB DEMO-001/002/003 isolation, Scientific Core V8.3, ENDO-TWIN Core, AI/ML, Model Registry, Ultrasound, Doctor PC, Patient Kivy Legacy, Patient Native Kotlin, Doctor Native Kotlin, Android APKs Native+Legacy, Website, Care Discovery, Chrono-Metabolic, Provenance, Build Scripts, Multi-Patient Safety PASS/WARN/FAIL never fake", "DIAGNOSTICS"),
+                (" Setup Garuda\nEnvironment Setup", "Detect project root, check Linux/Python, create .venv, install requirements, set permissions, create logs DIST/android dist/android, run diagnostics", "SETUP"),
             ])
 
             # Footer with proper wrapping
@@ -549,7 +549,7 @@ def main():
         print("="*70)
         statuses = get_status()
         for k, v in statuses.items():
-            icon = "🟢" if v['status'] == 'PASS' else "🟡" if v['status'] == 'WARN' else "🔴"
+            icon = "" if v['status'] == 'PASS' else "" if v['status'] == 'WARN' else ""
             print(f"{icon} {v['label']}: {v['status']} - {v['detail']}")
         print("\nLaunchers available in launchers/ and LAUNCH/:")
         launcher_dir = PROJECT_ROOT / "launchers"
