@@ -301,88 +301,34 @@ private fun HealthScreen(patientId: String) {
 
 @Composable
 private fun MeasureScreen(patientId: String) {
-    var selected by remember { mutableStateOf("Signals") }
-    val filters = listOf("Signals", "Quality", "Pipeline", "Models")
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("Measurements", "Acquisition → quality → features → provenance • $patientId") }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { PageTitle("Acquisition", "Live engineering status • $patientId") }
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                filters.forEach { f -> FilterChip(selected = selected == f, onClick = { selected = f }, label = { Text(f) }) }
-            }
-        }
-        when (selected) {
-            "Signals" -> {
-                item { MetricCard("PPG", "20 Hz transport", "MAX30102 packet stream • raw signal path", "DEMO_DATA", listOf(2f,5f,3f,6f,4f,8f,5f)) }
-                item { MetricCard("GSR / EDA", "Tonic + phasic", "Conductance proxy • processed at slower channel rate", "DEMO_DATA") }
-                item { MetricCard("Motion", "6-axis IMU", "Acceleration + gyro → activity context", "DEMO_DATA") }
-                item { MetricCard("Temperature", "32.7 °C", "Range / validity-gated sensor channel", "DEMO_DATA", listOf(32.5f,32.6f,32.7f,32.8f,32.7f)) }
-            }
-            "Quality" -> item {
-                Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text("Channel-aware quality gates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        listOf("PPG" to 0.94f, "IMU" to 0.98f, "GSR" to 0.91f, "Temperature" to 0.97f).forEach { (name, value) ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row { Text(name); Spacer(Modifier.weight(1f)); Text(String.format("%.0f%%", value * 100), fontWeight = FontWeight.Bold) }
-                                LinearProgressIndicator(progress = value, Modifier.fillMaxWidth(), color = Color(0xFF63D8C3), trackColor = Color(0xFF393F4D))
-                            }
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("Recorded channels", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    listOf(
+                        "MAX30102" to "IR / red PPG",
+                        "MPU6050" to "acceleration / gyro",
+                        "GSR" to "finger-electrode analog channel",
+                        "BME280" to "temperature / humidity / pressure",
+                        "BH1750" to "ambient light"
+                    ).forEach { (name, detail) ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text("Engineering gates reject missing, stale, flatline or low-quality channels; they do not create clinical validity.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            "Pipeline" -> item {
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Processing pipeline", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("CRC → decode → filtering → artifact rejection → feature extraction → quality → provenance → disease-model gate")
-                        ProvenanceBadge("MEASURED → DERIVED → MODEL-INFERRED", "derived")
-                    }
-                }
-            }
-            "Models" -> item {
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Model separation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Observed data and disease-model outputs stay on separate layers. CHRONO-PCOS requires disease-specific evidence and remains clinically unvalidated.")
-                        ProvenanceBadge("UNKNOWN / NOT RUN when evidence gate fails", "warn")
                     }
                 }
             }
         }
-        item { Text("Engineering validation is not clinical validation.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
-    }
-}
-
-@Composable
-private fun TimelineScreen(patientId: String) {
-    val events = listOf(
-        "Sensor session" to "DEMO_DATA • illustrative session • 20 Sep 2026",
-        "Symptom entry" to "PATIENT-REPORTED • example context",
-        "Cycle event" to "CLINICALLY_ENTERED • example context",
-        "Baseline update" to "DERIVED • repeated observations",
-        "Ultrasound study" to "IMAGE-DERIVED • unsupported anatomy remains UNKNOWN",
-        "Model gate" to "MODEL-INFERRED only after disease-specific evidence gate"
-    )
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        item { PageTitle("Timeline", "Chronological and patient-scoped • $patientId") }
         item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("All") }, leadingIcon = { Icon(Icons.Default.FilterList, null) })
-                AssistChip(onClick = {}, label = { Text("Signals") })
-                AssistChip(onClick = {}, label = { Text("Clinical") })
-                AssistChip(onClick = {}, label = { Text("Models") })
-            }
-        }
-        items(events) { (title, detail) ->
-            Card(shape = RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
-                    Box(Modifier.size(11.dp).clip(CircleShape).background(Color(0xFF63D8C3)))
-                    Spacer(Modifier.width(13.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            Card(shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("Quality gates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("CRC validation → packet freshness → channel quality → artifact handling → feature extraction.")
+                    ProvenanceBadge("MEASURED → DERIVED", "derived")
+                    Text("A high packet count does not mean high physiological validity. Contact, motion, light, electrode placement and environmental conditions can affect the signals.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
