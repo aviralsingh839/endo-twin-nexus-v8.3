@@ -49,7 +49,7 @@ class PublicStudyService : Service() {
                     socket.soTimeout = 15000
                     updateNotification("3-day study recorder • connected")
                     val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-                    while (isActive) {
+                    while (isActive && System.currentTimeMillis() < plannedEnd) {
                         val line = reader.readLine() ?: break
                         if (line.length > 4096) continue
                         val frame = line.trim()
@@ -73,6 +73,9 @@ class PublicStudyService : Service() {
             }
             delay(5000)
         }
+        db?.patientDao()?.finishPublicStudy(studyId, System.currentTimeMillis(), "COMPLETE")
+        updateNotification("3-day study recorder • complete")
+        stopSelf()
     }
 
     private fun notification(text: String): Notification =
