@@ -22,7 +22,7 @@ class PublicStudyService : Service() {
     override fun onCreate() {
         super.onCreate()
         db = Room.databaseBuilder(applicationContext, PatientDatabase::class.java, "endo_twin_patient.db")
-            .fallbackToDestructiveMigration().build()
+            .addMigrations(org.chronopcos.patient.data.database.MIGRATION_2_3).build()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "ENDO-TWIN public study", NotificationManager.IMPORTANCE_LOW)
         )
