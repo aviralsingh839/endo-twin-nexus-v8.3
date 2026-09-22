@@ -57,6 +57,17 @@ data class TimelineEntity(
     val createdAt: Long
 )
 
+@Entity(tableName = "raw_sensor_packets")
+data class RawSensorPacketEntity(
+    @PrimaryKey val packetId: String,
+    val patientId: String,
+    val transport: String,
+    val payload: String,
+    val receivedAt: Long,
+    val crcValid: Boolean,
+    val isDemo: Boolean = false
+)
+
 @Entity(
     tableName = "reports",
     foreignKeys = [ForeignKey(entity = PatientEntity::class, parentColumns = ["patientId"], childColumns = ["patientId"], onDelete = ForeignKey.CASCADE)],
@@ -99,13 +110,20 @@ interface PatientDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReport(report: ReportEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRawPacket(packet: RawSensorPacketEntity)
+
+    @Query("SELECT * FROM raw_sensor_packets WHERE patientId = :patientId ORDER BY receivedAt DESC")
+    suspend fun getRawPackets(patientId: String): List<RawSensorPacketEntity>
 }
 
 @Database(
-    entities = [PatientEntity::class, MeasurementEntity::class, TimelineEntity::class, ReportEntity::class],
-    version = 1,
+    entities = [PatientEntity::class, MeasurementEntity::class, TimelineEntity::class, ReportEntity::class, RawSensorPacketEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class PatientDatabase : RoomDatabase() {
+
     abstract fun patientDao(): PatientDao
 }
