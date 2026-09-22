@@ -74,3 +74,18 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Garuda Linux Ready: Dolphin → LAUNCH → COMPLETE_LAUNCHER.sh → Control Center');
     console.log('Website: Professional public-facing CHRONO-PCOS research/innovation platform');
 });
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggle = document.querySelector(".nav-toggle");
+  const links = document.querySelector("#site-links");
+  if (!toggle || !links) return;
+  toggle.addEventListener("click", () => {
+    const open = links.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", String(open));
+  });
+  links.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
+    links.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+  }));
+});
