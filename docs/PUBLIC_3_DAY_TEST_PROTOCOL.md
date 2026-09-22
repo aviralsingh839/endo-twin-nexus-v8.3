@@ -238,3 +238,8 @@ Then open the desktop application and use:
 5. **Report → generate the research report**
 
 The importer is offline-only. It verifies CP2 CRC before processing packets and labels imported feature rows as REAL / PUBLIC_3_DAY.
+
+
+### Sampling limitation
+
+The wearable firmware emits CP2 at approximately 20 Hz. The public Android archive intentionally keeps approximately 5 Hz by retaining every fourth valid frame. This is a storage trade-off for a three-day volunteer test. Treat fine-grained PPG/HRV analysis from this public archive as engineering/research output requiring validation; do not present it as clinical-grade HRV.
