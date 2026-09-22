@@ -2,6 +2,7 @@ package org.chronopcos.patient.study
 import android.app.*
 import android.content.Intent
 import android.os.IBinder
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.room.Room
 import kotlinx.coroutines.*
@@ -33,7 +34,7 @@ class PublicStudyService : Service() {
         val port = intent?.getIntExtra(EXTRA_PORT, 7777) ?: 7777
         val patientId = intent?.getStringExtra(EXTRA_PATIENT_ID) ?: "PUBLIC-PARTICIPANT"
         val studyId = intent?.getStringExtra(EXTRA_STUDY_ID) ?: "STUDY-" + UUID.randomUUID().toString().take(8)
-        startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"))
+        if (android.os.Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE) else startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"))
         job?.cancel()
         job = scope.launch { runRecorder(host, port, patientId, studyId) }
         return START_STICKY
