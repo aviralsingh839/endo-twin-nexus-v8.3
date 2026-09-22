@@ -1,10 +1,10 @@
-# ENDO-TWIN NEXUS V8.7 — ESP32 Wearable Build
+# ENDO-TWIN NEXUS V8.7 — ESP8266 Wearable Build
 
-The **ESP32 is the primary wearable**. This document is the practical build guide for the active wearable.
+The **ESP8266 is the primary wearable**. Arduino Mega remains the separate bench/lab controller.
 
 ## Bill of materials
 
-- ESP32 development board
+- NodeMCU 1.0 / ESP-12E ESP8266 development board
 - MAX30102
 - MPU6050
 - DS18B20
@@ -13,56 +13,54 @@ The **ESP32 is the primary wearable**. This document is the practical build guid
 - breadboard / prototype wiring
 - suitable regulated battery supply for body-worn testing
 
-The Arduino Mega is a separate bench/lab controller; it is not required for the wearable.
-
 ## Firmware
 
-`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+`hardware/esp8266/endo_twin_wearable/endo_twin_wearable.ino`
 
-Required Arduino libraries:
+Required libraries:
 - SparkFun MAX3010x Pulse and Proximity Sensor Library
 - Adafruit MPU6050
 - Adafruit Unified Sensor
 - OneWire
 - DallasTemperature
-- ESP32 BLE support from the Arduino-ESP32 core
+- ESP8266 Arduino core
+
+The ESP8266 Arduino platform is installed through Boards Manager or the documented ESP8266 core package. citeturn0search0
 
 ## Wiring
 
-- MAX30102 SDA → GPIO21, SCL → GPIO22
-- MPU6050 SDA → GPIO21, SCL → GPIO22
-- DS18B20 DATA → GPIO18, 4.7 kΩ to 3.3 V
-- GSR analog output → GPIO34
-- status LED → GPIO2
+- MAX30102 SDA → D1/GPIO5, SCL → D2/GPIO4
+- MPU6050 SDA → D1/GPIO5, SCL → D2/GPIO4
+- DS18B20 DATA → D6/GPIO12, 4.7 kΩ to 3.3 V
+- GSR analog output → A0
+- status LED → D4/GPIO2
 
-Check each sensor breakout's allowed logic voltage before connection.
+## Network
+
+The firmware starts the `ENDO-TWIN-ESP8266` Wi-Fi access point and TCP server on port 7777. Android connects over TCP. Desktop may use USB serial.
 
 ## Flash
 
-Use `arduino-cli compile` / `arduino-cli upload` with an ESP32 target such as `esp32:esp32:esp32`. The repository build helper compiles the canonical firmware.
+Use Arduino CLI with an ESP8266 NodeMCU target such as `esp8266:esp8266:nodemcuv2`. The repository build helper compiles the canonical firmware.
 
-## Serial validation
+## Validation
 
-115200 baud. A working device produces:
+At 115200 baud, the serial monitor should show the SoftAP IP and TCP server status. A working device produces newline-terminated:
 
 ```
 $CP2,...,<CRC>
 $CP2,...,<CRC>
-...
 ```
 
-Send `PING` and expect `$ACK,PONG,00`. Send `WHOAMI` and expect `$ACK,WHOAMI,ENDO-TWIN-ESP32`.
-
-## BLE validation
-
-Scan for **ENDO-TWIN-ESP32**, filter by service UUID, connect, subscribe to the notify characteristic, then reconstruct newline-terminated CP2 frames from notification chunks. The command characteristic accepts `PING`, `WHOAMI` and LED commands.
+Send `PING` or `WHOAMI` over USB/TCP and verify the corresponding ACK. The ESP8266 reports `ENDO-TWIN-ESP8266`.
 
 ## Physical test sequence
 
-1. Verify the I2C bus and sensor breakout voltages.
-2. Verify MAX30102 presence; a finger should raise IR readings.
-3. Verify MPU6050 movement changes acceleration/gyro values.
-4. Verify DS18B20 returns a plausible temperature.
-5. Verify GSR produces a changing ADC value.
+1. Verify I2C wiring and sensor voltage compatibility.
+2. Verify MAX30102 IR readings.
+3. Verify MPU6050 movement.
+4. Verify DS18B20 temperature.
+5. Verify GSR ADC values.
 6. Confirm CRC-valid CP2 packets.
-7. Run the Prototype Lab acceptance test.
+7. Join the ESP8266 AP from Android and connect to TCP 7777.
+8. Run the Prototype Lab acceptance test.
