@@ -50,7 +50,7 @@ class PublicStudyService : Service() {
                     socket.soTimeout = 15000
                     updateNotification("3-day study recorder • connected")
                     val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-                    while (isActive && System.currentTimeMillis() < plannedEnd) {
+                    while (currentCoroutineContext().isActive && System.currentTimeMillis() < plannedEnd) {
                         val line = reader.readLine() ?: break
                         if (line.length > 4096) continue
                         val frame = line.trim()
