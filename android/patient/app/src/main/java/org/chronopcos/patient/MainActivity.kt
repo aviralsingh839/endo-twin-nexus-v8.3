@@ -56,10 +56,10 @@ class MainActivity : ComponentActivity() {
 
 private enum class PatientTab(val route: String, val label: String) {
     Home("home", "Home"),
-    Health("health", "Health"),
-    Measure("measure", "Measure"),
-    Timeline("timeline", "3-Day Study"),
-    Connect("connect", "Connect")
+    Health("health", "My Health"),
+    Measure("measure", "Live Monitoring"),
+    Timeline("timeline", "Study"),
+    Connect("connect", "Devices")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +83,7 @@ private fun PatientApp(currentPatientId: String, alias: String) {
                     },
                     actions = {
                         Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Text("PUBLIC TEST • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                            Text("PATIENT • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(12.dp))
                     },
