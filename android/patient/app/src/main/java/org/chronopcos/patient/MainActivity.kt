@@ -176,7 +176,8 @@ private fun ProvenanceBadge(label: String, kind: String = "neutral") {
 }
 
 @Composable
-private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: Color = MaterialTheme.colorScheme.primary) {
+private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: Color = Color(0xFF0B6670)) {
+    val outline = MaterialTheme.colorScheme.outline
     Canvas(modifier.height(72.dp).fillMaxWidth()) {
         if (values.size < 2) return@Canvas
         val min = values.minOrNull() ?: return@Canvas
@@ -188,7 +189,7 @@ private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: 
             val y = size.height - (value - min) / span * size.height
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawLine(MaterialTheme.colorScheme.outline, Offset(0f, size.height * .5f), Offset(size.width, size.height * .5f), 1f)
+        drawLine(outline, Offset(0f, size.height * .5f), Offset(size.width, size.height * .5f), 1f)
         drawPath(path, color = line, style = Stroke(width = 3f, cap = StrokeCap.Round))
     }
 }
@@ -479,7 +480,7 @@ private fun PublicStudyScreen() {
                         ProvenanceBadge(if (total > 0) "RECORDED" else "WAITING", if (total > 0) "measured" else "neutral")
                     }
                     Text(total.toString() + " CP2 packets • " + valid.toString() + " CRC-valid")
-                    LinearProgressIndicator(progress = { quality }, Modifier.fillMaxWidth())
+                    LinearProgressIndicator(progress = quality, Modifier.fillMaxWidth())
                     Text(
                         if (total == 0) "No recorded packets yet."
                         else "Packet integrity " + String.format("%.1f%%", quality * 100f) + ". This is acquisition quality, not physiological validity.",
@@ -551,6 +552,14 @@ private fun ConnectionScreen() {
             }
         }
         item { Text("The ESP32-S3 wearable uses Wi-Fi/TCP on port 7777. CP2 frames are CRC-validated before storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
