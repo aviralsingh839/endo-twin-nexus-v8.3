@@ -412,94 +412,66 @@ private fun TimelineScreen(patientId: String) {
 
 @Composable
 private fun ConnectionScreen() {
-    val scope = rememberCoroutineScope()
-    var endpoint by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Not connected") }
-    var detail by remember { mutableStateOf("Use Doctor → Mobile Link to get the workstation address and 6-digit code.") }
-    var token by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val client = remember { org.chronopcos.patient.ble.EndoTwinBleClient(context) }
+    var state by remember { mutableStateOf(client.state) }
+    var device by remember { mutableStateOf<String?>(null) }
+    var packets by remember { mutableStateOf(0) }
+    var latest by remember { mutableStateOf("Waiting for a live CP2 frame…") }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    fun request(action: suspend () -> String) {
-        if (busy) return
-        busy = true
-        scope.launch {
-            try {
-                val json = JSONObject(action())
-                if (json.optBoolean("paired", false)) {
-                    token = json.optString("token").takeIf { it.isNotBlank() }
-                    status = "Connected"
-                    detail = "Paired to ${json.optString("server_name", "ENDO-TWIN Workstation")}."
-                } else {
-                    status = json.optString("status", "Completed")
-                    detail = json.optString("message", "Request completed.")
-                }
-            } catch (e: Exception) {
-                status = "Connection failed"
-                detail = e.message ?: "Check address, code, Wi-Fi and firewall."
-            } finally {
-                busy = false
-            }
+    val permissions = remember {
+        if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+        else arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.all { it }) client.scan() else error = "Bluetooth permission not granted."
+    }
+
+    DisposableEffect(client) {
+        client.onState = { state = it }
+        client.onDevice = { device = it }
+        client.onError = { error = it }
+        client.onSample = { sample ->
+            packets += 1
+            latest = "IR ${sample.ir} • Red ${sample.red} • GSR ${sample.gsr} • Temp ${sample.temp0 ?: Double.NaN} • status ${sample.status}"
         }
+        onDispose { client.disconnect() }
     }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("Connect", "Pair with the Doctor Workstation on a trusted local network.") }
-        item {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF25304A))) {
-                Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Outlined.Link, null, tint = Color(0xFFB3BCFF))
-                    Column {
-                        Text(status, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFFC5CDE1))
-                    }
-                }
-            }
-        }
-        item { OutlinedTextField(endpoint, { endpoint = it }, label = { Text("Doctor workstation address") }, placeholder = { Text("192.168.1.20:7777") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("6-digit pairing code") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedButton(onClick = { request { getJson(endpointFor(endpoint, "/v1/health")) } }, Modifier.weight(1f), enabled = !busy && endpoint.isNotBlank()) { Text("Test") }
-                Button(onClick = { request { postJson(endpointFor(endpoint, "/v1/pair"), JSONObject().put("code", code).toString()) } }, Modifier.weight(1f), enabled = !busy && endpoint.isNotBlank() && code.length == 6) { Text("Pair") }
-            }
-        }
+        item { PageTitle("ESP32 Wearable", "LIVE BLE • ENDO-TWIN-ESP32") }
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Session transfer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("This build intentionally sends DEMO_DATA. A future real-device package must be populated from patient-scoped local records and preserve provenance.")
-                    Button(
-                        onClick = {
-                            val t = token
-                            if (t == null) {
-                                status = "Pair first"
-                                detail = "Enter workstation address + code, then press Pair."
-                                return@Button
-                            }
-                            request {
-                                val payload = JSONObject()
-                                    .put("schema_version", "1.0")
-                                    .put("source_app", "ENDO-TWIN Patient Android")
-                                    .put("patient_id", "DEMO-001")
-                                    .put("label", "DEMO_DATA")
-                                    .put("provenance", "DEMO_DATA")
-                                    .put("created_at_epoch_ms", System.currentTimeMillis())
-                                    .put("measurements", JSONObject().put("heart_rate_bpm", 72).put("hrv_rmssd_ms", 48).put("skin_temperature_c", 32.5).put("activity_index", 35))
-                                    .put("note", "Demonstration payload only; not a clinical record.")
-                                postJson(endpointFor(endpoint, "/v1/upload"), payload.toString(), t)
-                            }
-                        },
-                        Modifier.fillMaxWidth(),
-                        enabled = !busy && token != null
-                    ) { Text("Send session") }
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("${state.name}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Text(device ?: "No ESP32 discovered yet.")
+                    Text("CP2 packets received: $packets")
+                    Text(latest, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             }
         }
-        item { Text("Security: research LAN bridge only. Production deployment requires encryption, authentication, authorization, auditability and threat modelling.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Button(onClick = {
+                    val missing = permissions.any { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+                    if (missing) permissionLauncher.launch(permissions) else client.scan()
+                }, Modifier.weight(1f)) { Text("Scan ESP32") }
+                OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.ble.EndoTwinBleClient.State.CONNECTED) { Text("PING") }
+                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.ble.EndoTwinBleClient.State.CONNECTED) { Text("WHOAMI") }
+            }
+        }
+        item { Text("Notifications are reassembled into newline-terminated CP2 frames and rejected when CRC validation fails.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-
 private fun endpointFor(raw: String, path: String): String {
     val v = raw.trim().trimEnd('/')
     val base = if (v.startsWith("http://") || v.startsWith("https://")) v else "http://$v"
