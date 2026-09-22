@@ -34,7 +34,7 @@ Do not store:
 - diagnosis;
 - unrelated personal notes.
 
-The public-test Android recorder stores CP2 packets locally in Room. The participant sees a persistent recording notification.
+The public-test Android recorder validates the incoming 20 Hz CP2 stream but archives every fourth valid frame (~5 Hz) locally in Room to keep three-day phone storage practical. The participant sees a persistent recording notification.
 
 The project should not upload the volunteer's raw physiological data to a public website by default.
 
