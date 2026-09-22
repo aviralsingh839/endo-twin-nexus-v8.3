@@ -218,15 +218,15 @@ if PYSIDE_AVAILABLE:
             if st == 'PASS':
                 border_color = "#10b981"
                 status_color = "#10b981"
-                status_icon = "🟢"
+                status_icon = "PASS"
             elif st == 'WARN':
                 border_color = "#f59e0b"
                 status_color = "#f59e0b"
-                status_icon = "🟡"
+                status_icon = "WARN"
             else:
                 border_color = "#ef4444"
                 status_color = "#ef4444"
-                status_icon = "🔴"
+                status_icon = "FAIL"
 
             self.setStyleSheet(f"""
                 QFrame {{
@@ -343,7 +343,7 @@ if PYSIDE_AVAILABLE:
 
             # Header with proper spacing
             header_frame = QFrame()
-            header_frame.setStyleSheet("background: #FFFFFF; border-radius: 12px; padding: 10px;")
+            header_frame.setStyleSheet("background: #142B3A; border: 1px solid #294657; border-radius: 10px; padding: 10px;")
             header_layout = QVBoxLayout(header_frame)
             header_layout.setContentsMargins(20, 20, 20, 20)
             header_layout.setSpacing(8)
@@ -436,13 +436,13 @@ if PYSIDE_AVAILABLE:
                 main_layout.addWidget(group)
 
             add_category("PATIENT", "Patient Platform - Mobile & Desktop", [
-                ("📱 Patient App\nPC Demo", "Dashboard, Profile, Measurements, Symptoms, Cycle, Results, Reports, Sharing, Find Care - Kivy offline-first", "PATIENT_APP"),
-                ("📱 Patient Android\nAPK Build", "Patient Android - APK build workflow, PC demo if APK not built, touch-friendly mobile UI", "PATIENT_ANDROID"),
+                ("Patient App\nPC Demo", "Dashboard, Profile, Measurements, Symptoms, Cycle, Results, Reports, Sharing, Find Care - Kivy offline-first", "PATIENT_APP"),
+                ("Patient Android\nAPK Build", "Patient Android - APK build workflow, PC demo if APK not built, touch-friendly mobile UI", "PATIENT_ANDROID"),
             ])
 
             add_category("DOCTOR", "Doctor Platform - Clinical Workstation", [
-                ("💻 Doctor PC\nFull Workstation", "Dashboard, Patient Management, Physiological Data, Advanced Analysis, Ultrasound, Longitudinal, Notes, Reports - PySide6", "DOCTOR_PC"),
-                ("📱 Doctor Android\nMobile Review", "Patient list, search, profiles, measurements, trends, screening results, reports, notes", "DOCTOR_ANDROID"),
+                ("Doctor PC\nFull Workstation", "Dashboard, Patient Management, Physiological Data, Advanced Analysis, Ultrasound, Longitudinal, Notes, Reports - PySide6", "DOCTOR_PC"),
+                ("Doctor Android\nMobile Review", "Patient list, search, profiles, measurements, trends, screening results, reports, notes", "DOCTOR_ANDROID"),
             ])
 
             add_category("SCIENCE", "Scientific Core - Research Engine", [
