@@ -94,18 +94,41 @@ class MainWindow(QMainWindow):
         self.risk_timer.timeout.connect(self._update_risk)
         self.risk_timer.start(2000)
 
-        # Build UI
+        # Build reference-style workstation shell:
+        # dark ENDO-TWIN top bar + compact connection strip + persistent left navigation.
         central = QWidget()
         self.setCentralWidget(central)
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(5, 5, 5, 5)
+        shell = QVBoxLayout(central)
+        shell.setContentsMargins(12, 12, 12, 12)
+        shell.setSpacing(10)
 
-        # Header
-        header = self._build_header()
-        layout.addWidget(header)
+        header = QFrame()
+        header.setObjectName("AppHeader")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(14, 10, 14, 10)
+        brand_col = QVBoxLayout()
+        title = QLabel("ENDO-TWIN NEXUS")
+        title.setObjectName("AppTitle")
+        subtitle = QLabel("Personalized Physiological Modelling Platform")
+        subtitle.setObjectName("AppSubtitle")
+        brand_col.addWidget(title)
+        brand_col.addWidget(subtitle)
+        hl.addLayout(brand_col)
+        hl.addStretch()
+        self.top_mode = QLabel("NO STREAM")
+        self.top_mode.setObjectName("StatusPill")
+        self.top_quality = QLabel("DATA QUALITY —")
+        self.top_quality.setObjectName("StatusPill")
+        self.top_patient = QLabel("NO PATIENT")
+        self.top_patient.setObjectName("StatusPill")
+        hl.addWidget(self.top_mode)
+        hl.addWidget(self.top_quality)
+        hl.addWidget(self.top_patient)
+        shell.addWidget(header)
 
-        # Tabs
-        self.tabs = QTabWidget()\n        self.tabs.setTabPosition(QTabWidget.TabPosition.West)\n        self.tabs.setDocumentMode(True)
+        self.tabs = QTabWidget()
+        self.tabs.setTabPosition(QTabWidget.TabPosition.West)
+        self.tabs.setDocumentMode(True)
         self.tabs.addTab(self._build_overview_tab(), "Overview")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
         self.tabs.addTab(self._build_trends_tab(), "Trends")
@@ -123,7 +146,8 @@ class MainWindow(QMainWindow):
         # Status bar
         self.status_label = QLabel(f"{APP_NAME} V8.3 | {APP_TAGLINE} | {DISCLAIMER}")
         self.status_label.setObjectName("SmallMuted")
-        layout.addWidget(self.status_label)
+        shell.addWidget(self.tabs, 1)
+        shell.addWidget(self.status_label)
 
         if start_demo:
             self.start_demo()
