@@ -28,7 +28,7 @@ Transport:
 - password `endotwins3`
 - TCP port 7777
 
-The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP2/TCP architecture can be retained. citeturn2search18
+The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP2/TCP architecture can be retained. 
 
 ## Mega hub
 
