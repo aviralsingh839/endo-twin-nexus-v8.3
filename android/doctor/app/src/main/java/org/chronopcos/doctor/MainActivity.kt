@@ -97,11 +97,11 @@ private fun DoctorApp() {
                         }
                     },
                     actions = {
-                        Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFF33405A)) {
-                            Text("DEMO_DATA", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFDDE3FF), fontWeight = FontWeight.Bold)
+                        Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Text("DEMO_DATA", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF5A678B), titleContentColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = Color.White)
                 )
             }
         ) { padding ->
@@ -191,7 +191,7 @@ private fun PatientRow(patient: DemoPatient, onOpen: (DemoPatient) -> Unit) {
     Card(onClick = { onOpen(patient) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF8F9CE9)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(42.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.Face, null, tint = Color.White)
                 }
                 Spacer(Modifier.width(10.dp))
@@ -224,7 +224,7 @@ private fun PatientWorkspace(patient: DemoPatient) {
         item {
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(50.dp).clip(CircleShape).background(Color(0xFF8F9CE9)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.Face, null, tint = Color.White, modifier = Modifier.size(30.dp))
                     }
                     Spacer(Modifier.width(12.dp))
