@@ -8,6 +8,8 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.room.Room
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -352,6 +354,20 @@ private fun PublicStudyScreen() {
     var status by remember { mutableStateOf(prefs.getString("status", "READY") ?: "READY") }
     var dayCounts by remember { mutableStateOf(listOf(0, 0, 0)) }
     var validCounts by remember { mutableStateOf(listOf(0, 0, 0)) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null && participantId.isNotBlank()) {
+            scope.launch(Dispatchers.IO) {
+                val packets = db.patientDao().getRawPackets(participantId)
+                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { out ->
+                    out.appendLine("received_at_ms,transport,crc_valid,payload")
+                    packets.asReversed().forEach { p ->
+                        val payload = p.payload.replace("\"", "\"\"")
+                        out.appendLine(p.receivedAt.toString() + "," + p.transport + "," + p.crcValid + ",\"" + payload + "\"")
+                    }
+                }
+            }
+        }
+    }
 
     fun refresh() {
         if (startedAt <= 0L || participantId.isBlank()) return
@@ -430,6 +446,12 @@ private fun PublicStudyScreen() {
                     enabled = consent && status != "ACTIVE",
                     modifier = Modifier.weight(1f)
                 ) { Text("Start 3-Day Test") }
+
+                OutlinedButton(
+                    onClick = { exportLauncher.launch((if (studyId.isBlank()) "endo_twin_public_3day" else studyId) + ".csv") },
+                    enabled = participantId.isNotBlank(),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Export CSV") }
 
                 OutlinedButton(
                     onClick = {
