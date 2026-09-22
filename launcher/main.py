@@ -343,7 +343,7 @@ if PYSIDE_AVAILABLE:
 
             # Header with proper spacing
             header_frame = QFrame()
-            header_frame.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0f172a, stop:1 #1e293b); border-radius: 12px; padding: 10px;")
+            header_frame.setStyleSheet("background: #FFFFFF; border-radius: 12px; padding: 10px;")
             header_layout = QVBoxLayout(header_frame)
             header_layout.setContentsMargins(20, 20, 20, 20)
             header_layout.setSpacing(8)
