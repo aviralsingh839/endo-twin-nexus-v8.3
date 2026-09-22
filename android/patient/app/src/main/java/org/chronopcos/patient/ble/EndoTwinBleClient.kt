@@ -120,8 +120,7 @@ class EndoTwinBleClient(private val context: Context) {
         val svc=g.getService(EndoTwinBleContract.serviceUuid) ?: return
         val c=svc.getCharacteristic(EndoTwinBleContract.commandUuid) ?: return
         c.writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        c.value=(command+"
-").toByteArray(Charsets.UTF_8)
+        c.value=(command+"\\n").toByteArray(Charsets.UTF_8)
         g.writeCharacteristic(c)
     }
 
@@ -160,8 +159,7 @@ class EndoTwinBleClient(private val context: Context) {
     private fun consume(bytes:ByteArray){
         frameBuffer.append(bytes.toString(Charset.forName("UTF-8")))
         while(true){
-            val idx=frameBuffer.indexOf("
-")
+            val idx=frameBuffer.indexOf("\\n")
             if(idx<0) break
             val frame=frameBuffer.substring(0,idx).trim()
             frameBuffer.delete(0,idx+1)
