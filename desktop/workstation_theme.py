@@ -3,74 +3,76 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QHBoxLayout
 
 APP_QSS = """
 QMainWindow,QWidget{
-    background:#151821;color:#e8ebf4;
+    background:#f5f7fa;color:#17212b;
     font-family:"Inter","Noto Sans",sans-serif;font-size:12px;
 }
-QFrame#sidebar{background:#1c202b;border-right:1px solid #303748;}
-QFrame#topbar{background:#101824;border:0;border-bottom:1px solid #273448;}
-QFrame#patientHeader{background:#1e232f;border:1px solid #364055;border-radius:15px;}
-QFrame#card{background:#1b222e;border:1px solid #303b50;border-radius:14px;}
-QFrame#soft{background:#1a1f2a;border:1px solid #30394c;border-radius:12px;}
-QFrame#hero{background:#182333;border:1px solid #2e4561;border-radius:14px;}
-QLabel#brand{color:#f8fbff;font-size:21px;font-weight:850;}
-QLabel#eyebrow{color:#8b96ac;font-size:10px;font-weight:800;letter-spacing:1px;}
-QLabel#title{color:#f3f6fb;font-size:27px;font-weight:850;}
-QLabel#subtitle{color:#bec6d7;font-size:13px;font-weight:650;}
-QLabel#muted{color:#8e98ad;font-size:11px;}
-QLabel#metricValue{color:#f5f7fb;font-size:27px;font-weight:850;}
-QLabel#bigValue{color:#f7f9fc;font-size:37px;font-weight:850;}
-QLabel#sectionTitle{color:#dfe4ee;font-size:14px;font-weight:850;}
-QLabel#smallCaps{color:#9099ae;font-size:9px;font-weight:800;letter-spacing:0.8px;}
+QFrame#sidebar{background:#142b3a;border-right:1px solid #203e4d;}
+QFrame#topbar{background:#ffffff;border:0;border-bottom:1px solid #d9e2e8;}
+QFrame#patientHeader{background:#ffffff;border:1px solid #d8e0e8;border-radius:10px;}
+QFrame#card{background:#ffffff;border:1px solid #d8e0e8;border-radius:10px;}
+QFrame#soft{background:#f8fafc;border:1px solid #d8e0e8;border-radius:9px;}
+QFrame#hero{background:#eef5f6;border:1px solid #c9dfe2;border-radius:10px;}
+QLabel#brand{color:#ffffff;font-size:20px;font-weight:850;}
+QLabel#eyebrow{color:#71808d;font-size:10px;font-weight:800;letter-spacing:1px;}
+QLabel#title{color:#17212b;font-size:27px;font-weight:850;}
+QLabel#subtitle{color:#50616e;font-size:13px;font-weight:650;}
+QLabel#muted{color:#71808d;font-size:11px;}
+QLabel#metricValue{color:#17212b;font-size:27px;font-weight:850;}
+QLabel#bigValue{color:#17212b;font-size:37px;font-weight:850;}
+QLabel#sectionTitle{color:#253746;font-size:14px;font-weight:850;}
+QLabel#smallCaps{color:#71808d;font-size:9px;font-weight:800;letter-spacing:0.8px;}
 QPushButton#nav{
-    text-align:left;background:transparent;border:0;border-radius:8px;
-    padding:11px 12px;color:#9fa8bb;font-size:12px;font-weight:750;
+    text-align:left;background:transparent;border:0;border-radius:7px;
+    padding:10px 11px;color:#b9c7d2;font-size:12px;font-weight:750;
 }
-QPushButton#nav:hover{background:#252b39;color:#ebf1fb;}
-QPushButton#nav:checked{background:#153b3a;color:#5fe0c2;}
-QPushButton#nav:disabled{color:#5c6473;}
+QPushButton#nav:hover{background:#1e3c4c;color:#ffffff;}
+QPushButton#nav:checked{background:#0b6670;color:#ffffff;}
+QPushButton#nav:disabled{color:#667783;}
 QPushButton#primary{
-    background:#2f6af6;color:white;border:0;border-radius:9px;
+    background:#0b6670;color:white;border:0;border-radius:7px;
     padding:9px 14px;font-weight:850;
 }
+QPushButton#primary:hover{background:#167d88;}
 QPushButton#secondary{
-    background:#1b2230;color:#dce3ef;border:1px solid #3a465c;
-    border-radius:9px;padding:8px 12px;font-weight:750;
+    background:#ffffff;color:#29404e;border:1px solid #cbd6dd;
+    border-radius:7px;padding:8px 12px;font-weight:750;
 }
 QPushButton#danger{
-    background:#4a2630;color:#ffb9c5;border:1px solid #7b3d4c;
-    border-radius:9px;padding:8px 12px;font-weight:800;
+    background:#fff3f2;color:#a83b38;border:1px solid #e4b8b5;
+    border-radius:7px;padding:8px 12px;font-weight:800;
 }
 QPushButton#tab{
     background:transparent;border:0;border-bottom:2px solid transparent;
-    border-radius:0;padding:10px 10px;color:#7e879b;font-weight:650;
+    border-radius:0;padding:10px 10px;color:#71808d;font-weight:650;
 }
-QPushButton#tab:hover{color:#bec8df;}
-QPushButton#tab:checked{color:#9fb2ff;border-bottom-color:#9fb2ff;}
+QPushButton#tab:hover{color:#29404e;}
+QPushButton#tab:checked{color:#0b6670;border-bottom-color:#0b6670;}
 QLineEdit,QTextEdit,QListWidget,QTableWidget,QComboBox{
-    background:#181d27;border:1px solid #354057;border-radius:8px;
-    padding:8px;color:#edf1f7;selection-background-color:#284c78;
+    background:#ffffff;border:1px solid #cbd6dd;border-radius:7px;
+    padding:8px;color:#17212b;selection-background-color:#d9eff0;
 }
-QTableWidget{gridline-color:#2a3345;}
+QTableWidget{gridline-color:#e1e7eb;}
 QHeaderView::section{
-    background:#1e2430;color:#909bb1;padding:9px;border:0;
-    border-bottom:1px solid #303a4d;font-weight:800;
+    background:#f2f5f7;color:#61717d;padding:9px;border:0;
+    border-bottom:1px solid #d8e0e8;font-weight:800;
 }
 QTableWidget::item{padding:8px;}
-QTableWidget::item:selected{background:#23384e;color:#f6f9fd;}
-QScrollBar:vertical{background:#141821;width:10px;}
-QScrollBar::handle:vertical{background:#343e53;border-radius:5px;min-height:30px;}
+QTableWidget::item:selected{background:#e5f1f2;color:#17212b;}
+QScrollBar:vertical{background:#f5f7fa;width:10px;}
+QScrollBar::handle:vertical{background:#c3cfd6;border-radius:5px;min-height:30px;}
 QProgressBar{
-    background:#171d27;border:1px solid #303a4b;border-radius:7px;
-    text-align:center;color:#eaf0f7;height:10px;
+    background:#edf1f3;border:1px solid #d3dde2;border-radius:6px;
+    text-align:center;color:#334955;height:10px;
 }
-QProgressBar::chunk{background:#45c8a4;border-radius:6px;}
+QProgressBar::chunk{background:#0b6670;border-radius:6px;}
 QTabBar::tab{
-    background:transparent;color:#7f889a;padding:10px 12px;
+    background:transparent;color:#71808d;padding:10px 12px;
     border:0;border-bottom:2px solid transparent;
 }
-QTabBar::tab:hover{color:#bbc4d8;}
-QTabBar::tab:selected{color:#a9baff;border-bottom:2px solid #a9baff;font-weight:800;}
-QToolTip{background:#202633;color:#f3f6fb;border:1px solid #455168;padding:5px;}
+QTabBar::tab:hover{color:#29404e;}
+QTabBar::tab:selected{color:#0b6670;border-bottom:2px solid #0b6670;font-weight:800;}
+QToolTip{background:#17212b;color:#ffffff;border:1px solid #52636f;padding:5px;}
+QLabel#warning{background:#fff8e8;color:#7a5700;border:1px solid #ead39a;border-radius:7px;padding:8px;}
 """
 
 def card(title, value, detail, parent=None, accent=None):
