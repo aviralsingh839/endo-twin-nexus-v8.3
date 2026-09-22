@@ -33,108 +33,108 @@ except ImportError:
 
 def get_status():
     status = {}
-    status['python'] = {'label': 'Python', 'status': 'PASS', 'detail': sys.version.split()[0], 'icon': '🐍'}
+    status['python'] = {'label': 'Python', 'status': 'PASS', 'detail': sys.version.split()[0], 'icon': 'PY'}
     venv_path = PROJECT_ROOT / ".venv" / "bin" / "python"
     if venv_path.exists():
-        status['venv'] = {'label': '.venv', 'status': 'PASS', 'detail': 'Environment ready', 'icon': '📦'}
+        status['venv'] = {'label': '.venv', 'status': 'PASS', 'detail': 'Environment ready', 'icon': 'PKG'}
     else:
-        status['venv'] = {'label': '.venv', 'status': 'FAIL', 'detail': 'Not found - run SETUP.sh', 'icon': '📦'}
+        status['venv'] = {'label': '.venv', 'status': 'FAIL', 'detail': 'Not found - run SETUP.sh', 'icon': 'PKG'}
     try:
         import PySide6
-        status['pyside'] = {'label': 'PySide6', 'status': 'PASS', 'detail': f'v{PySide6.__version__}', 'icon': '🎨'}
+        status['pyside'] = {'label': 'PySide6', 'status': 'PASS', 'detail': f'v{PySide6.__version__}', 'icon': 'UI'}
     except Exception as e:
-        status['pyside'] = {'label': 'PySide6', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🎨'}
+        status['pyside'] = {'label': 'PySide6', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'UI'}
     try:
         import numpy, pandas, sklearn
-        status['deps'] = {'label': 'Core Deps', 'status': 'PASS', 'detail': 'numpy, pandas, sklearn', 'icon': '📚'}
+        status['deps'] = {'label': 'Core Deps', 'status': 'PASS', 'detail': 'numpy, pandas, sklearn', 'icon': 'DEP'}
     except Exception as e:
-        status['deps'] = {'label': 'Core Deps', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '📚'}
+        status['deps'] = {'label': 'Core Deps', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'DEP'}
     try:
         from database.database import LocalDatabase
         db = LocalDatabase(db_path=Path("/tmp/control_center_check.db"))
         providers = db.list_providers()
-        status['database'] = {'label': 'Database V8.3', 'status': 'PASS', 'detail': f'{len(providers)} providers, 18 tables', 'icon': '🗄'}
+        status['database'] = {'label': 'Database V8.3', 'status': 'PASS', 'detail': f'{len(providers)} providers, 18 tables', 'icon': 'DB'}
     except Exception as e:
-        status['database'] = {'label': 'Database V8.3', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🗄'}
+        status['database'] = {'label': 'Database V8.3', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'DB'}
     try:
         from database.endo_twin_database import EndoTwinDatabase
         db = EndoTwinDatabase(db_path=Path("/tmp/control_center_check_endo.db"))
         result = db.test_patient_isolation()
         if result["overall_pass"]:
-            status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'PASS', 'detail': f'DEMO-001/002/003 isolation OK HR 72/78/68', 'icon': '🗄'}
+            status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'PASS', 'detail': f'DEMO-001/002/003 isolation OK HR 72/78/68', 'icon': 'DB'}
         else:
-            status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'FAIL', 'detail': f'Isolation FAIL', 'icon': '🗄'}
+            status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'FAIL', 'detail': f'Isolation FAIL', 'icon': 'DB'}
     except Exception as e:
-        status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🗄'}
+        status['endo_db'] = {'label': 'ENDO-TWIN DB', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'DB'}
     try:
         from src.core.feature_extraction import RealtimeFeatureExtractor
-        status['core'] = {'label': 'Scientific Core', 'status': 'PASS', 'detail': 'Feature extraction OK V8.3 preserved', 'icon': '🧬'}
+        status['core'] = {'label': 'Scientific Core', 'status': 'PASS', 'detail': 'Feature extraction OK V8.3 preserved', 'icon': 'CORE'}
     except Exception as e:
-        status['core'] = {'label': 'Scientific Core', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🧬'}
+        status['core'] = {'label': 'Scientific Core', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'CORE'}
     try:
         from endo_twin.core import EndoTwinCore
         core = EndoTwinCore()
         arch = core.get_architecture()
-        status['endo_core'] = {'label': 'ENDO-TWIN Core', 'status': 'PASS', 'detail': f'{arch["name"]} {arch["version"]} CHRONO-PCOS first module', 'icon': '🧬'}
+        status['endo_core'] = {'label': 'ENDO-TWIN Core', 'status': 'PASS', 'detail': f'{arch["name"]} {arch["version"]} CHRONO-PCOS first module', 'icon': 'CORE'}
     except Exception as e:
         try:
             from src.endo_twin.core.twin_core import EndoTwinCore as GeneralCore
             core = GeneralCore()
             arch = core.get_architecture()
-            status['endo_core'] = {'label': 'ENDO-TWIN Core General', 'status': 'PASS', 'detail': f'{arch["name"]} {arch["version"]} - {arch["one_sentence"]}', 'icon': '🧬'}
+            status['endo_core'] = {'label': 'ENDO-TWIN Core General', 'status': 'PASS', 'detail': f'{arch["name"]} {arch["version"]} - {arch["one_sentence"]}', 'icon': 'CORE'}
         except Exception as e2:
-            status['endo_core'] = {'label': 'ENDO-TWIN Core', 'status': 'FAIL', 'detail': str(e2)[:60], 'icon': '🧬'}
+            status['endo_core'] = {'label': 'ENDO-TWIN Core', 'status': 'FAIL', 'detail': str(e2)[:60], 'icon': 'CORE'}
     # Check general platform
     try:
         if (PROJECT_ROOT / "apps" / "main" / "main_app.py").exists():
-            status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'PASS', 'detail': 'General platform - Understand physiological patterns over time - apps/main/main_app.py', 'icon': '🧬'}
+            status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'PASS', 'detail': 'General platform - Understand physiological patterns over time - apps/main/main_app.py', 'icon': 'CORE'}
         else:
-            status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'WARN', 'detail': 'apps/main/main_app.py not found', 'icon': '🧬'}
+            status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'WARN', 'detail': 'apps/main/main_app.py not found', 'icon': 'CORE'}
     except Exception as e:
-        status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🧬'}
+        status['endo_twin_general'] = {'label': 'ENDO-TWIN General Platform', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'CORE'}
     # Check disease models
     try:
         if (PROJECT_ROOT / "disease_models" / "chrono_pcos" / "model" / "chrono_pcos_model.py").exists():
-            status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'PASS', 'detail': 'First disease model on ENDO-TWIN platform - disease_models/chrono_pcos/', 'icon': '🧬'}
+            status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'PASS', 'detail': 'First disease model on ENDO-TWIN platform - disease_models/chrono_pcos/', 'icon': 'CORE'}
         else:
-            status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'WARN', 'detail': 'Not found - disease_models/chrono_pcos/', 'icon': '🧬'}
+            status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'WARN', 'detail': 'Not found - disease_models/chrono_pcos/', 'icon': 'CORE'}
     except Exception as e:
-        status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🧬'}
+        status['chrono_pcos_model'] = {'label': 'CHRONO-PCOS Disease Model', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'CORE'}
     try:
         from src.disease_modules import pcos
-        status['ai'] = {'label': 'AI/ML', 'status': 'PASS', 'detail': 'PCOS, Sleep, Cardio, Autonomic', 'icon': '🧠'}
+        status['ai'] = {'label': 'AI/ML', 'status': 'PASS', 'detail': 'PCOS, Sleep, Cardio, Autonomic', 'icon': 'AI'}
     except Exception as e:
         try:
             from core.analysis import PCOSModule
-            status['ai'] = {'label': 'AI/ML', 'status': 'PASS', 'detail': 'Core AI wrappers', 'icon': '🧠'}
+            status['ai'] = {'label': 'AI/ML', 'status': 'PASS', 'detail': 'Core AI wrappers', 'icon': 'AI'}
         except Exception as e2:
-            status['ai'] = {'label': 'AI/ML', 'status': 'WARN', 'detail': str(e2)[:60], 'icon': '🧠'}
+            status['ai'] = {'label': 'AI/ML', 'status': 'WARN', 'detail': str(e2)[:60], 'icon': 'AI'}
     try:
         from endo_twin.registry import ModelRegistry
         registry = ModelRegistry()
-        status['model_registry'] = {'label': 'Model Registry', 'status': 'PASS', 'detail': 'Registry OK CHRONO-PCOS', 'icon': '🧠'}
+        status['model_registry'] = {'label': 'Model Registry', 'status': 'PASS', 'detail': 'Registry OK CHRONO-PCOS', 'icon': 'AI'}
     except Exception as e:
-        status['model_registry'] = {'label': 'Model Registry', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🧠'}
+        status['model_registry'] = {'label': 'Model Registry', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'AI'}
     if (PROJECT_ROOT / "docs" / "ULTRASOUND_PIPELINE.md").exists():
-        status['ultrasound'] = {'label': 'Ultrasound', 'status': 'PASS', 'detail': 'Pipeline ready 11 steps', 'icon': '🩻'}
+        status['ultrasound'] = {'label': 'Ultrasound', 'status': 'PASS', 'detail': 'Pipeline ready 11 steps', 'icon': 'IMG'}
     else:
-        status['ultrasound'] = {'label': 'Ultrasound', 'status': 'WARN', 'detail': 'Docs missing', 'icon': '🩻'}
+        status['ultrasound'] = {'label': 'Ultrasound', 'status': 'WARN', 'detail': 'Docs missing', 'icon': 'IMG'}
     if (PROJECT_ROOT / "desktop" / "doctor_app" / "main_enhanced.py").exists():
-        status['doctor_pc'] = {'label': 'Doctor PC', 'status': 'PASS', 'detail': 'Workstation ready 1450x950 patient scoped', 'icon': '💻'}
+        status['doctor_pc'] = {'label': 'Doctor PC', 'status': 'PASS', 'detail': 'Workstation ready 1450x950 patient scoped', 'icon': 'PC'}
     else:
-        status['doctor_pc'] = {'label': 'Doctor PC', 'status': 'FAIL', 'detail': 'Not found', 'icon': '💻'}
+        status['doctor_pc'] = {'label': 'Doctor PC', 'status': 'FAIL', 'detail': 'Not found', 'icon': 'PC'}
     if (PROJECT_ROOT / "android" / "patient_app" / "main.py").exists():
-        status['patient_kivy'] = {'label': 'Patient Kivy Legacy', 'status': 'PASS', 'detail': 'Kivy preserved, primary now Kotlin', 'icon': '📱'}
+        status['patient_kivy'] = {'label': 'Patient Kivy Legacy', 'status': 'PASS', 'detail': 'Kivy preserved, primary now Kotlin', 'icon': 'MOB'}
     else:
-        status['patient_kivy'] = {'label': 'Patient Kivy Legacy', 'status': 'WARN', 'detail': 'Not found', 'icon': '📱'}
+        status['patient_kivy'] = {'label': 'Patient Kivy Legacy', 'status': 'WARN', 'detail': 'Not found', 'icon': 'MOB'}
     if (PROJECT_ROOT / "android" / "patient" / "app" / "src" / "main" / "java" / "org" / "chronopcos" / "patient" / "MainActivity.kt").exists():
-        status['patient_native'] = {'label': 'Patient Native Kotlin', 'status': 'PASS', 'detail': 'Kotlin+Compose Material3 single patient', 'icon': '📱'}
+        status['patient_native'] = {'label': 'Patient Native Kotlin', 'status': 'PASS', 'detail': 'Kotlin+Compose Material3 single patient', 'icon': 'MOB'}
     else:
-        status['patient_native'] = {'label': 'Patient Native Kotlin', 'status': 'FAIL', 'detail': 'Not found', 'icon': '📱'}
+        status['patient_native'] = {'label': 'Patient Native Kotlin', 'status': 'FAIL', 'detail': 'Not found', 'icon': 'MOB'}
     if (PROJECT_ROOT / "android" / "doctor" / "app" / "src" / "main" / "java" / "org" / "chronopcos" / "doctor" / "MainActivity.kt").exists():
-        status['doctor_native'] = {'label': 'Doctor Native Kotlin', 'status': 'PASS', 'detail': 'Kotlin+Compose multi-patient DEMO-001/002/003', 'icon': '📱'}
+        status['doctor_native'] = {'label': 'Doctor Native Kotlin', 'status': 'PASS', 'detail': 'Kotlin+Compose multi-patient DEMO-001/002/003', 'icon': 'MOB'}
     else:
-        status['doctor_native'] = {'label': 'Doctor Native Kotlin', 'status': 'FAIL', 'detail': 'Not found', 'icon': '📱'}
+        status['doctor_native'] = {'label': 'Doctor Native Kotlin', 'status': 'FAIL', 'detail': 'Not found', 'icon': 'MOB'}
     apk_patient_native = list((PROJECT_ROOT / "android" / "patient" / "app" / "build" / "outputs").glob("**/*.apk")) if (PROJECT_ROOT / "android" / "patient" / "app" / "build").exists() else []
     apk_doctor_native = list((PROJECT_ROOT / "android" / "doctor" / "app" / "build" / "outputs").glob("**/*.apk")) if (PROJECT_ROOT / "android" / "doctor" / "app" / "build").exists() else []
     apk_patient = list((PROJECT_ROOT / "android" / "patient_app").glob("**/*.apk"))
@@ -143,29 +143,29 @@ def get_status():
     apk_dist2 = list((PROJECT_ROOT / "dist" / "android").glob("*.apk"))
     total_apks = len(apk_patient_native) + len(apk_doctor_native) + len(apk_patient) + len(apk_doctor) + len(apk_dist) + len(apk_dist2)
     if total_apks > 0:
-        status['apk'] = {'label': 'Android APKs Native+Legacy', 'status': 'PASS', 'detail': f'{total_apks} APK(s) native {len(apk_patient_native)+len(apk_doctor_native)} DIST {len(apk_dist)}', 'icon': '📦'}
+        status['apk'] = {'label': 'Android APKs Native+Legacy', 'status': 'PASS', 'detail': f'{total_apks} APK(s) native {len(apk_patient_native)+len(apk_doctor_native)} DIST {len(apk_dist)}', 'icon': 'PKG'}
     else:
-        status['apk'] = {'label': 'Android APKs Native+Legacy', 'status': 'WARN', 'detail': 'Not built - use BUILD scripts Kotlin+Compose', 'icon': '📦'}
+        status['apk'] = {'label': 'Android APKs Native+Legacy', 'status': 'WARN', 'detail': 'Not built - use BUILD scripts Kotlin+Compose', 'icon': 'PKG'}
     if (PROJECT_ROOT / "website" / "index.html").exists():
         size = (PROJECT_ROOT / "website" / "index.html").stat().st_size
-        status['website'] = {'label': 'Website', 'status': 'PASS', 'detail': f'Static site ready {size//1024}K extensive', 'icon': '🌐'}
+        status['website'] = {'label': 'Website', 'status': 'PASS', 'detail': f'Static site ready {size//1024}K extensive', 'icon': 'WEB'}
     else:
-        status['website'] = {'label': 'Website', 'status': 'FAIL', 'detail': 'Not found', 'icon': '🌐'}
+        status['website'] = {'label': 'Website', 'status': 'FAIL', 'detail': 'Not found', 'icon': 'WEB'}
     try:
         from provider_network.care_discovery import CareDiscoveryEngine
-        status['care'] = {'label': 'Care Discovery', 'status': 'PASS', 'detail': 'FIND CARE ready', 'icon': '📍'}
+        status['care'] = {'label': 'Care Discovery', 'status': 'PASS', 'detail': 'FIND CARE ready', 'icon': 'CARE'}
     except Exception as e:
-        status['care'] = {'label': 'Care Discovery', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '📍'}
+        status['care'] = {'label': 'Care Discovery', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'CARE'}
     try:
         from core.chrono_metabolic import ChronoMetabolicFingerprint
-        status['chrono'] = {'label': 'Chrono-Metabolic', 'status': 'PASS', 'detail': 'Fingerprint engine', 'icon': '🕐'}
+        status['chrono'] = {'label': 'Chrono-Metabolic', 'status': 'PASS', 'detail': 'Fingerprint engine', 'icon': 'TIME'}
     except Exception as e:
-        status['chrono'] = {'label': 'Chrono-Metabolic', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🕐'}
+        status['chrono'] = {'label': 'Chrono-Metabolic', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'TIME'}
     try:
         from endo_twin.provenance import ProvenanceTracker, ProvenanceLabel
-        status['provenance'] = {'label': 'Provenance', 'status': 'PASS', 'detail': f'Labels {[l.value for l in ProvenanceLabel]} first-class', 'icon': '🔍'}
+        status['provenance'] = {'label': 'Provenance', 'status': 'PASS', 'detail': f'Labels {[l.value for l in ProvenanceLabel]} first-class', 'icon': 'AUDIT'}
     except Exception as e:
-        status['provenance'] = {'label': 'Provenance', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': '🔍'}
+        status['provenance'] = {'label': 'Provenance', 'status': 'FAIL', 'detail': str(e)[:60], 'icon': 'AUDIT'}
     return status
 
 def get_launcher_status():
