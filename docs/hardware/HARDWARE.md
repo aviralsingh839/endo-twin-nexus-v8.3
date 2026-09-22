@@ -4,38 +4,41 @@
 
 | Controller | Role | Active? |
 |---|---|---|
-| **ESP32** | **Primary wearable** | YES |
+| **ESP8266 NodeMCU / ESP-12E** | **Primary Wi-Fi wearable** | YES |
 | **Arduino Mega 2560** | Bench / lab / expanded test controller | YES |
+| ESP32 | Historical wearable implementation | NO — legacy only |
 | Arduino Nano | Historical wearable implementation | NO — legacy only |
-| ESP8266 | Historical network bridge | NO — legacy only |
 
-The platform remains **ENDO-TWIN NEXUS**. CHRONO-PCOS is a disease-specific research extension inside the platform.
+ENDO-TWIN remains the parent platform; CHRONO-PCOS is a disease-specific research extension.
 
-## Primary wearable — ESP32
+## Primary wearable — ESP8266
 
 Canonical firmware:
-`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+`hardware/esp8266/endo_twin_wearable/endo_twin_wearable.ino`
 
 Core sensors:
-- MAX30102 PPG: SDA GPIO21, SCL GPIO22
-- MPU6050: SDA GPIO21, SCL GPIO22
-- DS18B20: DATA GPIO18 with 4.7 kΩ pull-up to 3.3 V
-- GSR/EDA: ADC GPIO34
-- Status LED: GPIO2
+- MAX30102 PPG: SDA D1 (GPIO5), SCL D2 (GPIO4)
+- MPU6050: SDA D1 (GPIO5), SCL D2 (GPIO4)
+- DS18B20: DATA D6 (GPIO12), 4.7 kΩ pull-up to 3.3 V
+- GSR/EDA: A0
+- Status LED: D4 (GPIO2)
 
 Transport:
 - USB serial at 115200 baud
-- BLE device name `ENDO-TWIN-ESP32`
-- BLE service `7f300001-6c12-4f70-9e6b-8e9f7b8b1001`
-- BLE notify `7f300002-6c12-4f70-9e6b-8e9f7b8b1001`
-- BLE command `7f300003-6c12-4f70-9e6b-8e9f7b8b1001`
+- Wi-Fi SoftAP: `ENDO-TWIN-ESP8266`
+- Default SoftAP password: `endotwin8266`
+- TCP server: port `7777`
+- USB and TCP both carry newline-terminated canonical CP2 packets
+- ESP8266 has no BLE; Android uses Wi-Fi/TCP
+
+The default wiring assumes a NodeMCU 1.0 / ESP-12E style board. NodeMCU labels D1/D2/D4/D6 map to GPIO5/4/2/12. citeturn0search7
 
 ## Bench/lab controller — Mega 2560
 
 Canonical firmware:
 `hardware/arduino/endo_twin_mega_lab/endo_twin_mega_lab.ino`
 
-The Mega may host the expanded lab set:
+The Mega may host:
 - MAX30102 / MPU6050
 - DS18B20
 - GSR
@@ -47,25 +50,25 @@ The Mega may host the expanded lab set:
 - optional SSD1306 OLED
 - buttons, LEDs, buzzer
 
-Mega I2C is D20/SDA and D21/SCL. It is USB-connected to the PC and is not the primary wearable wireless controller.
+Mega I2C is D20/SDA and D21/SCL.
 
 ## Data path
 
 ```
-ESP32 wearable ── USB Serial / BLE ──┐
-                                     ├─ CP2 ── Python/Desktop/Android
-Mega lab controller ── USB Serial ──┘          │
-                                               ├─ quality + features
-                                               ├─ local-first storage
-                                               └─ ENDO-TWIN / disease modules
+ESP8266 wearable ── USB Serial / Wi-Fi TCP ──┐
+                                             ├─ CP2 ── Desktop/Android
+Mega lab controller ── USB Serial ───────────┘          │
+                                                        ├─ quality + features
+                                                        ├─ local-first storage
+                                                        └─ ENDO-TWIN / disease modules
 ```
 
-Both active controllers emit the same canonical enhanced `$CP2` packet.
+Both active controllers emit the same enhanced `$CP2` packet.
 
 ## Legacy boundary
 
-Historical Nano and ESP8266 implementations are preserved under `hardware/legacy/` for reference only. No current build, launcher, Android path, desktop live path, or test requires them.
+Historical ESP32, Nano and old ESP8266 bridge snapshots remain under `hardware/legacy/`. They are not required by the active build or runtime.
 
 ## Safety
 
-This is an educational/research prototype, not a medical device. Sensor voltage compatibility, battery isolation, wiring integrity, placement, calibration and independent reference validation remain necessary. Never use unsafe power sources on body-worn hardware.
+Research/educational prototype only. Verify sensor voltage compatibility, battery isolation, wiring, placement and calibration before body-worn testing. Never connect unsafe mains-powered circuitry to body-worn hardware.
