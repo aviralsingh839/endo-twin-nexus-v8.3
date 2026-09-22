@@ -233,7 +233,7 @@ private fun HomeScreen(patientId: String, alias: String) {
             Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("3-day wearable observation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("The participant wears the ESP32-S3 pod during ordinary daily life. The app records timestamped CP2 packets locally and keeps the participant de-identified.")
+                    Text("The participant wears the ESP sensor pod during ordinary daily life. The app records timestamped CP2 packets locally and keeps the participant de-identified.")
                     ProvenanceBadge("REAL ACQUISITION ONLY", "measured")
                 }
             }
@@ -526,11 +526,11 @@ private fun ConnectionScreen() {
     }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item { PageTitle("ESP8266 Wearable", "LIVE Wi-Fi/TCP • ENDO-TWIN-ESP8266") }
+        item { PageTitle("ESP8266 Sensor Pod", "LIVE Wi-Fi/TCP • ENDO-TWIN") }
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ESP32-S3 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(endpoint, { endpoint = it }, label = { Text("ESP8266 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(portText, { portText = it }, label = { Text("TCP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Text("${state.name} • ${device ?: "Not connected"}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
                     Text("CP2 packets received: $packets")
@@ -541,7 +541,7 @@ private fun ConnectionScreen() {
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Button(onClick = { client.connect(endpoint, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP32-S3") }
+                Button(onClick = { client.connect(endpoint, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP8266") }
                 OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
             }
         }
@@ -551,7 +551,7 @@ private fun ConnectionScreen() {
                 OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.patient.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("WHOAMI") }
             }
         }
-        item { Text("The ESP32-S3 wearable uses Wi-Fi/TCP on port 7777. CP2 frames are CRC-validated before storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("The ESP8266 sensor pod uses Wi-Fi/TCP on port 7777. CP2 frames are CRC-validated before storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
