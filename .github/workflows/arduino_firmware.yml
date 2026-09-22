@@ -3,7 +3,7 @@ name: Active firmware quality gate
 on:
   push:
     paths:
-      - 'hardware/esp32/**'
+      - 'hardware/esp8266/**'
       - 'hardware/arduino/endo_twin_mega_lab/**'
       - 'scripts/build/build_firmware.sh'
       - '.github/workflows/arduino_firmware.yml'
@@ -25,7 +25,7 @@ jobs:
         run: |
           arduino-cli core update-index
           arduino-cli core install arduino:avr
-          arduino-cli core install esp32:esp32
+          arduino-cli core install esp8266:esp8266
       - name: Install sensor libraries
         run: |
           arduino-cli lib install 'SparkFun MAX3010x Pulse and Proximity Sensor Library'
@@ -37,7 +37,7 @@ jobs:
           arduino-cli lib install 'Adafruit BME280 Library'
           arduino-cli lib install 'Adafruit GFX Library'
           arduino-cli lib install 'Adafruit SSD1306'
-      - name: Compile ESP32 primary wearable
-        run: arduino-cli compile --fqbn esp32:esp32:esp32 --export-binaries 'hardware/esp32/endo_twin_wearable'
+      - name: Compile ESP8266 primary wearable
+        run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --export-binaries 'hardware/esp8266/endo_twin_wearable'
       - name: Compile Arduino Mega bench/lab
         run: arduino-cli compile --fqbn arduino:avr:mega --export-binaries 'hardware/arduino/endo_twin_mega_lab'
