@@ -21,7 +21,7 @@ data class Cp2AndroidSample(
 class Cp2AndroidParser {
     fun parse(line: String): Cp2AndroidSample? {
         val raw=line.trim()
-        if (!raw.startsWith("$CP2,")) return null
+        if (!raw.startsWith("\$CP2,")) return null
         val parts=raw.split(",")
         if (parts.size!=25) return null
         val received=parts.last().toIntOrNull(16) ?: return null
@@ -76,11 +76,11 @@ class EndoTwinTcpClient(private val context: Context) {
                     if(frame.length>4096){ error("CP2 frame exceeded safety limit"); break }
                     withContext(Dispatchers.Main){ onRawPacket?.invoke(frame) }
                     parser.parse(frame)?.let { sample -> withContext(Dispatchers.Main){ onSample?.invoke(sample) } }
-                        ?: if(frame.startsWith("$CP2,")) error("Invalid CP2/CRC")
+                        ?: if(frame.startsWith("\$CP2,")) error("Invalid CP2/CRC")
                 }
                 withContext(Dispatchers.Main){ state=State.DISCONNECTED; onState?.invoke(State.DISCONNECTED) }
             } catch (e:Exception) {
-                error("ESP8266 connection failed: \${e.message ?: e.javaClass.simpleName}")
+                error("ESP32-S3 connection failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 try { socket?.close() } catch(_:Exception) {}
                 socket=null; writer=null
@@ -99,6 +99,6 @@ class EndoTwinTcpClient(private val context: Context) {
     fun ping()=writeCommand("PING")
     fun whoAmI()=writeCommand("WHOAMI")
     private fun writeCommand(command:String) {
-        writer?.println(command) ?: onError?.invoke("ESP8266 TCP link is not connected")
+        writer?.println(command) ?: onError?.invoke("ESP32-S3 TCP link is not connected")
     }
 }
