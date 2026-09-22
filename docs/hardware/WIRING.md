@@ -1,41 +1,46 @@
-# WIRING - ENDO-TWIN V8.3+
+# WIRING - ENDO-TWIN V8.7
 
-Date: 2026-09-19
-Version: 8.3+
-Status: IMPLEMENTED - Preserved V8.1
+## ESP32 primary wearable
 
-## Nano Pod Wiring
+| Device | ESP32 connection |
+|---|---|
+| MAX30102 SDA | GPIO21 |
+| MAX30102 SCL | GPIO22 |
+| MPU6050 SDA | GPIO21 |
+| MPU6050 SCL | GPIO22 |
+| DS18B20 data | GPIO18 + 4.7k pull-up to 3.3V |
+| GSR analog | GPIO34 (ADC1 input) |
+| Status LED | GPIO2 (optional) |
+| Ground | Common GND |
 
-- MAX30102 PPG: I2C SDA A4 SCL A5 3.3V GND
-- MPU6050 IMU: I2C SDA A4 SCL A5 3.3V GND (shared I2C)
-- DS18B20 Temp: OneWire D2 3.3V GND 4.7k pullup
-- GSR: Analog A0 3.3V GND
-- Serial: USB Serial 115200 baud $CP2 protocol
+MAX30102 and MPU6050 are on the same I2C bus and must use compatible 3.3V logic. Check your breakout board before powering it; do not assume a 5V-only sensor input is safe.
 
-## Mega Hub Wiring
+## Arduino UNO bench
 
-- Arduino Mega aggregation
-- Serial to Nano Pod
-- USB to PC
+MAX30102/MPU6050: SDA=A4, SCL=A5. DS18B20: D2 with 4.7k pull-up. GSR: A0. USB serial: 115200.
 
-## Protocol
+## Arduino Mega bench/hub
 
-- $CP2 packets: qr_encoder.py packet_parser.py
-- Format: $CP2,hr,spo2,ax,ay,az,gx,gy,gz,temp,gsr*checksum
-- Example: $CP2,72,98,0.1,0.2,0.9,0.01,0.02,0.03,32.5,512*AB
-- Validation: Checksum, range checks, missing handling
+MAX30102/MPU6050: SDA=20, SCL=21. DS18B20: D2. GSR=A0. The existing Mega firmware can additionally host ECG, microphone, FSR, environmental sensors, OLED and buttons.
+
+## ESP32 BLE contract
+
+Service UUID: `7f300001-6c12-4f70-9e6b-8e9f7b8b1001`\nNotify UUID: `7f300002-6c12-4f70-9e6b-8e9f7b8b1001`\nCommand UUID: `7f300003-6c12-4f70-9e6b-8e9f7b8b1001`
+
+The data characteristic sends one complete $CP2 line per notification. USB serial uses the same line format.
+
+## Testing
+
+1. Flash ESP32 and open serial at 115200.
+2. Confirm device advertises as `ENDO-TWIN-ESP32`.
+3. Send `WHOAMI` and check the identity response.
+4. With no finger on MAX30102, the packet should carry the PPG-absent status bit rather than fake a signal.
+5. Place a finger gently on MAX30102 and observe IR/RED values.
+6. Move the IMU and observe acceleration/gyro fields.
+7. Touch/warm the DS18B20 and observe temperature changes.
+8. Verify GSR changes only when its sensor is correctly wired.
+9. Validate the resulting lines with the existing Python `PacketParser` tests before enabling any research-model pipeline.
 
 ## Safety
 
-- 3.3V sensors not 5V
-- I2C shared bus MAX30102 + MPU6050 different addresses
-- OneWire DS18B20 D2 with pullup
-- Analog GSR A0
-- Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
-- Never fabricate data when sensor unavailable show Sensor unavailable
-
-## Demo Mode
-
-- Entire workflow without physical sensors DEMO/SIMULATED DATA labeled
-- demo/demo_flow.py + demo/full_showcase.py 17 steps integrated ecosystem
-- Synthetic 10 subjects 30 days 6 scenarios 60 days wrist_ppg SYNTHETIC clearly labelled
+Never place an unverified powered prototype on a person. Use insulated wiring, current-limited battery power, and no direct mains connection.
