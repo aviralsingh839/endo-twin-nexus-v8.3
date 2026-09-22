@@ -62,6 +62,7 @@ private enum class DoctorTab(val label: String) {
     Dashboard("Dashboard"),
     Patients("Patients"),
     Models("Models"),
+    Hardware("Hardware"),
     Mobile("Mobile"),
     Settings("Settings")
 }
@@ -111,6 +112,7 @@ private fun DoctorApp() {
                         NavIcon(Icons.Outlined.Dashboard, "Dashboard", tab == DoctorTab.Dashboard) { selected = null; tab = DoctorTab.Dashboard }
                         NavIcon(Icons.Outlined.People, "Patients", tab == DoctorTab.Patients) { tab = DoctorTab.Patients }
                         NavIcon(Icons.Outlined.AutoGraph, "Models", tab == DoctorTab.Models) { tab = DoctorTab.Models }
+                        NavIcon(Icons.Outlined.Sensors, "Hardware", tab == DoctorTab.Hardware) { tab = DoctorTab.Hardware }
                         NavIcon(Icons.Outlined.Link, "Mobile", tab == DoctorTab.Mobile) { tab = DoctorTab.Mobile }
                         NavIcon(Icons.Outlined.Settings, "Settings", tab == DoctorTab.Settings) { tab = DoctorTab.Settings }
                     }
@@ -121,6 +123,7 @@ private fun DoctorApp() {
                     DoctorTab.Dashboard -> Dashboard(onOpen = { selected = it })
                     DoctorTab.Patients -> Patients(onOpen = { selected = it })
                     DoctorTab.Models -> ModelPage()
+                    DoctorTab.Hardware -> HardwarePage()
                     DoctorTab.Mobile -> MobilePage()
                     DoctorTab.Settings -> SettingsPage()
                 }
@@ -323,6 +326,55 @@ private fun ModelPage() {
     }
 }
 
+@Composable
+private fun HardwarePage() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val client = remember { org.chronopcos.doctor.ble.EndoTwinBleClient(context) }
+    var state by remember { mutableStateOf(client.state) }
+    var device by remember { mutableStateOf<String?>(null) }
+    var packets by remember { mutableStateOf(0) }
+    var latest by remember { mutableStateOf("Waiting for CP2…") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val permissions = remember {
+        if (android.os.Build.VERSION.SDK_INT >= 31) arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+        else arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted -> if (granted.values.all { it }) client.scan() else error = "Bluetooth permission not granted." }
+    DisposableEffect(client) {
+        client.onState = { state = it }
+        client.onDevice = { device = it }
+        client.onError = { error = it }
+        client.onSample = { sample -> packets += 1; latest = "IR ${sample.ir} • Red ${sample.red} • GSR ${sample.gsr} • status ${sample.status}" }
+        onDispose { client.disconnect() }
+    }
+    fun scan() {
+        val missing = permissions.any { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (missing) launcher.launch(permissions) else client.scan()
+    }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { PageTitle("Hardware Lab", "ESP32 wearable BLE • live engineering validation") }
+        item { SectionCard("BLE state", state.name, "${device ?: "No ESP32 discovered"} • $packets CP2 packets") }
+        item { SectionCard("Latest live frame", "MEASURED", latest) }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { scan() }, Modifier.weight(1f)) { Text("Scan ESP32") }
+                OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { client.ping() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.ble.EndoTwinBleClient.State.CONNECTED) { Text("PING") }
+                OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.ble.EndoTwinBleClient.State.CONNECTED) { Text("WHOAMI") }
+            }
+        }
+        item { error?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
+        item { SectionCard("Bench controller", "Arduino Mega", "USB-only CP2 bench/lab controller remains separate from the ESP32 wearable.") }
+        item { Text("Live hardware evidence is separate from DEMO_DATA and from disease-model output.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+    }
+}
 @Composable
 private fun MobilePage() {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
