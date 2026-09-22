@@ -66,7 +66,7 @@ class StartupDialog(QDialog):
         self.setMinimumWidth(720); self.setStyleSheet(APP_QSS); self.config = None
         v=QVBoxLayout(self)
         h=QLabel("Choose the data source before the workstation opens"); h.setObjectName("title"); v.addWidget(h)
-        n=QLabel("DEMO uses synthetic labelled data. LIVE uses the same processing chain from an ESP8266 wearable or Arduino Mega USB stream. The choice is fixed for the run.")
+        n=QLabel("DEMO uses synthetic labelled data. LIVE uses the same processing chain from an ESP32-S3 wearable or Arduino Mega USB stream. The choice is fixed for the run.")
         n.setObjectName("muted"); n.setWordWrap(True); v.addWidget(n)
         row=QHBoxLayout()
         demo=QPushButton("Open DEMO MODE"); demo.setObjectName("primary"); demo.clicked.connect(self._demo); row.addWidget(demo)
@@ -78,7 +78,7 @@ class StartupDialog(QDialog):
         self.refresh=QPushButton("Refresh"); self.refresh.setObjectName("secondary"); self.refresh.clicked.connect(self.auto_detect_port)
         port_row=QHBoxLayout(); port_row.addWidget(self.port,1); port_row.addWidget(self.detect); port_row.addWidget(self.refresh)
         f.addRow("USB port",port_row)
-        self.status=QLabel("Scanning for ESP8266 / Arduino Mega..."); self.status.setObjectName("muted"); self.status.setWordWrap(True)
+        self.status=QLabel("Scanning for ESP32-S3 / Arduino Mega..."); self.status.setObjectName("muted"); self.status.setWordWrap(True)
         f.addRow("Detection",self.status)
         self.baud=QSpinBox(); self.baud.setRange(1200,1000000); self.baud.setValue(115200)
         f.addRow("Baud",self.baud)
@@ -89,7 +89,7 @@ class StartupDialog(QDialog):
         ports=ArduinoReader.available_ports()
         if not ports:
             self.port.clear()
-            self.status.setText("No USB serial device detected. Connect the ESP8266 wearable or Arduino Mega and click Auto-detect USB.")
+            self.status.setText("No USB serial device detected. Connect the ESP32-S3 wearable or Arduino Mega and click Auto-detect USB.")
             return
         preferred=[p for p in ports if "/ttyACM" in p or "/ttyUSB" in p or p.upper().startswith("COM")]
         selected=preferred[0] if preferred else ports[0]
@@ -103,7 +103,7 @@ class StartupDialog(QDialog):
         if not self.port.text().strip():
             self.auto_detect_port()
         if not self.port.text().strip():
-            QMessageBox.warning(self,"LIVE mode","No USB serial device detected. Connect the ESP8266 or Arduino Mega and try Auto-detect USB."); return
+            QMessageBox.warning(self,"LIVE mode","No USB serial device detected. Connect the ESP32-S3 or Arduino Mega and try Auto-detect USB."); return
         self.config=LiveConfig("live","usb",port=self.port.text().strip(),baud=self.baud.value())
         self.accept()
 
@@ -196,7 +196,7 @@ class UnifiedWorkstation(QMainWindow):
             for c0,val in enumerate(row): self.modules.setItem(r0,c0,QTableWidgetItem(val))
         v.addWidget(self.modules,1); self.lab_log=QTextEdit(); self.lab_log.setReadOnly(True); self.lab_log.setMaximumHeight(155); v.addWidget(self.lab_log); return p
     def _settings_page(self):
-        p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Settings"); t.setObjectName("title"); v.addWidget(t); q=QLabel("Restart to change DEMO/LIVE or the live transport. Research bridge is LAN-only."); q.setObjectName("muted"); q.setWordWrap(True); v.addWidget(q); box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box); bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}")); bv.addWidget(QLabel("Active live hardware: ESP8266 wearable or Arduino Mega lab controller over USB. ESP8266 is legacy only.")); v.addWidget(box); v.addStretch(); return p
+        p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Settings"); t.setObjectName("title"); v.addWidget(t); q=QLabel("Restart to change DEMO/LIVE or the live transport. Research bridge is LAN-only."); q.setObjectName("muted"); q.setWordWrap(True); v.addWidget(q); box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box); bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}")); bv.addWidget(QLabel("Active live hardware: ESP32-S3 wearable or Arduino Mega lab controller over USB. ESP32-S3 is legacy only.")); v.addWidget(box); v.addStretch(); return p
     def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","lab","model","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
     def _seed_demo(self):
         if self.cfg.mode=="demo": self.current={"patient_id":"DEMO-021","anonymous_id":"DEMO-021","display_name":"Mira","age_years":23.0,"bmi":24.7,"cycle_irregular":True,"cycle_length":42,"years_post_menarche":10,"hyperandrogenism":True,"pcom_present":False,"exclusions_completed":True,"glucose_mg_dl":98.0,"demo":True}
