@@ -1,26 +1,28 @@
-# ENDO-TWIN NEXUS V8.7 — ESP32 + Mega Active Connection
-
-This page supersedes the old ESP8266 bridge topology.
+# ENDO-TWIN NEXUS V8.7 — ESP8266 + Mega Connection
 
 ## Active topology
 
 ### Wearable
-ESP32 → USB Serial → PC
+ESP8266 → USB Serial → Desktop
 
 or
 
-ESP32 → BLE → Android / Desktop BLE-capable client
+ESP8266 → Wi-Fi TCP port 7777 → Android / desktop TCP client
 
 ### Bench/lab
-Arduino Mega 2560 → USB Serial → PC
+Arduino Mega 2560 → USB Serial → Desktop
 
-The Mega does not sit between the ESP32 and the PC. The active controllers are independent CP2 producers.
+The Mega and ESP8266 are independent CP2 producers.
 
-## ESP32 BLE
+## ESP8266 network
 
-- Device name: `ENDO-TWIN-ESP32`
-- Service: `7f300001-6c12-4f70-9e6b-8e9f7b8b1001`
-- Notify: `7f300002-6c12-4f70-9e6b-8e9f7b8b1001`
-- Command: `7f300003-6c12-4f70-9e6b-8e9f7b8b1001`
+- SoftAP SSID: `ENDO-TWIN-ESP8266`
+- Password: `endotwin8266`
+- TCP port: `7777`
+- Default SoftAP address: normally `192.168.4.1`; confirm from serial output.
 
-Old ESP8266 Wi-Fi bridge details are historical only and are preserved in `hardware/legacy/esp8266/` and the project legacy history.
+ESP8266 has no BLE. Android therefore uses a TCP socket instead of the previous ESP32 BLE contract.
+
+## Legacy
+
+The previous ESP32 wearable and old ESP8266 bridge are preserved under `hardware/legacy/`.
