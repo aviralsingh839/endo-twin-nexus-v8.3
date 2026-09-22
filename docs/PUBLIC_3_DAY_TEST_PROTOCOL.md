@@ -57,9 +57,9 @@ Target:
 - Day 2: 24–48 h
 - Day 3: 48–72 h
 
-The Android app uses a foreground connected-device service for continuous recording while the study is active. Android requires appropriate foreground-service declarations and permissions for long-running connected-device work. citeturn1search1turn1search2
+The Android app uses a foreground connected-device service for continuous recording while the study is active. Android requires appropriate foreground-service declarations and permissions for long-running connected-device work. 
 
-Start the foreground service from a visible user action in the app. Android restricts arbitrary background foreground-service starts on modern Android versions. citeturn1search0turn1search3
+Start the foreground service from a visible user action in the app. Android restricts arbitrary background foreground-service starts on modern Android versions. 
 
 ## During the test
 
@@ -92,9 +92,9 @@ The CP2 stream contains:
 - quality/status information;
 - timestamp and CRC.
 
-The MAX30102 is an optical heart-rate/pulse-oximetry sensor intended for wearable applications. The underlying IC itself is not intended for direct skin contact; the wearable should use an appropriate cover/encapsulation over the optical sensor. citeturn0search0turn0search5
+The MAX30102 is an optical heart-rate/pulse-oximetry sensor intended for wearable applications. The underlying IC itself is not intended for direct skin contact; the wearable should use an appropriate cover/encapsulation over the optical sensor. 
 
-The BME280 provides temperature, humidity and pressure and is intended for low-power mobile/wearable applications. citeturn0search2turn0search26
+The BME280 provides temperature, humidity and pressure and is intended for low-power mobile/wearable applications. 
 
 ## Day-by-day engineering review
 
@@ -216,4 +216,4 @@ Before giving the pod to another volunteer:
 - verify the desktop study is assigned to the new participant;
 - verify the export contains only the selected study.
 
-Room supports explicit migration paths for schema changes; the current app adds a non-destructive 2→3 migration for the public-study table so existing patient data is not intentionally discarded during this feature update. citeturn2search0turn2search5
+Room supports explicit migration paths for schema changes; the current app adds a non-destructive 2→3 migration for the public-study table so existing patient data is not intentionally discarded during this feature update. 
