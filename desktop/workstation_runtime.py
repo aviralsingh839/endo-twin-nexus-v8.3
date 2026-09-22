@@ -35,7 +35,7 @@ class ModeDialog(QDialog):
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","ESP8266 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)
@@ -44,7 +44,7 @@ class ModeDialog(QDialog):
         b=QPushButton("Refresh"); b.setObjectName("secondary"); b.clicked.connect(self.refresh_ports)
         line.addWidget(self.port,1); line.addWidget(detect); line.addWidget(b); lv.addLayout(line)
         self.port_status=QLabel("Detecting USB serial devices…"); self.port_status.setObjectName("muted"); self.port_status.setWordWrap(True); lv.addWidget(self.port_status)
-        n=QLabel("Active hardware: ESP8266 primary wearable or Arduino Mega bench/lab controller. Both emit the canonical ~20 packets/s CP2 stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
+        n=QLabel("Active hardware: ESP32-S3 primary wearable or Arduino Mega bench/lab controller. Both emit the canonical ~20 packets/s CP2 stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
         root.addWidget(box)
         self.refresh_ports()
         self.auto_detect_port()
@@ -62,13 +62,13 @@ class ModeDialog(QDialog):
         ports=ArduinoReader.available_ports()
         self.port.clear(); self.port.addItems(ports)
         if cur and cur in ports: self.port.setCurrentText(cur)
-        self.port_status.setText(f"USB serial devices found: {len(ports)}" if ports else "No USB serial device detected. Connect the ESP8266 or Mega and click Auto-detect USB.")
+        self.port_status.setText(f"USB serial devices found: {len(ports)}" if ports else "No USB serial device detected. Connect the ESP32-S3 or Mega and click Auto-detect USB.")
 
     def auto_detect_port(self):
         ports=ArduinoReader.available_ports()
         self.port.clear(); self.port.addItems(ports)
         if not ports:
-            self.port_status.setText("No USB serial device detected. Connect the ESP8266 or Mega and click Auto-detect USB.")
+            self.port_status.setText("No USB serial device detected. Connect the ESP32-S3 or Mega and click Auto-detect USB.")
             return
         # Prefer the normal Linux/macOS USB-serial names, then Windows COM ports.
         preferred=[p for p in ports if "/ttyACM" in p or "/ttyUSB" in p or p.upper().startswith("COM")]
@@ -80,7 +80,7 @@ class ModeDialog(QDialog):
         if mode=="live" and not self.port.currentText().strip():
             self.auto_detect_port()
         if mode=="live" and not self.port.currentText().strip():
-            QMessageBox.warning(self,"Live mode","No USB serial device detected. Connect the ESP8266 or Mega and try Auto-detect USB."); return
+            QMessageBox.warning(self,"Live mode","No USB serial device detected. Connect the ESP32-S3 or Mega and try Auto-detect USB."); return
         self.choice=ModeConfig(mode=mode,port=self.port.currentText().strip()); self.accept()
 
 def choose_mode(title: str) -> ModeConfig | None:
