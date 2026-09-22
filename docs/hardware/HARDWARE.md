@@ -1,61 +1,25 @@
-# HARDWARE - ENDO-TWIN V8.3+
+# HARDWARE - ENDO-TWIN V8.7
 
-Date: 2026-09-19
-Version: 8.3+
-Status: IMPLEMENTED - Preserved V8.1
+## Active architecture
 
-## Preserved Hardware
+- **ESP32 = primary wearable controller**. Arduino Nano is no longer required.
+- **Arduino UNO = bench/prototype validation controller** for the same core sensors.
+- **Arduino Mega 2560 = extended bench/hub controller** when ECG, microphone, FSR, BME280, OLED and other expansion sensors are needed.
+- **MAX30102 + MPU6050 share I2C on the ESP32 (GPIO21/22). DS18B20 uses GPIO18. GSR uses ADC GPIO34.**
+- **BLE is the preferred ESP32 → Android transport; USB serial at 115200 remains available for desktop diagnostics.**
+- The canonical data contract remains newline-delimited **$CP2** with XOR CRC. Missing channels stay explicit placeholders; no synthetic values are inserted into real sessions.
 
-- Nano pod: Arduino Nano wearable pod MAX30102 PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP2 MPU6050 motion ax ay az gx gy gz motion index activity level DS18B20 skin temp room temp temp slope GSR raw tonic phasic
-- Mega hub: Arduino Mega hub aggregation
-- Sensors: MAX30102 PPG, MPU6050 IMU, DS18B20 temperature, GSR
-- Communication: Serial $CP2 protocol packet_parser.py qr_encoder.py ecg.py etc.
+## Active files
 
-## Architecture
+- Wearable: `hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
+- UNO bench: `hardware/arduino/endo_twin_uno_bench/endo_twin_uno_bench.ino`
+- Mega bench/hub: `hardware/arduino/chrono_pcos_mega_firmware/chrono_pcos_mega_firmware.ino`
+- Former Nano firmware is retained only as a **legacy reference** and must not be presented as the required wearable.
 
-- hardware/arduino/ nano_pod/ mega_hub/
-- src/serial_io/ serial_reader.py packet_parser.py preserved
-- src/signal_processing/ ppg.py ecg.py gsr.py hrv.py imu.py spo2.py temperature.py filters.py preserved
-- Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
-- Offline-first core offline demo local no cloud
-- Demo mode entire workflow without physical sensors DEMO/SIMULATED DATA labeled
+## Data flow
 
-## Data Flow
-
-```
-Nano Pod Sensors
- ↓ $CP2 packets
-Serial Reader
- ↓ packet_parser
-Validation
- ↓
-Signal Processing filtering artifact quality HR HRV motion temp GSR
- ↓
-Feature Extraction HR 72 bpm MEASURED quality 0.91 HRV RMSSD 48 ms DERIVED quality 0.85 etc
- ↓
-Baseline Longitudinal Fusion Disease Model Prediction Explanation Uncertainty Provenance Report/UI
-```
-
-## Benchmark References
-
-- PPGbetter: Real-time PPG acquisition Android lifecycle
-- research-project: Python/Android division filtering HRV
-- E2E-PPG: End-to-end SQA reconstruction
-- Colepp: Wearable acquisition existing ecosystems Wear OS hardware strategy maximize existing real sensor data
-- OpenRing: BLE reconnection passive sampling local-first sensor abstraction
-- Gadgetbridge: BENCHMARK ONLY GPL architectural study vendor independence
-
-## Performance
-
-- Import core 267.9 ms fast
-- Deterministic inference 0.3 ms extremely fast
-- Real inference 993 ms moderate
-- Dashboard 22 ms fast
-- Ring buffers streaming lazy loading async model inference
+`ESP32 sensors → $CP2 → BLE/USB → packet_parser.py → quality control → signal processing → feature extraction → longitudinal fusion → research models/UI`
 
 ## Safety
 
-- Research prototype not medical device
-- Gracefully handle sensor failures
-- Never fabricate data when sensor unavailable
-- Demo labeled never clinical
+Educational/research prototype only; not a diagnostic medical device. For body-worn operation use battery power or an electrically isolated supply and keep mains power away from the body.
