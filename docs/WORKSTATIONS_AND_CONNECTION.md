@@ -2,8 +2,8 @@
 
 ## Active hardware paths
 
-**ESP32 primary wearable**
-→ USB Serial or BLE
+**ESP8266 primary wearable**
+→ USB Serial or Wi-Fi/TCP
 → CP2
 → Patient / Doctor / Research processing
 
@@ -17,13 +17,11 @@ The workstation accepts dynamically discovered serial ports; it does not assume 
 ## Modes
 
 - DEMO MODE: deterministic synthetic stream explicitly labelled `DEMO_DATA`
-- LIVE SENSOR MODE: actual CP2 packets from ESP32 or Mega, CRC checked before processing
-
-The mode is selected at startup to prevent accidental mixing of synthetic and measured records.
+- LIVE SENSOR MODE: actual CP2 packets from ESP8266 or Mega, CRC checked before processing
 
 ## Android
 
-Native Kotlin + Jetpack Compose + Material 3 remain the Android architecture. ESP32 BLE is the active wearable transport. The app must keep DEMO, LIVE USB and LIVE BLE states distinct and must not replace live sensor data with demo values.
+Native Kotlin + Jetpack Compose + Material 3 remain the Android architecture. ESP8266 has no BLE, so mobile live acquisition uses Wi-Fi/TCP. The default AP is `ENDO-TWIN-ESP8266` with TCP port 7777.
 
 ## Local-first data
 
@@ -31,4 +29,4 @@ Patient data, doctor data, raw sensor data and research outputs remain locally s
 
 ## Prototype Lab
 
-Doctor → Prototype Lab is the engineering surface for testing ESP32 and Mega hardware before using a session in the wider ENDO-TWIN pipeline.
+Doctor → Prototype Lab is the engineering surface for testing ESP8266 and Mega hardware before using a session in the wider ENDO-TWIN pipeline.
