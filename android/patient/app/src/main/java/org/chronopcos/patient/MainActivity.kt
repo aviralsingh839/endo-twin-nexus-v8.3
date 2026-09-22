@@ -78,16 +78,16 @@ private fun PatientApp(currentPatientId: String, alias: String) {
                     title = {
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text("ENDO-TWIN NEXUS", fontWeight = FontWeight.ExtraBold)
-                            Text("Personalized physiological modelling", style = MaterialTheme.typography.labelSmall, color = Color(0xFFDDE5FA))
+                            Text("Personalized physiological modelling", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
                     actions = {
-                        Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFF33405A)) {
-                            Text("PUBLIC TEST • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFFDDE3FF), fontWeight = FontWeight.Bold)
+                        Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Text("PUBLIC TEST • $currentPatientId", Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(12.dp))
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF5A678B), titleContentColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface, titleContentColor = Color.White)
                 )
             },
             bottomBar = {
@@ -146,7 +146,7 @@ private fun tabIcon(tab: PatientTab) = when (tab) {
 @Composable
 private fun Avatar(initial: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFF8F9CE9)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
             Icon(Icons.Outlined.Face, label, tint = Color.White, modifier = Modifier.size(28.dp))
         }
         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
@@ -164,11 +164,11 @@ private fun PageTitle(title: String, subtitle: String) {
 @Composable
 private fun ProvenanceBadge(label: String, kind: String = "neutral") {
     val (bg, fg) = when (kind) {
-        "measured" -> Color(0xFF193F39) to Color(0xFF77D8BE)
-        "derived" -> Color(0xFF39345A) to Color(0xFFB8AEFF)
-        "warn" -> Color(0xFF4E3C20) to Color(0xFFF1B969)
-        "error" -> Color(0xFF4D2B2C) to Color(0xFFFF9C90)
-        else -> Color(0xFF2A303D) to Color(0xFFBCC5D5)
+        "measured" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        "derived" -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+        "warn" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.secondary
+        "error" -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(shape = RoundedCornerShape(8.dp), color = bg) {
         Text(label, Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = fg, fontWeight = FontWeight.Bold)
@@ -176,7 +176,7 @@ private fun ProvenanceBadge(label: String, kind: String = "neutral") {
 }
 
 @Composable
-private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: Color = Color(0xFF63D8C3)) {
+private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: Color = MaterialTheme.colorScheme.primary) {
     Canvas(modifier.height(72.dp).fillMaxWidth()) {
         if (values.size < 2) return@Canvas
         val min = values.minOrNull() ?: return@Canvas
@@ -188,7 +188,7 @@ private fun MiniTrend(values: List<Float>, modifier: Modifier = Modifier, line: 
             val y = size.height - (value - min) / span * size.height
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawLine(Color(0xFF333949), Offset(0f, size.height * .5f), Offset(size.width, size.height * .5f), 1f)
+        drawLine(MaterialTheme.colorScheme.outline, Offset(0f, size.height * .5f), Offset(size.width, size.height * .5f), 1f)
         drawPath(path, color = line, style = Stroke(width = 3f, cap = StrokeCap.Round))
     }
 }
@@ -211,10 +211,10 @@ private fun MetricCard(title: String, value: String, detail: String, provenance:
 
 @Composable
 private fun DemoBanner() {
-    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF262D3B))) {
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF3B4361)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Info, null, tint = Color(0xFFB7C1FF))
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Demonstration dataset", fontWeight = FontWeight.Bold)
@@ -289,8 +289,8 @@ private fun HealthScreen(patientId: String) {
                 "Research-model interpretation"
             ).forEachIndexed { i, text ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(26.dp).clip(CircleShape).background(Color(0xFF2A4A48)), contentAlignment = Alignment.Center) {
-                        Text((i + 1).toString(), color = Color(0xFF7DE1C7), fontWeight = FontWeight.Bold)
+                    Box(Modifier.size(26.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                        Text((i + 1).toString(), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.width(10.dp))
                     Text(text)
