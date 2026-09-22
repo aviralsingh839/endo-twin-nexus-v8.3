@@ -217,7 +217,7 @@ QTabWidget::pane {{
 QTabBar::tab {{
     background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-left: 3px solid transparent;
     padding: 8px 10px;
     margin: 2px 3px 0 0;
     font-size: 9.5pt;
@@ -226,7 +226,7 @@ QTabBar::tab {{
 QTabBar::tab:selected {{
     color: {TEXT};
     font-weight: 650;
-    border-bottom: 2px solid {ACCENT_STRONG};
+    border-left: 3px solid {ACCENT_STRONG};\n    background: #E8F3F4;
 }}
 QTabBar::tab:hover:!selected {{ color: {TEXT}; background: {PANEL_HOVER}; }}
 
