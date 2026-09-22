@@ -347,11 +347,11 @@ private fun HardwarePage() {
     }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { PageTitle("Hardware Lab", "ESP8266 wearable Wi-Fi/TCP • live engineering validation") }
+        item { PageTitle("Hardware Lab", "ESP32-S3 wearable Wi-Fi/TCP • live engineering validation") }
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(host, { host = it }, label = { Text("ESP8266 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(host, { host = it }, label = { Text("ESP32-S3 IP / host") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(portText, { portText = it }, label = { Text("TCP port") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Text("TCP ${state.name} • ${device ?: "Not connected"}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
                     Text("$packets CP2 packets • $latest")
@@ -361,7 +361,7 @@ private fun HardwarePage() {
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { client.connect(host, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP8266") }
+                Button(onClick = { client.connect(host, portText.toIntOrNull() ?: 7777); error = null }, Modifier.weight(1f)) { Text("Connect ESP32-S3") }
                 OutlinedButton(onClick = { client.disconnect() }, Modifier.weight(1f)) { Text("Disconnect") }
             }
         }
@@ -371,8 +371,8 @@ private fun HardwarePage() {
                 OutlinedButton(onClick = { client.whoAmI() }, Modifier.weight(1f), enabled = state == org.chronopcos.doctor.wifi.EndoTwinTcpClient.State.CONNECTED) { Text("WHOAMI") }
             }
         }
-        item { SectionCard("Bench controller", "Arduino Mega", "USB-only CP2 bench/lab controller remains separate from the ESP8266 wearable.") }
-        item { Text("The ESP8266 has no BLE. Mobile/remote acquisition uses Wi-Fi/TCP; USB serial remains available for desktop bench testing.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
+        item { SectionCard("Bench controller", "Arduino Mega", "USB-only CP2 bench/lab controller remains separate from the ESP32-S3 wearable.") }
+        item { Text("The ESP32-S3 wearable uses Wi-Fi/TCP for the current Android link; USB serial remains available for desktop bench testing.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
     }
 }
 
