@@ -34,6 +34,7 @@ class PublicStudyService : Service() {
         val port = intent?.getIntExtra(EXTRA_PORT, 7777) ?: 7777
         val patientId = intent?.getStringExtra(EXTRA_PATIENT_ID) ?: "PUBLIC-PARTICIPANT"
         val studyId = intent?.getStringExtra(EXTRA_STUDY_ID) ?: "STUDY-" + UUID.randomUUID().toString().take(8)
+        val plannedEnd = getSharedPreferences("public_study", MODE_PRIVATE).getLong("planned_end", System.currentTimeMillis() + 3L * 86_400_000L)
         if (android.os.Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE) else startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"))
         job?.cancel()
         job = scope.launch { runRecorder(host, port, patientId, studyId, plannedEnd) }
