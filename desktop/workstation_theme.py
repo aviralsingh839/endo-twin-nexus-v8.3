@@ -7,14 +7,14 @@ QMainWindow,QWidget{
     font-family:"Inter","Noto Sans",sans-serif;font-size:12px;
 }
 QFrame#sidebar{background:#1c202b;border-right:1px solid #303748;}
-QFrame#topbar{background:#aebcf1;border:0;border-bottom:1px solid #8e9bd0;}
+QFrame#topbar{background:#101824;border:0;border-bottom:1px solid #273448;}
 QFrame#patientHeader{background:#1e232f;border:1px solid #364055;border-radius:15px;}
-QFrame#card{background:#202531;border:1px solid #354057;border-radius:14px;}
+QFrame#card{background:#1b222e;border:1px solid #303b50;border-radius:14px;}
 QFrame#soft{background:#1a1f2a;border:1px solid #30394c;border-radius:12px;}
-QFrame#hero{background:#24283a;border:1px solid #4b4b73;border-radius:14px;}
+QFrame#hero{background:#182333;border:1px solid #2e4561;border-radius:14px;}
 QLabel#brand{color:#f8fbff;font-size:21px;font-weight:850;}
 QLabel#eyebrow{color:#8b96ac;font-size:10px;font-weight:800;letter-spacing:1px;}
-QLabel#title{color:#eef1f7;font-size:26px;font-weight:850;}
+QLabel#title{color:#f3f6fb;font-size:27px;font-weight:850;}
 QLabel#subtitle{color:#bec6d7;font-size:13px;font-weight:650;}
 QLabel#muted{color:#8e98ad;font-size:11px;}
 QLabel#metricValue{color:#f5f7fb;font-size:27px;font-weight:850;}
