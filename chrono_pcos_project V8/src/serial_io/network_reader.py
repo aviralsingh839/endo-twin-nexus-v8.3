@@ -1,6 +1,6 @@
-"""TCP network reader for the ESP8266 Wi-Fi bridge.
+"""TCP network reader for the ESP32-S3 Wi-Fi bridge.
 
-The ESP8266 bridge (arduino/chrono_pcos_esp8266_bridge) exposes a small TCP
+The ESP32-S3 bridge (arduino/chrono_pcos_esp8266_bridge) exposes a small TCP
 server: the Arduino Mega serial packets are relayed to any connected TCP
 client. This reader connects to that bridge and feeds the exact same packet
 parser used for USB serial, with the same auto-reconnect behaviour.
