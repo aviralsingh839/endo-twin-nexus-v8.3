@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         stop_btn.clicked.connect(self.stop_stream)
 
         self.net_edit = QLineEdit()
-        self.net_edit.setPlaceholderText("ESP8266 bridge IP:port e.g. 192.168.4.1:7777")
+        self.net_edit.setPlaceholderText("ESP8266 wearable IP:port e.g. 192.168.4.1:7777")
         net_btn = QPushButton("Connect Wi-Fi Bridge")
         net_btn.clicked.connect(lambda: self.connect_network(self.net_edit.text().strip()))
 
