@@ -84,7 +84,7 @@ class EndoTwinTcpClient(private val context: Context) {
                 }
                 withContext(Dispatchers.Main){ state=State.DISCONNECTED; onState?.invoke(State.DISCONNECTED) }
             } catch (e:Exception) {
-                error("ESP32-S3 connection failed: ${e.message ?: e.javaClass.simpleName}")
+                error("ESP sensor pod connection failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 try { socket?.close() } catch(_:Exception) {}
                 socket=null; writer=null
@@ -103,6 +103,6 @@ class EndoTwinTcpClient(private val context: Context) {
     fun ping()=writeCommand("PING")
     fun whoAmI()=writeCommand("WHOAMI")
     private fun writeCommand(command:String) {
-        writer?.println(command) ?: onError?.invoke("ESP32-S3 TCP link is not connected")
+        writer?.println(command) ?: onError?.invoke("ESP sensor pod TCP link is not connected")
     }
 }
