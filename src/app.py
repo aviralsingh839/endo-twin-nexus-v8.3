@@ -17,7 +17,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="CHRONO-TWIN NEXUS V8.3 offline dashboard")
     parser.add_argument("--demo", action="store_true", help="start synthetic demo stream")
     parser.add_argument("--port", type=str, default=None, help="Arduino serial port, e.g. COM5 or /dev/ttyACM0")
-    parser.add_argument("--net", type=str, default=None, help="ESP8266 Wi-Fi bridge host:port, e.g. 192.168.4.1:7777")
+    parser.add_argument("--net", type=str, default=None, help="ESP8266 wearable TCP host:port, e.g. 192.168.4.1:7777")
     parser.add_argument("--scenario", type=str, default=None, help="Load a synthetic scenario on start")
     args = parser.parse_args(argv)
 
