@@ -36,12 +36,12 @@ class PublicStudyService : Service() {
         val studyId = intent?.getStringExtra(EXTRA_STUDY_ID) ?: "STUDY-" + UUID.randomUUID().toString().take(8)
         if (android.os.Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE) else startForeground(NOTIFICATION_ID, notification("3-day study recorder • connecting"))
         job?.cancel()
-        job = scope.launch { runRecorder(host, port, patientId, studyId) }
+        job = scope.launch { runRecorder(host, port, patientId, studyId, plannedEnd) }
         return START_STICKY
     }
 
-    private suspend fun runRecorder(host: String, port: Int, patientId: String, studyId: String) {
-        while (isActive) {
+    private suspend fun runRecorder(host: String, port: Int, patientId: String, studyId: String, plannedEnd: Long) {
+        while (isActive && System.currentTimeMillis() < plannedEnd) {
             try {
                 Socket().use { socket ->
                     socket.connect(InetSocketAddress(host, port), 5000)
