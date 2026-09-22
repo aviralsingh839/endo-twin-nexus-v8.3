@@ -43,7 +43,7 @@ class PublicStudyService : Service() {
     }
 
     private suspend fun runRecorder(host: String, port: Int, patientId: String, studyId: String, plannedEnd: Long) {
-        while (isActive && System.currentTimeMillis() < plannedEnd) {
+        while (currentCoroutineContext().isActive && System.currentTimeMillis() < plannedEnd) {
             try {
                 Socket().use { socket ->
                     socket.connect(InetSocketAddress(host, port), 5000)
