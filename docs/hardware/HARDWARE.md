@@ -1,61 +1,71 @@
-# HARDWARE - ENDO-TWIN V8.3+
+# ENDO-TWIN NEXUS V8.7 — Hardware Architecture
 
-Date: 2026-09-19
-Version: 8.3+
-Status: IMPLEMENTED - Preserved V8.1
+## Active architecture
 
-## Preserved Hardware
+| Controller | Role | Active? |
+|---|---|---|
+| **ESP32** | **Primary wearable** | YES |
+| **Arduino Mega 2560** | Bench / lab / expanded test controller | YES |
+| Arduino Nano | Historical wearable implementation | NO — legacy only |
+| ESP8266 | Historical network bridge | NO — legacy only |
 
-- Nano pod: Arduino Nano wearable pod MAX30102 PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP2 MPU6050 motion ax ay az gx gy gz motion index activity level DS18B20 skin temp room temp temp slope GSR raw tonic phasic
-- Mega hub: Arduino Mega hub aggregation
-- Sensors: MAX30102 PPG, MPU6050 IMU, DS18B20 temperature, GSR
-- Communication: Serial $CP2 protocol packet_parser.py qr_encoder.py ecg.py etc.
+The platform remains **ENDO-TWIN NEXUS**. CHRONO-PCOS is a disease-specific research extension inside the platform.
 
-## Architecture
+## Primary wearable — ESP32
 
-- hardware/arduino/ nano_pod/ mega_hub/
-- src/serial_io/ serial_reader.py packet_parser.py preserved
-- src/signal_processing/ ppg.py ecg.py gsr.py hrv.py imu.py spo2.py temperature.py filters.py preserved
-- Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
-- Offline-first core offline demo local no cloud
-- Demo mode entire workflow without physical sensors DEMO/SIMULATED DATA labeled
+Canonical firmware:
+`hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
-## Data Flow
+Core sensors:
+- MAX30102 PPG: SDA GPIO21, SCL GPIO22
+- MPU6050: SDA GPIO21, SCL GPIO22
+- DS18B20: DATA GPIO18 with 4.7 kΩ pull-up to 3.3 V
+- GSR/EDA: ADC GPIO34
+- Status LED: GPIO2
+
+Transport:
+- USB serial at 115200 baud
+- BLE device name `ENDO-TWIN-ESP32`
+- BLE service `7f300001-6c12-4f70-9e6b-8e9f7b8b1001`
+- BLE notify `7f300002-6c12-4f70-9e6b-8e9f7b8b1001`
+- BLE command `7f300003-6c12-4f70-9e6b-8e9f7b8b1001`
+
+## Bench/lab controller — Mega 2560
+
+Canonical firmware:
+`hardware/arduino/endo_twin_mega_lab/endo_twin_mega_lab.ino`
+
+The Mega may host the expanded lab set:
+- MAX30102 / MPU6050
+- DS18B20
+- GSR
+- optional MAX4466 microphone
+- optional AD8232 ECG
+- optional FSR
+- optional BH1750
+- optional BME280
+- optional SSD1306 OLED
+- buttons, LEDs, buzzer
+
+Mega I2C is D20/SDA and D21/SCL. It is USB-connected to the PC and is not the primary wearable wireless controller.
+
+## Data path
 
 ```
-Nano Pod Sensors
- ↓ $CP2 packets
-Serial Reader
- ↓ packet_parser
-Validation
- ↓
-Signal Processing filtering artifact quality HR HRV motion temp GSR
- ↓
-Feature Extraction HR 72 bpm MEASURED quality 0.91 HRV RMSSD 48 ms DERIVED quality 0.85 etc
- ↓
-Baseline Longitudinal Fusion Disease Model Prediction Explanation Uncertainty Provenance Report/UI
+ESP32 wearable ── USB Serial / BLE ──┐
+                                     ├─ CP2 ── Python/Desktop/Android
+Mega lab controller ── USB Serial ──┘          │
+                                               ├─ quality + features
+                                               ├─ local-first storage
+                                               └─ ENDO-TWIN / disease modules
 ```
 
-## Benchmark References
+Both active controllers emit the same canonical enhanced `$CP2` packet.
 
-- PPGbetter: Real-time PPG acquisition Android lifecycle
-- research-project: Python/Android division filtering HRV
-- E2E-PPG: End-to-end SQA reconstruction
-- Colepp: Wearable acquisition existing ecosystems Wear OS hardware strategy maximize existing real sensor data
-- OpenRing: BLE reconnection passive sampling local-first sensor abstraction
-- Gadgetbridge: BENCHMARK ONLY GPL architectural study vendor independence
+## Legacy boundary
 
-## Performance
-
-- Import core 267.9 ms fast
-- Deterministic inference 0.3 ms extremely fast
-- Real inference 993 ms moderate
-- Dashboard 22 ms fast
-- Ring buffers streaming lazy loading async model inference
+Historical Nano and ESP8266 implementations are preserved under `hardware/legacy/` for reference only. No current build, launcher, Android path, desktop live path, or test requires them.
 
 ## Safety
 
-- Research prototype not medical device
-- Gracefully handle sensor failures
-- Never fabricate data when sensor unavailable
-- Demo labeled never clinical
+This is an educational/research prototype, not a medical device. Sensor voltage compatibility, battery isolation, wiring integrity, placement, calibration and independent reference validation remain necessary. Never use unsafe power sources on body-worn hardware.
