@@ -82,14 +82,14 @@ class PublicStudyManager:
                 "ts": feature.timestamp_s,
                 "hr": feature.hr_bpm,
                 "rmssd": feature.rmssd_ms,
-                "spo2": getattr(feature, "spo2", None),
+                "spo2": getattr(feature, "spo2_pct", None),
                 "skin_temp": feature.skin_temp_c,
                 "gsr": feature.gsr_tonic,
                 "motion": feature.motion_index,
                 "activity": feature.activity_level,
                 "stress": feature.stress_index,
                 "sleep_prob": feature.sleep_probability,
-                "circadian": feature.circadian_stability,
+                "circadian": feature.circadian_stability_index,
                 "signal_quality": feature.signal_quality,
             },
             extra_json='{"provenance":"REAL","study":"PUBLIC_3_DAY"}',
@@ -127,4 +127,4 @@ class PublicStudyManager:
     def export_csv(self, path: Path | str) -> int:
         if not self.study:
             return 0
-        return self.store.export_features_csv(path, days=365, include_demo=False)
+        df = self.store.features_for_session(self.study.session_id)\n        df.to_csv(path, index=False)\n        return len(df)
