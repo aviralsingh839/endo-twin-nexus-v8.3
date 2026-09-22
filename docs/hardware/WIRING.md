@@ -1,41 +1,54 @@
-# WIRING - ENDO-TWIN V8.3+
+# ENDO-TWIN NEXUS V8.7 — Wiring
 
-Date: 2026-09-19
-Version: 8.3+
-Status: IMPLEMENTED - Preserved V8.1
+## ESP32 primary wearable
 
-## Nano Pod Wiring
+| Module | ESP32 connection |
+|---|---|
+| MAX30102 | SDA GPIO21, SCL GPIO22 |
+| MPU6050 | SDA GPIO21, SCL GPIO22 |
+| DS18B20 | DATA GPIO18 + 4.7 kΩ pull-up to 3.3 V |
+| GSR / EDA | analog output GPIO34 |
+| Status LED | GPIO2 through appropriate resistor |
 
-- MAX30102 PPG: I2C SDA A4 SCL A5 3.3V GND
-- MPU6050 IMU: I2C SDA A4 SCL A5 3.3V GND (shared I2C)
-- DS18B20 Temp: OneWire D2 3.3V GND 4.7k pullup
-- GSR: Analog A0 3.3V GND
-- Serial: USB Serial 115200 baud $CP2 protocol
+MAX30102 and MPU6050 share the I2C bus. Do not feed a 5 V signal into ESP32 GPIO.
 
-## Mega Hub Wiring
+### Wearable power
 
-- Arduino Mega aggregation
-- Serial to Nano Pod
-- USB to PC
+Use a suitable regulated, battery-powered ESP32 supply for body-worn operation. Keep the body-worn circuit isolated from mains. Do not connect unsafe chargers, exposed mains wiring or incompatible sensor outputs to the body-worn assembly.
 
-## Protocol
+## Arduino Mega bench/lab controller
 
-- $CP2 packets: qr_encoder.py packet_parser.py
-- Format: $CP2,hr,spo2,ax,ay,az,gx,gy,gz,temp,gsr*checksum
-- Example: $CP2,72,98,0.1,0.2,0.9,0.01,0.02,0.03,32.5,512*AB
-- Validation: Checksum, range checks, missing handling
+| Module | Mega connection |
+|---|---|
+| MAX30102 | SDA D20, SCL D21 |
+| MPU6050 | SDA D20, SCL D21 |
+| DS18B20 | DATA D2 + 4.7 kΩ pull-up |
+| GSR | A0 |
+| MAX4466 | A1 optional |
+| AD8232 | OUT A2; LO+ D11; LO− D12 optional |
+| FSR | A3 optional |
+| BH1750/BME280/OLED | I2C D20/D21 |
+| Buttons | D3/D4/D5 to GND, INPUT_PULLUP |
+| LEDs | D8/D9/D10 through 220 Ω |
+| Buzzer | D6 |
 
-## Safety
+The Mega is intended for bench testing and expanded sensor experiments. It connects directly to the PC by USB and does not require Nano or ESP8266 hardware.
 
-- 3.3V sensors not 5V
-- I2C shared bus MAX30102 + MPU6050 different addresses
-- OneWire DS18B20 D2 with pullup
-- Analog GSR A0
-- Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
-- Never fabricate data when sensor unavailable show Sensor unavailable
+## Canonical protocol
 
-## Demo Mode
+```
+$CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+```
 
-- Entire workflow without physical sensors DEMO/SIMULATED DATA labeled
-- demo/demo_flow.py + demo/full_showcase.py 17 steps integrated ecosystem
-- Synthetic 10 subjects 30 days 6 scenarios 60 days wrist_ppg SYNTHETIC clearly labelled
+CRC is XOR of every payload character before the final comma, including `$`, represented as two hexadecimal digits.
+
+ESP32 fills unsupported extended channels with explicit missing-data placeholders (`-1` or `nan`). It never fabricates sensor measurements.
+
+## USB test
+
+1. Flash the appropriate active firmware.
+2. Connect ESP32 or Mega by USB.
+3. Select the discovered serial device in LIVE SENSOR MODE.
+4. Confirm approximately 20 CP2 packets/s.
+5. Confirm CRC passes.
+6. Use Prototype Lab to inspect PPG, IMU, temperature, GSR and optional channels.
