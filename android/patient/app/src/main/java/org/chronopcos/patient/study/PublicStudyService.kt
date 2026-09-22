@@ -19,6 +19,7 @@ class PublicStudyService : Service() {
     private var job: Job? = null
     private val parser = Cp2AndroidParser()
     private var db: PatientDatabase? = null
+    private var packetIndex: Long = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -54,6 +55,9 @@ class PublicStudyService : Service() {
                         if (line.length > 4096) continue
                         val frame = line.trim()
                         parser.parse(frame)?.let { sample ->
+                            packetIndex++
+                            // Firmware remains 20 Hz; public-test archival stores every 4th valid frame (~5 Hz) to limit phone storage.
+                            if (packetIndex % 4L != 0L) return@let
                             db?.patientDao()?.insertRawPacket(
                                 RawSensorPacketEntity(
                                     packetId = studyId + "-" + UUID.randomUUID().toString(),
