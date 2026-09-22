@@ -1,4 +1,4 @@
-"""Shared V8.6 workstation startup, live sensor processing and plotting widgets."""
+"""Shared V8.7 workstation startup, live sensor processing and plotting widgets."""
 from __future__ import annotations
 from dataclasses import dataclass
 from collections import deque
@@ -35,14 +35,14 @@ class ModeDialog(QDialog):
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","Arduino / USB serial","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP32 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)
         line=QHBoxLayout(); self.port=QComboBox(); self.port.setEditable(True); self.port.setPlaceholderText("Select /dev/ttyACM0, /dev/ttyUSB0, COM3 …")
         b=QPushButton("Refresh"); b.setObjectName("secondary"); b.clicked.connect(self.refresh_ports)
         line.addWidget(self.port,1); line.addWidget(b); lv.addLayout(line)
-        n=QLabel("The canonical Mega/Nano firmware emits about 20 PC packets/s. The workstation processes the received packet stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
+        n=QLabel("Active hardware: ESP32 primary wearable or Arduino Mega bench/lab controller. Both emit the canonical ~20 packets/s CP2 stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
         root.addWidget(box)
         self.refresh_ports()
 
