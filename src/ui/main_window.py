@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QPushButton, QGroupBox, QGridLayout, QTextEdit,
     QDoubleSpinBox, QSpinBox, QComboBox, QScrollArea, QFrame,
-    QLineEdit, QProgressBar, QSplitter
+    QLineEdit, QProgressBar, QSplitter, QFileDialog, QCheckBox
 )
 
 from src.config import APP_VERSION, APP_VERSION_LABEL, APP_NAME, APP_TAGLINE, UserProfile, DATA_DIR
@@ -47,6 +47,7 @@ from src.ui.live_plots import TimeSeriesPlot
 from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
+from src.utils.public_study import PublicStudyManager
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
 
@@ -80,6 +81,9 @@ class MainWindow(QMainWindow):
         self.arduino_reader: ArduinoReader | None = None
         self.network_reader: NetworkReader | None = None
         self.history_store = HistoryStore(db_path) if db_path else HistoryStore()
+        self.public_study = PublicStudyManager(self.history_store)
+        self.public_study.attach_latest()
+        self._last_public_study_log = 0.0
 
         # Timers
         self.feature_timer = QTimer()
@@ -112,6 +116,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_explanation_tab(), "Explanation")
         self.tabs.addTab(self._build_report_tab(), "Report")
         self.tabs.addTab(self._build_validation_tab(), "Validation")
+        self.tabs.addTab(self._build_public_study_tab(), "3-Day Public Test")
 
         layout.addWidget(self.tabs, 1)
 
@@ -243,6 +248,89 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
+        return tab
+
+    def _build_public_study_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        title = QLabel("3-Day Public Wearable Test")
+        title.setObjectName("BigValue")
+        layout.addWidget(title)
+        info = QLabel(
+            "Anonymous research recording for a volunteer wearing the ESP32-S3 pod for three days. "
+            "Use only the generated participant code. Do not enter names, phone numbers, addresses, emails, "
+            "diagnoses or other direct identifiers. Raw data stays local in SQLite until you explicitly export it."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        consent = QCheckBox("Participant has been informed and agrees to this research-prototype recording.")
+        layout.addWidget(consent)
+        row = QHBoxLayout()
+        start = QPushButton("Start 3-Day Study")
+        finish = QPushButton("Finish Study")
+        refresh = QPushButton("Refresh Timeline")
+        export = QPushButton("Export Study CSV")
+        for w in (start, finish, refresh, export): row.addWidget(w)
+        layout.addLayout(row)
+        self.public_study_status = QLabel("No public study active.")
+        self.public_study_status.setWordWrap(True)
+        layout.addWidget(self.public_study_status)
+        self.public_study_timeline = QTextEdit()
+        self.public_study_timeline.setReadOnly(True)
+        layout.addWidget(self.public_study_timeline, 1)
+
+        def refresh_view():
+            study = self.public_study.study
+            if not study:
+                self.public_study_status.setText("No public study active. Start a new anonymous 3-day test.")
+                self.public_study_timeline.setText("DAY 1  • waiting\nDAY 2  • waiting\nDAY 3  • waiting")
+                return
+            elapsed = min(3.0, study.elapsed_days)
+            self.public_study_status.setText(
+                f"Participant: {study.participant_id}   |   Study: {study.study_id}\n"
+                f"Status: {study.status}   |   Elapsed: {elapsed:.2f}/3.00 days\n"
+                "REAL acquisition is stored separately from DEMO/SYNTHETIC data."
+            )
+            rows = self.public_study.daily_summary()
+            lines = []
+            for idx, day in enumerate(rows[-3:], 1):
+                lines.append(
+                    f"DAY {idx}  {day['day']}\n"
+                    f"  Samples: {day['samples']:,}\n"
+                    f"  Quality: {day['quality']:.0%}"
+                )
+                if day.get("hr") is not None: lines[-1] += f"\n  HR median: {day['hr']:.1f} bpm"
+                if day.get("rmssd") is not None: lines[-1] += f"\n  HRV RMSSD median: {day['rmssd']:.1f} ms"
+                if day.get("gsr") is not None: lines[-1] += f"\n  GSR median: {day['gsr']:.1f}"
+                if day.get("activity") is not None: lines[-1] += f"\n  Activity mean: {day['activity']:.1f}"
+                lines[-1] += "\n  Acquisition quality ≠ clinical validity."
+            while len(lines) < 3: lines.append(f"DAY {len(lines)+1}  • waiting for recorded data")
+            self.public_study_timeline.setText("\n\n".join(lines))
+
+        def start_study():
+            if not consent.isChecked():
+                self.public_study_status.setText("Consent acknowledgement is required before starting the public test.")
+                return
+            study = self.public_study.start()
+            self.public_study_status.setText(f"Started {study.study_id} with anonymous participant code {study.participant_id}.")
+            refresh_view()
+
+        def finish_study():
+            self.public_study.finish()
+            refresh_view()
+
+        def export_study():
+            if not self.public_study.study: return
+            path, _ = QFileDialog.getSaveFileName(self, "Export public study CSV", "endo_twin_public_3day.csv", "CSV (*.csv)")
+            if path:
+                n = self.public_study.export_csv(path)
+                self.public_study_status.setText(f"Exported {n:,} study feature rows to {path}")
+
+        start.clicked.connect(start_study)
+        finish.clicked.connect(finish_study)
+        refresh.clicked.connect(refresh_view)
+        export.clicked.connect(export_study)
+        refresh_view()
         return tab
 
     def _build_baseline_tab(self):
@@ -695,6 +783,12 @@ class MainWindow(QMainWindow):
             self.extractor.add_sample(sample)
             fv = self.extractor.compute()
             self.feature_history.append(fv)
+            if self.public_study.study and (time.time() - self._last_public_study_log) >= 10.0:
+                try:
+                    self.public_study.record_feature(fv)
+                    self._last_public_study_log = time.time()
+                except Exception as e:
+                    self.history_store.log_error(self.public_study.study.session_id, "study", str(e))
             if len(self.feature_history) > 5000:
                 self.feature_history = self.feature_history[-5000:]
 
