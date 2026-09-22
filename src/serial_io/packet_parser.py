@@ -112,7 +112,7 @@ class PacketParser:
                 pressure_hpa=float(parts[21]),
                 buttons=int(float(parts[22])),
                 status=int(float(parts[23])),
-                source="serial-mega",
+                source="serial-usb",
             )
         except (ValueError, IndexError) as exc:
             raise PacketParseError(f"numeric conversion failed: {exc}") from exc
