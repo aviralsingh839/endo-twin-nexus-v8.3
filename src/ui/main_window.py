@@ -523,7 +523,7 @@ DAY 3  • waiting")
         root.addWidget(self.baseline_status)
 
         btn_row = QHBoxLayout()
-        capture_btn = QPushButton("Capture Baseline (5 min)")
+        capture_btn = QPushButton("Capture Baseline (1 hour)")
         capture_btn.clicked.connect(self._capture_baseline)
         btn_row.addWidget(capture_btn)
         root.addLayout(btn_row)
@@ -1156,7 +1156,7 @@ Quality: {result.data_quality:.2f}
                 self.baseline_label.setText(f"Baseline: YES (conf {self.baseline_engine.baseline.confidence:.2f}, {self.baseline_engine.baseline.days_covered} days)")
                 self.baseline_label.setStyleSheet("color: #4ade80;")
             else:
-                self.baseline_label.setText("Baseline: NO - need 5 min calm data")
+                self.baseline_label.setText("Baseline: CALIBRATING - need ~1 hour quality-gated data")
                 self.baseline_label.setStyleSheet("color: #fbbf24;")
 
             # Data quality tab
