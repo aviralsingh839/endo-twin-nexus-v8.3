@@ -115,7 +115,7 @@ def section_header(title, detail=""):
     row.addStretch()
     return box
 
-def pill(text, bg="#2a2548", fg="#b6a8ff", parent=None):
+def pill(text, bg="#E8F3F4", fg="#0B6670", parent=None):
     x = QLabel(text, parent)
     x.setStyleSheet(
         f"background:{bg};color:{fg};border:1px solid {bg};"
@@ -125,13 +125,16 @@ def pill(text, bg="#2a2548", fg="#b6a8ff", parent=None):
 
 def status_badge(text, kind="neutral", parent=None):
     palette = {
-        "good": ("#183d35", "#69d5b3", "#28604f"),
-        "fair": ("#4a391e", "#e9ae45", "#6b5429"),
-        "poor": ("#4d2b25", "#ee8c79", "#714139"),
-        "info": ("#24284a", "#b3a6ff", "#46456b"),
-        "neutral": ("#2a2f3b", "#b4bdcc", "#41495a"),
-        "measured": ("#173b38", "#79dac0", "#376f63"),
-        "derived": ("#2d2949", "#b2a6ef", "#56507e"),
+        "good": ("#E8F4EE", "#237A57", "#B8D8C8"),
+        "fair": ("#FFF6E2", "#A66A00", "#E8D39A"),
+        "poor": ("#FBEDEC", "#B33A3A", "#E2B9B6"),
+        "info": ("#EAF0F7", "#315B84", "#C7D6E5"),
+        "neutral": ("#F1F4F7", "#667483", "#D8E0E8"),
+        "measured": ("#E8F3F4", "#0B6670", "#BBDADD"),
+        "derived": ("#EEF0F7", "#6D628A", "#D2CEE1"),
+        "demo": ("#FFF6E2", "#A66A00", "#E8D39A"),
+        "model": ("#EEF0F7", "#6D628A", "#D2CEE1"),
+        "unavailable": ("#F1F4F7", "#667483", "#D8E0E8"),
     }
     bg, fg, border = palette.get(kind, palette["neutral"])
     x = QLabel(text, parent)
