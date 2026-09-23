@@ -190,7 +190,7 @@ class RealtimeFeatureExtractor:
         else:
             elapsed = now - self.start_time
             if not self.auto_captured and elapsed >= BASELINE_CAPTURE_S:
-                # Automatic baseline calibration after a calm 5-minute window.
+                # Automatic baseline calibration after a one-hour quality-gated window.
                 recent = [f for f in self.feature_history if now - f.timestamp_s <= BASELINE_CAPTURE_S]
                 if recent and float(np.mean([f.signal_quality for f in recent])) >= 0.5:
                     self.auto_captured = self.capture_baseline()
