@@ -43,6 +43,26 @@ YELLOW = "#A66A00"
 ORANGE = "#B65E13"
 RED = "#B33A3A"
 
+# Layout tokens — keep screens aligned to the same 4px rhythm.
+SPACE_1, SPACE_2, SPACE_3, SPACE_4 = 4, 8, 12, 16
+SPACE_5, SPACE_6, SPACE_8 = 20, 24, 32
+RADIUS_SM, RADIUS_MD, RADIUS_LG = 6, 8, 10
+
+# Semantic provenance tokens. Never use these to imply clinical validity.
+PROVENANCE = {
+    "LIVE": ACCENT_STRONG,
+    "DEMO": YELLOW,
+    "MEASURED": ACCENT,
+    "DERIVED": INDIGO,
+    "MODEL": VIOLET,
+    "UNAVAILABLE": TEXT_MUTED,
+    "ERROR": RED,
+}
+
+def provenance_color(label: str) -> str:
+    """Return the semantic UI color for a provenance/state label."""
+    return PROVENANCE.get(str(label).upper(), TEXT_MUTED)
+
 def painter_font(size: int, bold: bool = False) -> QFont:
     font = QFont(PAINTER_FONT, size)
     font.setBold(bold)
