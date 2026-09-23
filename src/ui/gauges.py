@@ -1,4 +1,16 @@
-"""Gauge widgets."""
+"""Gauge widgets.
+
+Accessibility contract:
+  * The risk band is written out as a word ("Low", "Moderate", "Elevated",
+    "High") under the percentage. The dial's colour reinforces the band, it
+    does not carry it — a greyscale print or a colour-vision deficiency still
+    yields the same reading.
+  * Every colour comes from the shared token layer in ``src.ui.theme``, so the
+    gauge cannot drift away from the contrast-checked palette the rest of the
+    workstation uses.
+  * An "insufficient data" gauge says so in words and shows no number, rather
+    than rendering a misleading zero.
+"""
 from __future__ import annotations
 
 import math
@@ -7,19 +19,30 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-from src.ui.theme import painter_font
+from src.ui.theme import (ACCENT, BORDER_LIGHT, GREEN, ORANGE, RED, TEXT,
+                          TEXT_MUTED, YELLOW, painter_font)
 
 # Gauge arc geometry: start at 210° and sweep -240° (i.e. a 300° dial).
 START_ANGLE = 210 * 16
 SPAN_TOTAL = -240 * 16
 
-# Value bands used both for the zone track and the needle colour.
+# Value bands used for both the zone track and the needle colour. The words are
+# the accessible half of each band — see `band_label()`.
+BAND_LOW, BAND_MODERATE, BAND_ELEVATED, BAND_HIGH = (
+    "Low", "Moderate", "Elevated", "High",
+)
+
 ZONES = [
-    (0.00, 0.25, "#34d399"),   # low     → green
-    (0.25, 0.50, "#fbbf24"),   # medium  → amber
-    (0.50, 0.75, "#fb923c"),   # high    → orange
-    (0.75, 1.01, "#f87171"),   # very hi → red
+    (0.00, 0.25, GREEN, BAND_LOW),
+    (0.25, 0.50, YELLOW, BAND_MODERATE),
+    (0.50, 0.75, ORANGE, BAND_ELEVATED),
+    (0.75, 1.01, RED, BAND_HIGH),
 ]
+
+# Dial furniture, from the token layer so it matches every other surface.
+TRACK_DIM = BORDER_LIGHT
+TICK = TEXT_MUTED
+WITHHELD_WARN = YELLOW
 
 
 class GaugeWidget(QWidget):
@@ -29,65 +52,91 @@ class GaugeWidget(QWidget):
         self.value = 0.0
         self.ci = (0.0, 0.0)
         self.withheld: str | None = None
-        self.setMinimumSize(190, 156)
+        self.setMinimumSize(190, 172)
+        self.setAccessibleName(title)
 
+    # --------------------------------------------------------------- public
     def set_value(self, value: float, ci_low: float | None = None, ci_high: float | None = None):
         self.value = max(0.0, min(100.0, float(value)))
         if ci_low is not None and ci_high is not None:
             self.ci = (float(ci_low), float(ci_high))
+        self._sync_accessible_text()
         self.update()
 
     def set_withheld(self, reason: str | None):
         """Show 'Insufficient data for reliable estimation' instead of a number."""
         self.withheld = reason
+        self._sync_accessible_text()
         self.update()
 
-    def _color(self):
-        for lo, hi, col in ZONES:
-            if self.value < hi:
-                return QColor(col)
+    def band_label(self) -> str:
+        """The word for the current band — the gauge's non-colour channel."""
+        for _lo, hi, _colour, word in ZONES:
+            if self.value < hi * 100.0:
+                return word
+        return ZONES[-1][3]
+
+    # ------------------------------------------------------------ internals
+    def _sync_accessible_text(self) -> None:
+        if self.withheld:
+            self.setAccessibleDescription(
+                f"Withheld: {self.withheld}. Insufficient data for reliable estimation."
+            )
+            return
+        self.setAccessibleDescription(
+            f"{self.value:.0f} percent, {self.band_label()} band, "
+            f"90 percent confidence interval {self.ci[0]:.0f} to {self.ci[1]:.0f} percent."
+        )
+
+    def _color(self) -> QColor:
+        for _lo, hi, colour, _word in ZONES:
+            if self.value < hi * 100.0:
+                return QColor(colour)
         return QColor(ZONES[-1][2])
 
     def _angle_for(self, value: float) -> float:
         """Angle (in 1/16 deg units) for a value in [0, 100]."""
         return START_ANGLE + SPAN_TOTAL * max(0.0, min(100.0, value)) / 100.0
 
+    # ---------------------------------------------------------------- paint
     def paintEvent(self, event):  # noqa: N802
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         title_h = 26
-        ci_h = 22
-        side = min(w - 24, h - title_h - ci_h - 16)
+        band_h = 20
+        ci_h = 20
+        side = min(w - 24, h - title_h - band_h - ci_h - 16)
         rect = QRectF((w - side) / 2.0, title_h + 8, side, side)
 
         if self.withheld:
             # Dim the track, then show the withhold message instead of a value.
-            p.setPen(QPen(QColor("#232f47"), 14, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
+            p.setPen(QPen(QColor(TRACK_DIM), 14, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
             p.drawArc(rect, START_ANGLE, SPAN_TOTAL)
-            p.setPen(QColor("#8ecbff"))
+            p.setPen(QColor(ACCENT))
             p.setFont(painter_font(11, bold=True))
             p.drawText(0, 4, w, title_h, Qt.AlignmentFlag.AlignCenter, self.title)
-            p.setPen(QColor("#fbbf24"))
+            p.setPen(QColor(WITHHELD_WARN))
             p.setFont(painter_font(11, bold=True))
-            p.drawText(0, title_h + 10, w, h - title_h - ci_h - 10, Qt.AlignmentFlag.AlignCenter,
+            p.drawText(0, title_h + 10, w, h - title_h - band_h - ci_h - 10,
+                       Qt.AlignmentFlag.AlignCenter,
                        "Insufficient data\nfor reliable estimation")
-            p.setPen(QColor("#94a6c2"))
+            p.setPen(QColor(TEXT_MUTED))
             p.setFont(painter_font(8))
             p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter, self.withheld[:60])
             return
 
         # 1) Zone track: subtle coloured bands under the needle.
-        for lo, hi, col in ZONES:
+        for lo, hi, colour, _word in ZONES:
             a0 = self._angle_for(lo * 100.0)
             a1 = self._angle_for(hi * 100.0)
-            band = QColor(col)
+            band = QColor(colour)
             band.setAlpha(70)
             p.setPen(QPen(band, 14, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
             p.drawArc(rect, int(a0), int(a1 - a0))
 
-        # 2) Tick marks every 10 units.
-        p.setPen(QPen(QColor("#5b7199"), 2))
+        # 2) Tick marks every 10 units (decorative graticule, not information).
+        p.setPen(QPen(QColor(TICK), 1))
         for v in range(0, 101, 10):
             ang = self._angle_for(v) / 16.0
             rad = math.radians(ang - 90)
@@ -110,25 +159,31 @@ class GaugeWidget(QWidget):
         ang = math.radians(self._angle_for(self.value) / 16.0 - 90)
         rn = rect.width() / 2.0 - 26
         cx, cy = rect.center().x(), rect.center().y()
-        p.setPen(QPen(QColor("#e8eef7"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.setPen(QPen(QColor(TEXT), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         p.drawLine(int(cx), int(cy), int(cx + rn * math.cos(ang)), int(cy + rn * math.sin(ang)))
         p.setBrush(self._color())
         p.setPen(Qt.PenStyle.NoPen)
         p.drawEllipse(int(cx - 5), int(cy - 5), 10, 10)
 
         # 5) Title.
-        p.setPen(QColor("#8ecbff"))
+        p.setPen(QColor(ACCENT))
         p.setFont(painter_font(11, bold=True))
         p.drawText(0, 4, w, title_h, Qt.AlignmentFlag.AlignCenter, self.title)
 
         # 6) Value.
-        p.setPen(QColor("#ffffff"))
+        p.setPen(QColor(TEXT))
         p.setFont(painter_font(25, bold=True))
-        p.drawText(0, title_h + 8, w, h - title_h - ci_h - 8, Qt.AlignmentFlag.AlignCenter,
-                   f"{self.value:.0f}%")
+        p.drawText(0, title_h + 8, w, h - title_h - band_h - ci_h - 8,
+                   Qt.AlignmentFlag.AlignCenter, f"{self.value:.0f}%")
 
-        # 7) Confidence interval.
-        p.setPen(QColor("#94a6c2"))
+        # 7) Band word — the information the arc colour used to carry alone.
+        p.setPen(self._color())
+        p.setFont(painter_font(10, bold=True))
+        p.drawText(0, h - band_h - ci_h, w, band_h, Qt.AlignmentFlag.AlignCenter,
+                   f"{self.band_label()} band")
+
+        # 8) Confidence interval.
+        p.setPen(QColor(TEXT_MUTED))
         p.setFont(painter_font(9))
         p.drawText(0, h - ci_h, w, ci_h, Qt.AlignmentFlag.AlignCenter,
                    f"90% CI {self.ci[0]:.0f}–{self.ci[1]:.0f}%")

@@ -1,91 +1,225 @@
-// CHRONO-PCOS V8.3+ Website - Highly Polished Extensive Scientific Project Website - Professional, Modern, Credible, Human, Innovative
-// Minimal JS, no excessive animations, no fake medical claims, smooth scrolling, interactive diagrams
+/* ENDO-TWIN NEXUS research portal — progressive enhancement (2026-09)
+ *
+ * Accessibility contract for this file:
+ *  - Nothing here is required to read the page. With JS disabled the content is
+ *    fully visible, every link works, and the nav is a plain link list.
+ *  - Content is never left hidden: the scroll-reveal only arms itself when
+ *    IntersectionObserver exists, motion is not reduced, and it force-reveals
+ *    everything if the observer never fires.
+ *  - Anchors keep their native behaviour (focus move, :target, history) so
+ *    keyboard and screen-reader users are not displaced. We only add
+ *    scroll-margin via CSS and close the mobile menu.
+ *  - State is exposed with aria-* attributes, and colour is never the only cue.
+ */
+(function () {
+  'use strict';
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Smooth scrolling for nav links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                // Update URL without jump
-                history.pushState(null, null, this.getAttribute('href'));
-            }
+  var reduceMotion = window.matchMedia
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : { matches: false };
+
+  var STORAGE_KEY = 'endo-twin-text-scale';
+  var SCALES = ['normal', 'large', 'xlarge'];
+
+  /* ------------------------------------------------------------ text size */
+  function applyTextScale(scale) {
+    if (SCALES.indexOf(scale) === -1) scale = 'normal';
+    if (scale === 'normal') {
+      document.documentElement.removeAttribute('data-text-scale');
+    } else {
+      document.documentElement.setAttribute('data-text-scale', scale);
+    }
+    var buttons = document.querySelectorAll('[data-text-scale]');
+    for (var i = 0; i < buttons.length; i++) {
+      var isActive = buttons[i].getAttribute('data-text-scale') === scale;
+      buttons[i].setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    }
+    return scale;
+  }
+
+  function initTextScale() {
+    var buttons = document.querySelectorAll('[data-text-scale]');
+    if (!buttons.length) return;
+
+    var stored = null;
+    try { stored = window.localStorage.getItem(STORAGE_KEY); } catch (e) { /* private mode */ }
+    applyTextScale(stored || 'normal');
+
+    for (var i = 0; i < buttons.length; i++) {
+      (function (button) {
+        button.addEventListener('click', function () {
+          var applied = applyTextScale(button.getAttribute('data-text-scale'));
+          try { window.localStorage.setItem(STORAGE_KEY, applied); } catch (e) { /* ignore */ }
+          announce('Text size set to ' + button.textContent.trim() + '.');
         });
-    });
-
-    // Highlight active nav link on scroll
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
-
-    function highlightNav() {
-        let current = '';
-        sections.forEach(section => {
-            const sectionTop = section.offsetTop;
-            const sectionHeight = section.clientHeight;
-            if (window.scrollY >= (sectionTop - 100)) {
-                current = section.getAttribute('id');
-            }
-        });
-
-        navLinks.forEach(link => {
-            link.style.background = '';
-            link.style.color = '';
-            if (link.getAttribute('href') === '#' + current) {
-                link.style.background = 'rgba(14,165,233,0.2)';
-                link.style.color = 'white';
-            }
-        });
+      })(buttons[i]);
     }
 
-    window.addEventListener('scroll', highlightNav);
-    highlightNav();
+    // Announce the restored preference to assistive tech on load.
+    if (stored && stored !== 'normal') {
+      announce('Text size preference ' + stored + ' restored.');
+    }
+  }
 
-    // Add subtle fade-in for cards on scroll (no excessive animations)
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
+  /* ------------------------------------------------- polite live announcer */
+  var liveRegion = null;
+  function announce(message) {
+    if (!message) return;
+    if (!liveRegion) {
+      liveRegion = document.createElement('p');
+      liveRegion.setAttribute('aria-live', 'polite');
+      liveRegion.setAttribute('role', 'status');
+      liveRegion.className = 'visually-hidden';
+      document.body.appendChild(liveRegion);
+    }
+    liveRegion.textContent = message;
+  }
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
-        });
-    }, observerOptions);
+  /* ------------------------------------------------------------ navigation */
+  function initNav() {
+    var toggle = document.querySelector('.nav-toggle');
+    var links = document.getElementById('site-links');
+    if (!toggle || !links) return;
 
-    document.querySelectorAll('.card, .tech-card, .app-card, .flow-step, .timeline-item').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(10px)';
-        el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-        observer.observe(el);
+    function setOpen(open) {
+      links.classList.toggle('is-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    toggle.addEventListener('click', function () {
+      setOpen(links.className.indexOf('is-open') === -1);
     });
 
-    // Log scientific integrity
-    console.log('CHRONO-PCOS V8.3+ - Research prototype, not a medical device');
-    console.log('Sense • Model • Predict • Personalize • Connect');
-    console.log('Local-first, offline, privacy-focused, honest limitations');
-    console.log('MEASURED, CLINICALLY ENTERED, IMAGE-DERIVED, MODEL-INFERRED, UNKNOWN - Never fabricate');
-    console.log('No fake medical claims, no fake statistics, no fake testimonials, no stock-photo overload');
-    console.log('Scientific, technical, modern, credible, human, innovative');
-    console.log('Garuda Linux Ready: Dolphin → LAUNCH → COMPLETE_LAUNCHER.sh → Control Center');
-    console.log('Website: Professional public-facing CHRONO-PCOS research/innovation platform');
-});
+    // Escape closes the menu and returns focus to the control that opened it.
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape' && event.key !== 'Esc') return;
+      if (links.className.indexOf('is-open') === -1) return;
+      setOpen(false);
+      toggle.focus();
+    });
 
+    // A click outside the header dismisses the open menu.
+    document.addEventListener('click', function (event) {
+      if (links.className.indexOf('is-open') === -1) return;
+      if (toggle.contains(event.target) || links.contains(event.target)) return;
+      setOpen(false);
+    });
 
-document.addEventListener("DOMContentLoaded", () => {
-  const toggle = document.querySelector(".nav-toggle");
-  const links = document.querySelector("#site-links");
-  if (!toggle || !links) return;
-  toggle.addEventListener("click", () => {
-    const open = links.classList.toggle("is-open");
-    toggle.setAttribute("aria-expanded", String(open));
-  });
-  links.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
-    links.classList.remove("is-open");
-    toggle.setAttribute("aria-expanded", "false");
-  }));
-});
+    // Leaving the mobile breakpoint resets the toggle so a later resize is clean.
+    if (window.matchMedia) {
+      var wide = window.matchMedia('(min-width: 981px)');
+      var onChange = function (event) { if (event.matches) setOpen(false); };
+      if (wide.addEventListener) wide.addEventListener('change', onChange);
+      else if (wide.addListener) wide.addListener(onChange);
+    }
+  }
+
+  /* ------------------------------------------------------------- scroll spy */
+  function initScrollSpy() {
+    var sections = document.querySelectorAll('main section[id]');
+    var navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+    if (!sections.length || !navLinks.length) return;
+
+    var byId = {};
+    for (var i = 0; i < navLinks.length; i++) {
+      byId[navLinks[i].getAttribute('href').slice(1)] = navLinks[i];
+    }
+
+    function clear() {
+      for (var id in byId) {
+        if (Object.prototype.hasOwnProperty.call(byId, id)) {
+          byId[id].removeAttribute('aria-current');
+        }
+      }
+    }
+
+    function setCurrent(id) {
+      clear();
+      if (byId[id]) byId[id].setAttribute('aria-current', 'true');
+    }
+
+    if (!('IntersectionObserver' in window)) return;
+
+    var visible = {};
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        visible[entry.target.id] = entry.isIntersecting;
+      });
+      // Pick the topmost section currently intersecting the viewport band.
+      var best = null;
+      for (var i = 0; i < sections.length; i++) {
+        if (visible[sections[i].id]) { best = sections[i].id; break; }
+      }
+      if (best) setCurrent(best);
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+    for (var j = 0; j < sections.length; j++) observer.observe(sections[j]);
+  }
+
+  /* --------------------------------------------------------- scroll reveal */
+  function initReveal() {
+    var targets = document.querySelectorAll(
+      '.card, .tech-card, .app-card, .flow-step, .timeline-item'
+    );
+    if (!targets.length) return;
+
+    function revealAll() {
+      for (var i = 0; i < targets.length; i++) {
+        targets[i].classList.add('is-revealed');
+      }
+    }
+
+    // Reduced motion, or no observer support: show everything, no animation.
+    if (reduceMotion.matches || !('IntersectionObserver' in window)) {
+      revealAll();
+      return;
+    }
+
+    document.documentElement.classList.add('has-reveal');
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.05, rootMargin: '0px 0px -5% 0px' });
+
+    for (var i = 0; i < targets.length; i++) observer.observe(targets[i]);
+
+    // Safety net: if anything goes wrong, unhide the page rather than trap it.
+    window.setTimeout(revealAll, 2500);
+
+    // Honour a mid-session switch to "reduce motion".
+    if (reduceMotion.addEventListener) {
+      reduceMotion.addEventListener('change', function (event) {
+        if (event.matches) {
+          revealAll();
+          document.documentElement.classList.remove('has-reveal');
+        }
+      });
+    }
+  }
+
+  /* ----------------------------------------------------------------- boot */
+  function boot() {
+    initTextScale();
+    initNav();
+    initScrollSpy();
+    initReveal();
+
+    // Scientific integrity note, kept out of the rendered page.
+    if (window.console && window.console.log) {
+      window.console.log(
+        'ENDO-TWIN NEXUS — research prototype, not a medical device. ' +
+        'MEASURED / CLINICALLY_ENTERED / IMAGE_DERIVED / MODEL_INFERRED / DEMO_DATA / UNKNOWN.'
+      );
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();

@@ -32,9 +32,20 @@ TEXT_MUTED = "#8EA4B8"
 ACCENT = "#18C7E8"
 ACCENT_STRONG = "#24D6F2"
 ACCENT_DEEP = "#0B6F89"
+# Hover fill for ACCENT_DEEP buttons. Deliberately *darker* than ACCENT:
+# white on ACCENT is only 2.0:1, so hovering used to erase the label.
+ACCENT_HOVER = "#0E7F9C"
 INDIGO = "#7185FF"
 VIOLET = "#A27BFF"
 PINK = "#F06FAE"
+
+# Interaction states. Selection must stay dark — the previous #E8F3F4 fill put
+# near-white body text on a near-white row (1.02:1) and made selections invisible.
+SEL_BG = "#144C63"
+SEL_TEXT = "#FFFFFF"
+# Focus ring. White clears 3:1 against every dark surface in this theme and
+# against the deepest brand fill, so it never disappears on focus.
+FOCUS = "#FFFFFF"
 
 # Semantic
 GREEN = "#32D6A0"
@@ -179,16 +190,28 @@ QLabel#WarningText {{ color: {YELLOW}; font-weight: 650; font-size: 10pt; }}
 
 QPushButton {{
     background: {ACCENT_DEEP};
-    border: 1px solid {ACCENT_DEEP};
+    border: 2px solid {ACCENT_DEEP};
     color: white;
     border-radius: 6px;
     padding: 7px 12px;
     font-weight: 600;
+    min-height: 26px;
 }}
-QPushButton:hover {{ background: {ACCENT}; border-color: {ACCENT}; }}
-QPushButton:pressed {{ background: #084B53; }}
-QPushButton:focus {{ border: 2px solid {ACCENT_STRONG}; }}
+QPushButton:hover {{ background: {ACCENT_HOVER}; border-color: {ACCENT_HOVER}; }}
+QPushButton:pressed {{ background: #084B53; border-color: #084B53; }}
+QPushButton:focus {{ border: 2px solid {FOCUS}; }}
 QPushButton:disabled {{ background: {TRACK}; border-color: {BORDER}; color: {TEXT_MUTED}; }}
+QPushButton:default {{ border-color: {ACCENT_STRONG}; }}
+
+QToolButton {{
+    background: transparent;
+    border: 1px solid {BORDER};
+    border-radius: 6px;
+    color: {TEXT};
+    padding: 4px 8px;
+}}
+QToolButton:hover {{ border-color: {BORDER_LIGHT}; background: {PANEL_HOVER}; }}
+QToolButton:focus {{ border: 2px solid {FOCUS}; }}
 
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTimeEdit {{
     background: {PANEL};
@@ -196,11 +219,13 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTimeEdit {{
     border-radius: 6px;
     padding: 6px 8px;
     font-size: 10pt;
-    selection-background-color: {ACCENT};
+    color: {TEXT};
+    selection-background-color: {SEL_BG};
+    selection-color: {SEL_TEXT};
 }}
 QLineEdit:hover, QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover, QTimeEdit:hover {{ border-color: {BORDER_LIGHT}; }}
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTimeEdit:focus {{
-    border-color: {ACCENT_STRONG};
+    border: 2px solid {FOCUS};
 }}
 QComboBox::drop-down {{ border: none; width: 22px; }}
 QComboBox::down-arrow {{
@@ -214,8 +239,8 @@ QComboBox QAbstractItemView {{
     background: {PANEL};
     color: {TEXT};
     border: 1px solid {BORDER};
-    selection-background-color: {PANEL_HOVER};
-    selection-color: {TEXT};
+    selection-background-color: {SEL_BG};
+    selection-color: {SEL_TEXT};
     outline: 0;
 }}
 
@@ -224,8 +249,9 @@ QProgressBar {{
     border: 1px solid {BORDER};
     border-radius: 5px;
     text-align: center;
-    font-size: 9pt;
-    color: {TEXT_MUTED};
+    font-size: 9.5pt;
+    color: {TEXT};
+    min-height: 18px;
 }}
 QProgressBar::chunk {{ background: {ACCENT_STRONG}; border-radius: 5px; }}
 
@@ -240,71 +266,101 @@ QTabBar::tab {{
     border-left: 3px solid transparent;
     padding: 8px 10px;
     margin: 2px 3px 0 0;
-    font-size: 9.5pt;
+    font-size: 10pt;
     color: {TEXT_MUTED};
+    min-height: 22px;
 }}
+/* NOTE: this rule previously carried an escaped newline inside the f-string,
+   which silently swallowed the border-left declaration and left a near-white
+   #E8F3F4 tab on a dark theme. Keep every declaration on its own line. */
 QTabBar::tab:selected {{
     color: {TEXT};
     font-weight: 650;
-    border-left: 3px solid {ACCENT_STRONG};\n    background: #E8F3F4;
+    border-left: 3px solid {ACCENT_STRONG};
+    background: {PANEL_HOVER};
 }}
 QTabBar::tab:hover:!selected {{ color: {TEXT}; background: {PANEL_HOVER}; }}
+QTabBar::tab:focus {{ border: 2px solid {FOCUS}; }}
 
-QTextEdit {{
+QTextEdit, QPlainTextEdit {{
     background: {PANEL};
     border: 1px solid {BORDER};
     border-radius: 7px;
     padding: 8px;
     font-size: 10pt;
-    selection-background-color: {ACCENT};
+    color: {TEXT};
+    selection-background-color: {SEL_BG};
+    selection-color: {SEL_TEXT};
 }}
-QTextEdit:focus {{ border-color: {ACCENT_STRONG}; }}
+QTextEdit:focus, QPlainTextEdit:focus {{ border: 2px solid {FOCUS}; }}
 
 QTableWidget {{
     background: {PANEL};
     border: 1px solid {BORDER};
     border-radius: 7px;
-    font-size: 9.5pt;
+    font-size: 10pt;
+    color: {TEXT};
     gridline-color: {TRACK};
-    selection-background-color: #E8F3F4;
-    selection-color: {TEXT};
+    selection-background-color: {SEL_BG};
+    selection-color: {SEL_TEXT};
     alternate-background-color: {PANEL_ALT};
 }}
 QTableWidget::item {{ padding: 5px 6px; }}
+QTableWidget:focus {{ border: 2px solid {FOCUS}; }}
 QHeaderView::section {{
     background: {PANEL_ALT};
-    color: {TEXT_MUTED};
+    color: {TEXT};
     font-weight: 650;
     padding: 7px;
     border: none;
     border-bottom: 1px solid {BORDER};
 }}
 
-QListWidget {{
+QListWidget, QListView, QTreeWidget, QTreeView {{
     background: {PANEL};
     border: 1px solid {BORDER};
     border-radius: 7px;
     padding: 5px;
     outline: 0;
     font-size: 10pt;
+    color: {TEXT};
+    selection-background-color: {SEL_BG};
+    selection-color: {SEL_TEXT};
 }}
-QListWidget::item {{ border: none; margin: 1px; padding: 4px 6px; }}
-QListWidget::item:hover {{ background: {PANEL_HOVER}; }}
-QListWidget::item:selected {{ background: #E8F3F4; color: {TEXT}; }}
+QListWidget::item, QListView::item, QTreeWidget::item, QTreeView::item {{
+    border: none;
+    margin: 1px;
+    padding: 4px 6px;
+    min-height: 20px;
+}}
+QListWidget::item:hover, QListView::item:hover,
+QTreeWidget::item:hover, QTreeView::item:hover {{ background: {PANEL_HOVER}; }}
+QListWidget::item:selected, QListView::item:selected,
+QTreeWidget::item:selected, QTreeView::item:selected {{
+    background: {SEL_BG};
+    color: {SEL_TEXT};
+}}
+QListWidget:focus, QListView:focus, QTreeWidget:focus, QTreeView:focus {{
+    border: 2px solid {FOCUS};
+}}
 
-QSlider::groove:horizontal {{ height: 5px; background: {TRACK}; border-radius: 2px; }}
+QSlider::groove:horizontal {{ height: 6px; background: {TRACK}; border-radius: 3px; }}
 QSlider::handle:horizontal {{
     background: {PANEL};
     width: 16px;
-    margin: -5px 0;
+    margin: -6px 0;
     border-radius: 8px;
     border: 2px solid {ACCENT_STRONG};
 }}
+QSlider::handle:horizontal:hover {{ border-color: {FOCUS}; }}
+QSlider:focus {{ border: 2px solid {FOCUS}; border-radius: 6px; }}
 
-QScrollBar:vertical {{ background: transparent; width: 9px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: {BORDER_LIGHT}; border-radius: 4px; min-height: 28px; }}
-QScrollBar:horizontal {{ background: transparent; height: 9px; margin: 2px; }}
-QScrollBar::handle:horizontal {{ background: {BORDER_LIGHT}; border-radius: 4px; min-width: 28px; }}
+QScrollBar:vertical {{ background: transparent; width: 12px; margin: 2px; }}
+QScrollBar::handle:vertical {{ background: {BORDER_LIGHT}; border-radius: 5px; min-height: 28px; }}
+QScrollBar::handle:vertical:hover {{ background: {TEXT_MUTED}; }}
+QScrollBar:horizontal {{ background: transparent; height: 12px; margin: 2px; }}
+QScrollBar::handle:horizontal {{ background: {BORDER_LIGHT}; border-radius: 5px; min-width: 28px; }}
+QScrollBar::handle:horizontal:hover {{ background: {TEXT_MUTED}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 
@@ -315,21 +371,38 @@ QMenu {{
     padding: 4px;
 }}
 QMenu::item {{ padding: 7px 18px; border-radius: 4px; }}
-QMenu::item:selected {{ background: {PANEL_HOVER}; color: {TEXT}; }}
+QMenu::item:selected {{ background: {SEL_BG}; color: {SEL_TEXT}; }}
 
-QCheckBox {{ spacing: 7px; }}
+QCheckBox, QRadioButton {{ spacing: 7px; padding: 3px 0; min-height: 22px; }}
 QCheckBox::indicator {{
-    width: 16px; height: 16px; border-radius: 4px;
-    border: 1px solid {BORDER_LIGHT}; background: {PANEL};
+    width: 17px; height: 17px; border-radius: 4px;
+    border: 2px solid {BORDER_LIGHT}; background: {PANEL};
 }}
-QCheckBox::indicator:checked {{ background: {ACCENT_STRONG}; border-color: {ACCENT_STRONG}; }}
+QCheckBox::indicator:hover {{ border-color: {TEXT_MUTED}; }}
+/* Checked state changes fill *and* border weight, so it is legible without
+   relying on hue alone. */
+QCheckBox::indicator:checked {{
+    background: {ACCENT_STRONG};
+    border: 3px solid {TEXT};
+}}
+QCheckBox::indicator:disabled {{ border-color: {BORDER}; background: {TRACK}; }}
+QCheckBox:focus {{ border: 2px solid {FOCUS}; border-radius: 5px; }}
+QRadioButton::indicator {{
+    width: 17px; height: 17px; border-radius: 9px;
+    border: 2px solid {BORDER_LIGHT}; background: {PANEL};
+}}
+QRadioButton::indicator:checked {{
+    background: {ACCENT_STRONG};
+    border: 3px solid {TEXT};
+}}
+QRadioButton:focus {{ border: 2px solid {FOCUS}; border-radius: 5px; }}
 
 QToolTip {{
-    background: {TEXT};
-    color: #FFFFFF;
-    border: none;
+    background: {PANEL_ALT};
+    color: {TEXT};
+    border: 1px solid {FOCUS};
     padding: 6px 8px;
     border-radius: 4px;
-    font-size: 9pt;
+    font-size: 9.5pt;
 }}
 """

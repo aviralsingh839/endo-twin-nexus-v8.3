@@ -216,16 +216,20 @@ if PYSIDE_AVAILABLE:
 
             st = status_info.get('status', 'WARN')
             if st == 'PASS':
+                # Verified against #ffffff: 5.26:1 (was #10b981 at 2.28:1).
                 border_color = "#10b981"
-                status_color = "#10b981"
+                status_color = "#237A57"
                 status_icon = "PASS"
             elif st == 'WARN':
+                # Verified against #ffffff: 5.05:1 (was #f59e0b at 2.15:1).
                 border_color = "#f59e0b"
-                status_color = "#f59e0b"
+                status_color = "#9C6200"
                 status_icon = "WARN"
             else:
+                # Verified against #ffffff: 5.86:1 (was #ef4444 at 3.76:1).
+                # The word FAIL is always rendered too, so the red is reinforcement.
                 border_color = "#ef4444"
-                status_color = "#ef4444"
+                status_color = "#B33A3A"
                 status_icon = "FAIL"
 
             self.setStyleSheet(f"""
@@ -264,7 +268,7 @@ if PYSIDE_AVAILABLE:
             status_text = f"{status_icon} {st}: {status_info.get('detail','')[:50]}"
             status_label = QLabel(status_text)
             status_label.setWordWrap(True)
-            status_label.setStyleSheet(f"font-size: 10px; color: {status_color}; font-weight: 600; border: none; background: transparent;")
+            status_label.setStyleSheet(f"font-size: 11px; color: {status_color}; font-weight: 600; border: none; background: transparent;")
             status_label.setMinimumHeight(30)
             status_label.setToolTip(f"Status: {st}\nDetail: {status_info.get('detail','')}\nLauncher: {launcher_name}.sh")
             layout.addWidget(status_label)
@@ -366,7 +370,7 @@ if PYSIDE_AVAILABLE:
             disclaimer = QLabel("ENDO-TWIN is general platform, CHRONO-PCOS is first disease-specific model - General physiological monitoring, personal baseline, longitudinal tracking, AI/ML infrastructure, disease models plugin - NOT clinically validated universal digital twin - Research / risk-screening output — not a medical diagnosis • Local-first • Offline • Privacy-focused • Garuda Linux Ready • Kotlin + Compose Native Android")
             disclaimer.setAlignment(Qt.AlignCenter)
             disclaimer.setWordWrap(True)
-            disclaimer.setStyleSheet("font-size: 10px; color: #fbbf24; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); padding: 8px; border-radius: 6px; margin-top: 8px;")
+            disclaimer.setStyleSheet("font-size: 11px; color: #fbbf24; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); padding: 8px; border-radius: 6px; margin-top: 8px;")
             header_layout.addWidget(disclaimer)
 
             main_layout.addWidget(header_frame)
@@ -402,7 +406,7 @@ if PYSIDE_AVAILABLE:
                 label1.setWordWrap(True)
                 card_layout.addWidget(label1)
                 label2 = QLabel(info['detail'][:70])
-                label2.setStyleSheet("font-size: 9px; color: #64748b; border: none; background: transparent;")
+                label2.setStyleSheet("font-size: 11px; color: #64748b; border: none; background: transparent;")
                 label2.setWordWrap(True)
                 card_layout.addWidget(label2)
                 card.setToolTip(f"{info['label']}: {st}\n{info['detail']}")
@@ -510,19 +514,19 @@ if PYSIDE_AVAILABLE:
             footer2 = QLabel("ENDO-TWIN is general platform, CHRONO-PCOS is first disease-specific model - General physiological monitoring, personal baseline, longitudinal tracking, AI/ML infrastructure, disease models plugin - NOT clinically validated universal digital twin - Research / risk-screening output — not a medical diagnosis - Local-first offline privacy-focused Garuda Linux Ready - Kotlin + Compose Native Android - One sentence: ENDO-TWIN is platform, CHRONO-PCOS is first disease-specific model")
             footer2.setAlignment(Qt.AlignCenter)
             footer2.setWordWrap(True)
-            footer2.setStyleSheet("font-size: 10px; color: #94a3b8; background: transparent; border: none;")
+            footer2.setStyleSheet("font-size: 11px; color: #94a3b8; background: transparent; border: none;")
             footer_layout.addWidget(footer2)
 
             footer3 = QLabel(f"Project Root: {PROJECT_ROOT} | Logs: {PROJECT_ROOT / 'logs'} | DIST: {PROJECT_ROOT / 'DIST' / 'android'} + dist/android/ | Website: {PROJECT_ROOT / 'website' / 'index.html'} | ENDO-TWIN: {PROJECT_ROOT / 'endo_twin'} | Native: android/patient/ android/doctor/ Kotlin+Compose")
             footer3.setAlignment(Qt.AlignCenter)
             footer3.setWordWrap(True)
-            footer3.setStyleSheet("font-size: 10px; color: #64748b; background: transparent; border: none;")
+            footer3.setStyleSheet("font-size: 11px; color: #94a3b8; background: transparent; border: none;")
             footer_layout.addWidget(footer3)
 
             footer4 = QLabel("Double-click LAUNCH/ individual .sh for direct launch, or use this Engineering Control Center - All launchers auto-detect project root, use .venv/bin/python, work from any directory, log to logs/ - Multi-Patient Safety DEMO-001/002/003 isolation OK - No cross-contamination database level")
             footer4.setAlignment(Qt.AlignCenter)
             footer4.setWordWrap(True)
-            footer4.setStyleSheet("font-size: 10px; color: #64748b; background: transparent; border: none;")
+            footer4.setStyleSheet("font-size: 11px; color: #94a3b8; background: transparent; border: none;")
             footer_layout.addWidget(footer4)
 
             main_layout.addWidget(footer_frame)
@@ -534,7 +538,7 @@ if PYSIDE_AVAILABLE:
             )
             info.setAlignment(Qt.AlignCenter)
             info.setWordWrap(True)
-            info.setStyleSheet("font-size: 10px; color: #94a3b8; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;")
+            info.setStyleSheet("font-size: 11px; color: #4d5c6b; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0;")
             main_layout.addWidget(info)
 
             # Add stretch at end

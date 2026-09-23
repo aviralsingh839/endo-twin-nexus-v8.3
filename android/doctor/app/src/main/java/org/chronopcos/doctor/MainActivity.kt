@@ -218,7 +218,7 @@ private fun PatientRow(patient: DemoPatient, onOpen: (DemoPatient) -> Unit) {
                     Text(String.format("%.0f%% quality", patient.quality * 100), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            LinearProgressIndicator(progress = patient.quality, Modifier.fillMaxWidth(), color = Color(0xFF63D8C3), trackColor = Color(0xFF39404E))
+            LinearProgressIndicator(progress = patient.quality, Modifier.fillMaxWidth(), color = Color(0xFF63D8C3), trackColor = Color(0xFF4A5568))
         }
     }
 }

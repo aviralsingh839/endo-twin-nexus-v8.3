@@ -40,7 +40,8 @@ from src.fusion.multimodal_fusion import FusionEngine
 from src.explainability.explanation_engine import ExplanationEngine
 from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.network_reader import NetworkReader
-from src.ui.theme import DARK_QSS, GREEN, ORANGE, RED, YELLOW, TEXT_MUTED
+from src.ui.theme import (DARK_QSS, ACCENT_STRONG, GREEN, ORANGE, RED,
+                          YELLOW, TEXT_MUTED)
 from src.ui.gauges import GaugeWidget
 from src.ui.vital_cards import VitalCard
 from src.ui.live_plots import TimeSeriesPlot
@@ -541,10 +542,10 @@ class MainWindow(QMainWindow):
         info.setWordWrap(True)
         layout.addWidget(info)
 
-        self.trend_plot = TimeSeriesPlot("HR Trend", "bpm", "#f87171")
+        self.trend_plot = TimeSeriesPlot("HR Trend", "bpm", RED)
         layout.addWidget(self.trend_plot)
 
-        self.trend_plot2 = TimeSeriesPlot("HRV Trend", "ms", "#60a5fa")
+        self.trend_plot2 = TimeSeriesPlot("HRV Trend", "ms", ACCENT_STRONG)
         layout.addWidget(self.trend_plot2)
 
         self.longitudinal_text = QTextEdit()
@@ -823,10 +824,10 @@ class MainWindow(QMainWindow):
             self.arduino_reader = ArduinoReader(port=p, baud=115200)
             self.arduino_reader.start()
             self.mode_label.setText(f"Mode: LIVE SERIAL {p}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+            self.mode_label.setStyleSheet(f"font-weight: bold; color: {GREEN};")
         except Exception as e:
             self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+            self.mode_label.setStyleSheet(f"font-weight: bold; color: {RED};")
 
     def connect_network(self, hostport: str):
         if not hostport:
@@ -838,7 +839,7 @@ class MainWindow(QMainWindow):
             self.network_reader = NetworkReader(host=host, port=port)
             self.network_reader.start()
             self.mode_label.setText(f"Mode: LIVE NETWORK {hostport}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+            self.mode_label.setStyleSheet(f"font-weight: bold; color: {GREEN};")
         except Exception as e:
             self.mode_label.setText(f"Mode: NETWORK FAILED {e}")
 
@@ -846,7 +847,7 @@ class MainWindow(QMainWindow):
         self.demo_stream = DemoSensorStream()
         self.demo_stream.start()
         self.mode_label.setText("Mode: DEMO SYNTHETIC - clearly labelled")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
+        self.mode_label.setStyleSheet(f"font-weight: bold; color: {YELLOW};")
 
     def stop_stream(self):
         if self.arduino_reader:
@@ -859,7 +860,7 @@ class MainWindow(QMainWindow):
             self.demo_stream.stop()
             self.demo_stream = None
         self.mode_label.setText("Mode: NO STREAM")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+        self.mode_label.setStyleSheet(f"font-weight: bold; color: {RED};")
 
     def _load_scenario_dialog(self):
         # Load one of the 6 scenarios as demo
@@ -895,7 +896,7 @@ class MainWindow(QMainWindow):
                 vectors.append(fv)
             self.feature_history = vectors
             self.mode_label.setText(f"Mode: SCENARIO {name} - {data['expected_result']}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #60a5fa;")
+            self.mode_label.setStyleSheet(f"font-weight: bold; color: {ACCENT_STRONG};")
             self._update_risk()
         except Exception as e:
             self.mode_label.setText(f"Failed to load scenario: {e}")
@@ -1040,13 +1041,13 @@ class MainWindow(QMainWindow):
                 )
                 # Color by level
                 if result.level == "high":
-                    self.signal_labels[name].setStyleSheet("color: #f87171; font-weight: bold;")
+                    self.signal_labels[name].setStyleSheet(f"color: {RED}; font-weight: bold;")
                 elif result.level == "elevated":
-                    self.signal_labels[name].setStyleSheet("color: #fb923c;")
+                    self.signal_labels[name].setStyleSheet(f"color: {ORANGE};")
                 elif result.level == "moderate":
-                    self.signal_labels[name].setStyleSheet("color: #fbbf24;")
+                    self.signal_labels[name].setStyleSheet(f"color: {YELLOW};")
                 else:
-                    self.signal_labels[name].setStyleSheet("color: #4ade80;")
+                    self.signal_labels[name].setStyleSheet(f"color: {GREEN};")
 
         # Fusion
         try:
@@ -1084,10 +1085,10 @@ class MainWindow(QMainWindow):
             # Baseline status
             if self.baseline_engine.has_baseline:
                 self.baseline_label.setText(f"Baseline: YES (conf {self.baseline_engine.baseline.confidence:.2f}, {self.baseline_engine.baseline.days_covered} days)")
-                self.baseline_label.setStyleSheet("color: #4ade80;")
+                self.baseline_label.setStyleSheet(f"color: {GREEN};")
             else:
                 self.baseline_label.setText("Baseline: CALIBRATING - need ~1 hour quality-gated data")
-                self.baseline_label.setStyleSheet("color: #fbbf24;")
+                self.baseline_label.setStyleSheet(f"color: {YELLOW};")
 
             # Data quality tab
             self.quality_text.setText(

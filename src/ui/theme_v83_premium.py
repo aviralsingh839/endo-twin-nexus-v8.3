@@ -40,7 +40,7 @@ DARK = {
     "border_light": "#2c3e63",
     "text": "#e8eef7",
     "text_muted": "#94a6c2",
-    "text_secondary": "#7a8db0",
+    "text_secondary": "#8598bb",
     "accent": "#8ecbff",
     "accent_strong": "#3aa7f0",
     "accent_deep": "#2f6fd6",
@@ -69,11 +69,16 @@ LIGHT = {
     "border": "#e2e8f0",
     "border_light": "#cbd5e1",
     "text": "#0f172a",
-    "text_muted": "#64748b",
-    "text_secondary": "#94a3b8",
-    "accent": "#0ea5e9",
+    # Both were below AA over the light surfaces (#64748b was 3.86:1 on
+    # panel_hover, #94a3b8 only 2.45:1 on bg). Darkened to clear 4.5:1 on
+    # bg / panel / panel_alt / panel_hover.
+    "text_muted": "#4d5c6b",
+    "text_secondary": "#5a6875",
+    # #0ea5e9 only reached 2.77:1 on the light panels, so accent text and
+    # focus rings disappeared. Stepped down to the next shade in the same ramp.
+    "accent": "#0369a1",
     "accent_strong": "#0284c7",
-    "accent_deep": "#0369a1",
+    "accent_deep": "#03394f",
     "indigo": "#6366f1",
     "violet": "#8b5cf6",
     "pink": "#ec4899",

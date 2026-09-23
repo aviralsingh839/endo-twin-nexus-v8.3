@@ -135,7 +135,7 @@ class PatientWindow(QMainWindow):
         b.setStyleSheet("color:#ffffff;font-size:16px;font-weight:900;")
         tl.addWidget(b)
         s = QLabel("Understand your physiological patterns over time")
-        s.setStyleSheet("color:#dce4fb;font-size:10px;font-weight:650;")
+        s.setStyleSheet("color:#dce4fb;font-size:11px;font-weight:650;")
         tl.addWidget(s)
         tl.addStretch()
         self.mode_badge = status_badge("●  Demo data • synthetic", "info")

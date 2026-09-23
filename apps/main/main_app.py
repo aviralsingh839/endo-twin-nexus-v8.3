@@ -429,7 +429,7 @@ if PYSIDE_AVAILABLE:
                 f"Extensible architecture"
             )
             footer.setWordWrap(True)
-            footer.setStyleSheet("font-size: 10px; color: #64748b; padding: 10px;")
+            footer.setStyleSheet("font-size: 11px; color: #4d5c6b; padding: 10px;")
             layout.addWidget(footer)
         
         def open_chrono_pcos(self):
