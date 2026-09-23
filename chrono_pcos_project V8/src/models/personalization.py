@@ -1,7 +1,7 @@
 """Personal baseline calibration and personalized normal ranges.
 
 The dashboard starts from conservative population defaults. Once the user (or
-the physical BASELINE button) starts a calibration session, a 5-minute window
+the physical BASELINE button) starts a calibration session, a one-hour quality-gated window
 of good-quality data is distilled into *personal* normal ranges for the key
 physiological metrics. Everything downstream (risk confidence, anomaly
 detection, sleep priors) then compares the live signal against these personal
