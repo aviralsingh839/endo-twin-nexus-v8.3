@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from collections import deque
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QDateTime
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QPushButton, QGroupBox, QGridLayout, QTextEdit,
@@ -90,18 +90,19 @@ class MainWindow(QMainWindow):
         self.risk_timer.timeout.connect(self._update_risk)
         self.risk_timer.start(2000)
 
-        # Build UI
+        # Build UI — ENDO-TWIN command-center shell
         central = QWidget()
+        central.setObjectName("CentralRoot")
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(10, 10, 10, 8)
+        layout.setSpacing(9)
 
-        # Header
         header = self._build_header()
         layout.addWidget(header)
 
-        # Tabs
         self.tabs = QTabWidget()
+        self.tabs.tabBar().hide()
         self.tabs.addTab(self._build_overview_tab(), "Overview")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
         self.tabs.addTab(self._build_trends_tab(), "Trends")
@@ -113,12 +114,21 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_report_tab(), "Report")
         self.tabs.addTab(self._build_validation_tab(), "Validation")
 
-        layout.addWidget(self.tabs, 1)
+        body = QHBoxLayout()
+        body.setSpacing(10)
+        sidebar = self._build_sidebar()
+        body.addWidget(sidebar)
+        body.addWidget(self.tabs, 1)
+        layout.addLayout(body, 1)
 
-        # Status bar
-        self.status_label = QLabel(f"{APP_NAME} V8.3 | {APP_TAGLINE} | {DISCLAIMER}")
+        self.status_label = QLabel(f"●  {APP_NAME} V8.3  •  {APP_TAGLINE}  •  {DISCLAIMER}")
         self.status_label.setObjectName("SmallMuted")
         layout.addWidget(self.status_label)
+
+        self.header_clock_timer = QTimer(self)
+        self.header_clock_timer.timeout.connect(self._update_header_clock)
+        self.header_clock_timer.start(1000)
+        self._update_header_clock()
 
         if start_demo:
             self.start_demo()
@@ -128,40 +138,141 @@ class MainWindow(QMainWindow):
             self.connect_network(net)
 
     def _build_header(self):
-        box = QGroupBox(f"{APP_NAME} V8.3 - {APP_TAGLINE}")
+        box = QFrame()
+        box.setObjectName("AppHeader")
         layout = QHBoxLayout(box)
+        layout.setContentsMargins(16, 10, 14, 10)
+        layout.setSpacing(10)
+
+        brand = QLabel("∞")
+        brand.setObjectName("BrandMark")
+        brand.setMinimumWidth(28)
+        layout.addWidget(brand)
+
+        brand_col = QVBoxLayout()
+        brand_col.setSpacing(0)
+        title = QLabel("ENDO-TWIN NEXUS")
+        title.setObjectName("AppTitle")
+        subtitle = QLabel("Sense  •  Model  •  Predict  •  Personalize")
+        subtitle.setObjectName("AppSubtitle")
+        brand_col.addWidget(title)
+        brand_col.addWidget(subtitle)
+        layout.addLayout(brand_col)
+
+        search = QLineEdit()
+        search.setPlaceholderText("Search patients, devices, studies…")
+        search.setMinimumWidth(280)
+        search.setMaximumWidth(390)
+        search.setClearButtonEnabled(True)
+        layout.addWidget(search, 1)
 
         self.port_combo = QComboBox()
         self.port_combo.setEditable(True)
         self.port_combo.addItems(["COM5", "/dev/ttyACM0", "/dev/ttyUSB0"])
+        self.port_combo.setToolTip("Wearable serial port")
+        layout.addWidget(self.port_combo)
+
         refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("HeaderAction")
         refresh_btn.clicked.connect(self._refresh_ports)
+        layout.addWidget(refresh_btn)
+
         connect_btn = QPushButton("Connect Wearable")
+        connect_btn.setObjectName("PrimaryAction")
         connect_btn.clicked.connect(self.connect_serial)
-        demo_btn = QPushButton("Demo Mode (Synthetic)")
+        layout.addWidget(connect_btn)
+
+        demo_btn = QPushButton("Demo")
+        demo_btn.setObjectName("HeaderAction")
         demo_btn.clicked.connect(self.start_demo)
+        layout.addWidget(demo_btn)
+
         stop_btn = QPushButton("Stop")
+        stop_btn.setObjectName("HeaderAction")
         stop_btn.clicked.connect(self.stop_stream)
+        layout.addWidget(stop_btn)
 
         self.net_edit = QLineEdit()
-        self.net_edit.setPlaceholderText("ESP8266 bridge IP:port e.g. 192.168.4.1:7777")
-        net_btn = QPushButton("Connect Wi-Fi Bridge")
+        self.net_edit.setPlaceholderText("ESP8266 bridge IP:port")
+        self.net_edit.setMaximumWidth(210)
+        layout.addWidget(self.net_edit)
+
+        net_btn = QPushButton("Wi-Fi")
+        net_btn.setObjectName("HeaderAction")
         net_btn.clicked.connect(lambda: self.connect_network(self.net_edit.text().strip()))
-
-        scenario_btn = QPushButton("Load Scenario")
-        scenario_btn.clicked.connect(self._load_scenario_dialog)
-
-        layout.addWidget(QLabel("Port"))
-        layout.addWidget(self.port_combo, 1)
-        layout.addWidget(refresh_btn)
-        layout.addWidget(connect_btn)
-        layout.addWidget(demo_btn)
-        layout.addWidget(stop_btn)
-        layout.addWidget(self.net_edit, 1)
         layout.addWidget(net_btn)
+
+        scenario_btn = QPushButton("Scenario")
+        scenario_btn.setObjectName("HeaderAction")
+        scenario_btn.clicked.connect(self._load_scenario_dialog)
         layout.addWidget(scenario_btn)
 
+        clock_col = QVBoxLayout()
+        clock_col.setSpacing(0)
+        date_label = QLabel()
+        date_label.setObjectName("HeaderDate")
+        self.header_date = date_label
+        clock_col.addWidget(date_label)
+        clock = QLabel()
+        clock.setObjectName("HeaderClock")
+        self.header_clock = clock
+        clock_col.addWidget(clock)
+        layout.addLayout(clock_col)
         return box
+
+    def _update_header_clock(self):
+        now = QDateTime.currentDateTime()
+        self.header_date.setText(now.toString("ddd, dd MMM yyyy"))
+        self.header_clock.setText(now.toString("hh:mm AP"))
+
+    def _build_sidebar(self):
+        box = QFrame()
+        box.setObjectName("Sidebar")
+        box.setFixedWidth(184)
+        root = QVBoxLayout(box)
+        root.setContentsMargins(8, 10, 8, 10)
+        root.setSpacing(4)
+
+        nav_items = [
+            ("⌂", "Overview"),
+            ("♙", "Baseline"),
+            ("⌁", "Trends"),
+            ("◈", "Health Signals"),
+            ("◌", "Data Quality"),
+            ("▣", "Clinical Inputs"),
+            ("▧", "Ultrasound"),
+            ("✦", "Explanation"),
+            ("▤", "Report"),
+            ("✓", "Validation"),
+        ]
+        self.sidebar_buttons = []
+        for index, (icon, label) in enumerate(nav_items):
+            btn = QPushButton(f"{icon}   {label}")
+            btn.setObjectName("SideNav")
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, i=index: self._select_sidebar_tab(i))
+            root.addWidget(btn)
+            self.sidebar_buttons.append(btn)
+
+        root.addStretch(1)
+        status_title = QLabel("SYSTEM STATUS")
+        status_title.setObjectName("SectionEyebrow")
+        root.addWidget(status_title)
+        self.sidebar_status = QLabel("●  All systems operational")
+        self.sidebar_status.setObjectName("SmallMuted")
+        self.sidebar_status.setWordWrap(True)
+        root.addWidget(self.sidebar_status)
+        version = QLabel(f"ENDO-TWIN NEXUS\nV{APP_VERSION} • Research Platform")
+        version.setObjectName("SmallMuted")
+        root.addWidget(version)
+
+        self._select_sidebar_tab(0)
+        return box
+
+    def _select_sidebar_tab(self, index: int):
+        self.tabs.setCurrentIndex(index)
+        for i, btn in enumerate(self.sidebar_buttons):
+            btn.setChecked(i == index)
 
     def _build_overview_tab(self):
         tab = QWidget()
@@ -170,10 +281,16 @@ class MainWindow(QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
+        content.setObjectName("OverviewScrollContent")
         root = QVBoxLayout(content)
+        root.setSpacing(12)
 
         # Headline
         head = QHBoxLayout()
+        eyebrow = QLabel("ENDO-TWIN AI RESEARCH WORKSTATION")
+        eyebrow.setObjectName("SectionEyebrow")
+        head.addWidget(eyebrow)
+        head.addStretch(1)
         self.risk_gauge = GaugeWidget("Overall Research Signal")
         head.addWidget(self.risk_gauge, 2)
 
