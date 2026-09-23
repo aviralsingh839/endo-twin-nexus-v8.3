@@ -34,7 +34,7 @@ class ModeDialog(QDialog):
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked $CP3 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)

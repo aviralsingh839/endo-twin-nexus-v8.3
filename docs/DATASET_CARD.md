@@ -36,7 +36,9 @@ CHRONO-TWIN NEXUS V8.3 uses multiple datasets, clearly labelled.
 - **Files:** s1_walk, s1_high_resistance_bike, etc., .dat, .hea, .atr, RECORDS, ANNOTATORS, SHA256SUMS
 - **Usage:** PPG quality model training - HR reliability |PPG HR - ECG HR| <=5 bpm
 - **Limitations:** Different sensor and sampling rate than MAX30102, so model only used as soft correction 40% weight, heuristic dominant, source page withdrawn so local copy only source
-- **File:** `chrono_pcos_project V8/data/public/wrist_ppg_during_exercise/` (legacy) - not copied to new data/public to avoid large files, but reference preserved
+- **File:** `chrono_pcos_project V8/data/public/wrist_ppg_during_exercise/` (legacy) - headers, annotations and
+  `SHA256SUMS.txt` only; the large `.dat` binaries were removed from the repository and are re-downloadable from
+  PhysioNet, and were never copied into data/public to avoid large files, but reference preserved
 
 ## Synthetic Datasets (SYNTHETIC)
 

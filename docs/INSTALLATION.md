@@ -34,12 +34,12 @@ cd chrono-pcos-v8.1
 ./LAUNCH/SETUP.sh
 
 # This does:
-# - Detects project root (handles LAUNCH/ and launchers/ subdirectories)
+# - Detects project root (handles the LAUNCH/ subdirectory)
 # - Checks Linux/Garuda (handles ID_LIKE unbound variable fixed)
 # - Checks Python 3.10+
 # - Creates .venv
 # - Installs requirements.txt (PySide6, pyqtgraph, numpy, pandas, sklearn, etc)
-# - Sets executable permissions for launchers/LAUNCH/*.sh
+# - Sets executable permissions for LAUNCH/*.sh
 # - Creates logs/ directory
 # - Runs diagnostics
 
@@ -173,7 +173,7 @@ chrono-pcos-v8.1/
   BUILD_DOCTOR_APK.sh - Build Doctor APK workflow
   BUILD_ALL_APKS.sh - Build both
   LAUNCH/ - Individual launchers (20 scripts) + SETUP + BUILD
-  launchers/ - Same as LAUNCH/ for compatibility
+
   launcher/main.py - Complete Control Center GUI 1450x950 polished
   desktop/doctor_app/main_enhanced.py - Doctor PC polished workstation
   android/patient_app/main.py - Patient Android Kivy
@@ -198,7 +198,7 @@ chrono-pcos-v8.1/
 
 3. Direct Python: `python launcher/main.py`, `python desktop/doctor_app/main_enhanced.py`, `python android/patient_app/main.py` (Kivy PC demo)
 
-4. Website: `LAUNCH/WEBSITE.sh` or `WEBSITE.sh` opens `website/index.html` via xdg-open or python http.server
+4. Website: `LAUNCH/WEBSITE.sh` opens `website/index.html` via xdg-open or python http.server
 
 5. Android APK: `BUILD_PATIENT_APK.sh` builds APK to DIST/android/
 
@@ -207,7 +207,7 @@ chrono-pcos-v8.1/
 - `libGL.so.1: cannot open shared object file`: `sudo pacman -S libgl` or `sudo apt install libgl1`
 - `ID_LIKE: unbound variable`: Fixed in setup_garuda.sh with `${ID:-} ${ID_LIKE:-} ${NAME:-}` guards
 - `ModuleNotFoundError: No module named 'PySide6'`: Run `./setup_garuda.sh`
-- `Permission denied`: `chmod +x LAUNCH/*.sh launchers/*.sh *.sh`
+- `Permission denied`: `chmod +x LAUNCH/*.sh *.sh`
 - `Dolphin asks Run/Display/Cancel`: Choose Run, or set Dolphin Settings → General → Executable files → Run
 - `APK not built`: Expected without Android SDK/NDK, use PC demo via PATIENT_ANDROID.sh, BUILD scripts show honest reporting
 
@@ -220,7 +220,7 @@ Research prototype not medical diagnosis, local-first offline privacy-focused, n
 ## Next Steps
 
 - Read docs/GARUDA_LAUNCH_GUIDE.md for launch details
-- Read docs/SHOWCASE_GUIDE.md for 16 steps demo
+- Read docs/PROJECT_STATUS.md for the demo walkthrough and current status
 - Read docs/ARCHITECTURE.md for system architecture
 - Read docs/ANDROID_BUILD_GUIDE.md for APK building
 - Run `./LAUNCH/FULL_SHOWCASE.sh` for science-fair demonstration

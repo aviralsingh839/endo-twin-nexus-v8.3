@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
-# If script is inside LAUNCH/ or launchers/, go up one level
+# If script is inside LAUNCH/, go up one level
 if [[ "$(basename "$SCRIPT_DIR")" == "LAUNCH" || "$(basename "$SCRIPT_DIR")" == "launchers" || "$(basename "$SCRIPT_DIR")" == "launcher" ]]; then
     PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 fi
@@ -140,13 +140,13 @@ echo ""
 echo "[5/10] Setting executable permissions..."
 chmod +x "$PROJECT_ROOT/COMPLETE_LAUNCHER.sh" 2>/dev/null || true
 chmod +x "$PROJECT_ROOT/setup_garuda.sh" 2>/dev/null || true
-chmod +x "$PROJECT_ROOT/launchers/"*.sh 2>/dev/null || true
+chmod +x "$PROJECT_ROOT/LAUNCH/"*.sh "$PROJECT_ROOT"/*.sh 2>/dev/null || true
 chmod +x "$PROJECT_ROOT/LAUNCH/"*.sh 2>/dev/null || true
 chmod +x "$PROJECT_ROOT/run_"*.sh 2>/dev/null || true
 echo "✓ Executable permissions set"
 PASS=$((PASS+1))
 echo "Launchers:"
-ls -lh "$PROJECT_ROOT/launchers/"*.sh 2>/dev/null | awk '{print $1, $9}' || echo "No launchers yet (will be created)"
+ls -lh "$PROJECT_ROOT/LAUNCH/"*.sh 2>/dev/null | awk '{print $1, $9}' || echo "No launchers yet"
 ls -lh "$PROJECT_ROOT/LAUNCH/"*.sh 2>/dev/null | awk '{print $1, $9}' || echo "No LAUNCH yet"
 
 # 6. Create logs directory
@@ -240,7 +240,7 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  ./LAUNCH/COMPLETE_LAUNCHER.sh"
     echo ""
     echo "For individual apps, open LAUNCH/ and double-click:"
-    echo "  DOCTOR_PC.sh, PATIENT_APP.sh, WEBSITE.sh, etc."
+    echo "  ./START.sh (menu) or LAUNCH/UNIFIED_WORKSTATION.sh, LAUNCH/WEBSITE.sh"
     echo ""
     echo "If double-click opens text editor in Dolphin:"
     echo "  Dolphin → Right-click .sh → Properties → Permissions → Check 'Is executable'"

@@ -31,7 +31,9 @@ Never mix these silently.
 
 - `public/PCOS_data.csv` - Kaggle PCOS cohort (PUBLIC DATASET)
 - `public/PCOS_infertility.csv` - Infertility subset (PUBLIC DATASET)
-- `public/wrist_ppg_during_exercise/` - PhysioNet wrist PPG (PUBLIC DATASET, local copy as source withdrawn)
+- `public/wrist_ppg_during_exercise/` - PhysioNet wrist PPG (PUBLIC DATASET). Signal binaries
+  are not committed; the legacy copy under `chrono_pcos_project V8/data/public/` keeps its WFDB
+  headers, annotations and `SHA256SUMS.txt` so the exact files can be re-downloaded and verified
 
 Additional optional datasets (links in `scripts/dataset_links.py`):
 - WESAD, BIDSleep, MESA, MMASH, mcPHASES, NHANES

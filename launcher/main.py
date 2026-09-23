@@ -292,20 +292,18 @@ if PYSIDE_AVAILABLE:
 
         def launch(self):
             project_root = PROJECT_ROOT
-            launcher_path = project_root / "launchers" / f"{self.launcher_name}.sh"
-            launch_path = project_root / "LAUNCH" / f"{self.launcher_name}.sh"
-            script_to_run = None
-            if launcher_path.exists():
-                script_to_run = launcher_path
-            elif launch_path.exists():
-                script_to_run = launch_path
-            else:
-                root_path = project_root / f"{self.launcher_name}.sh"
-                if root_path.exists():
-                    script_to_run = root_path
+            candidates = [
+                project_root / "LAUNCH" / f"{self.launcher_name}.sh",
+                project_root / f"{self.launcher_name}.sh",
+                project_root / "scripts" / "build" / f"{self.launcher_name}.sh",
+            ]
+            script_to_run = next((c for c in candidates if c.exists()), None)
             if not script_to_run:
                 QMessageBox.warning(self, "Launcher Not Found",
-                    f"Launcher {self.launcher_name}.sh not found.\n\nChecked:\n{launcher_path}\n{launch_path}\n\nRun SETUP.sh")
+                    f"Launcher {self.launcher_name}.sh not found.\n\nChecked:\n"
+                    + "\n".join(str(c) for c in candidates)
+                    + "\n\nUse ./START.sh instead - it covers workstation, doctor, patient,"
+                      " website, APK builds, tests and diagnostics.")
                 return
             log_file = project_root / "logs" / "launcher.log"
             try:
@@ -555,12 +553,12 @@ def main():
         for k, v in statuses.items():
             icon = "" if v['status'] == 'PASS' else "" if v['status'] == 'WARN' else ""
             print(f"{icon} {v['label']}: {v['status']} - {v['detail']}")
-        print("\nLaunchers available in launchers/ and LAUNCH/:")
-        launcher_dir = PROJECT_ROOT / "launchers"
+        print("\nLaunchers available in LAUNCH/:")
+        launcher_dir = PROJECT_ROOT / "LAUNCH"
         if launcher_dir.exists():
             for sh in sorted(launcher_dir.glob("*.sh")):
                 print(f"  {sh.name}")
-        print("\nRun ./LAUNCH/COMPLETE_LAUNCHER.sh for GUI")
+        print("\nRun ./LAUNCH/UNIFIED_WORKSTATION.sh for the GUI, or ./START.sh for the menu")
         return 0
     app = QApplication(sys.argv)
     # Set application style for better look

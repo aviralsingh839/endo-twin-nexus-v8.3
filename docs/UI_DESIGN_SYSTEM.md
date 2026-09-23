@@ -63,3 +63,53 @@ Hover and pressed states are subtle. Focus rings must remain visible. Motion is 
 ## Shared surface vocabulary
 
 Every major surface should answer: Where am I? What data am I viewing? Where did it come from? Is it LIVE or DEMO? What is the next useful action?
+
+## Design direction (V8.6.1 research notes)
+
+The interface aims at a **clinical research operating system**, not a generic
+hospital EMR and not a sci-fi dashboard. Patterns were researched from MITRE
+Open Health Dashboard (Apache-2.0), manticarodrigo/health-dashboard (MIT) and
+current Material 3 guidance for adaptive navigation. No code was imported; only
+publicly documented component patterns informed the layout.
+
+## Per-surface flows
+
+**Doctor desktop:** Dashboard → Patients → patient workspace
+(Overview · Timeline · Sensor Data · Trends/Physiology · Ultrasound · AI/Models ·
+Clinical Inputs · Reports · Notes · Provenance · Audit). The selected patient stays
+visible in the header so changing context is deliberate.
+
+**Patient desktop:** Overview · My Health · Measurements · Timeline · Reports ·
+Connect · Notes - calmer, baseline-first, with provenance badges and simple
+explanations. Disease-model output is never mixed into routine measurements.
+
+**Android:** phone uses bottom navigation with stacked cards and large touch
+targets; large screens use an adaptive navigation rail with the same content
+hierarchy rather than a stretched phone layout.
+
+## Component rules
+
+Metric cards carry: name, large value, short interpretation, provenance badge and
+trend when available. Status badges use the semantics measured / derived / warning
+/ error / neutral / research-model, and colour is never the only indicator.
+
+## Scientific UI rules
+
+Every value keeps its evidence boundary visible - "88 bpm · MEASURED",
+"31 ms · DERIVED", "CHRONO-PCOS · MODEL-INFERRED", "UNKNOWN · insufficient
+evidence", "88 bpm · DEMO_DATA". The interface must never imply that a wearable
+diagnoses PCOS, that a heuristic research index is a clinical probability, that an
+uploaded ultrasound yields anatomical findings, or that an engineering quality
+score equals clinical validity.
+
+Reports are ordered **Patient → Acquisition → Quality → Features → Baseline →
+Longitudinal Context → Model → Uncertainty → Limitations** so a model result cannot
+visually masquerade as a raw observation. Unsupported imaging features stay
+explicitly unknown; no plausible-looking value is filled in to complete a panel.
+
+## Design acceptance checklist
+
+Before releasing a UI change: demo/live status visible; patient scope visible;
+provenance visible; missing/unknown states visible; model and validation status
+visible; no synthetic value looks like a measured record; navigation suits the form
+factor; charts have bounded histories; colour supports hierarchy without decoration.

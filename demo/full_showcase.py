@@ -33,7 +33,7 @@ STEPS = [
     {"id": 2, "title": "Database Initialization", "desc": "Local-first SQLite 18 tables, seeded 4 demo providers 5 supplies clearly marked demo", "action": "database"},
     {"id": 3, "title": "Demo Patient", "desc": "Create demo patient PXXXXX Age 22 BMI 23.5 USER-ENTERED DEMO", "action": "demo_patient"},
     {"id": 4, "title": "Patient Workflow", "desc": "Patient Android App - Dashboard, Profile, Measurements, Symptoms, Cycle, Results, Reports, Sharing, Find Care", "action": "patient_workflow"},
-    {"id": 5, "title": "Sensor/Data Acquisition", "desc": "Simulated/recorded sensor 20Hz $CP2 CRC XOR labeled DEMO/SIMULATED", "action": "sensor"},
+    {"id": 5, "title": "Sensor/Data Acquisition", "desc": "Simulated/recorded sensor 20Hz $CP3 CRC XOR labeled DEMO/SIMULATED", "action": "sensor"},
     {"id": 6, "title": "Signal Processing", "desc": "Filtering bandpass 0.5-4Hz PPG, baseline removal, artifact detection, quality control", "action": "signal"},
     {"id": 7, "title": "Feature Extraction", "desc": "HR 72 bpm MEASURED quality 0.91, HRV RMSSD 48 ms DERIVED quality 0.85", "action": "features"},
     {"id": 8, "title": "AI/ML", "desc": "PCOSModule v8.3.0 pcos_associated_risk low confidence 0.75 clinical validation NOT ESTABLISHED", "action": "ai"},

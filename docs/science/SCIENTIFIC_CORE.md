@@ -73,7 +73,7 @@ Do NOT replace scientifically meaningful working component with simplified place
 
 ### Chrono-Metabolic Fingerprinting
 
-- disease_models/chrono_pcos/chrono_metabolic/pcos_chrono_metabolic.py, src/core/chrono_metabolic (if exists), docs/08_CHRONO_METABOLIC.md
+- disease_models/chrono_pcos/chrono_metabolic/pcos_chrono_metabolic.py, src/core/chrono_metabolic (if exists)
 - Domains: Circadian sleep timing activity timing temp rhythm regularity, Autonomic HR HRV recovery stress-response, Metabolic context glucose activity sleep temp observations, Coordination relationships between domains
 - Clearly distinguish OBSERVED DERIVED MODEL-INFERRED EXPERIMENTAL, do not turn hypotheses into established medical claims
 - Experimental research not diagnosis
@@ -140,4 +140,4 @@ Core works without internet, no unnecessary cloud dependencies, degrade graceful
 - PPG-derived HRV less accurate than ECG, skin temp not core temp, wrist activity not whole-body
 - Small datasets 541 rows, synthetic excluded honest
 - Research prototype not replacement for professional medical evaluation
-- See docs/23_SAFETY_ETHICS.md and docs/ai_ml/MODEL_DIAGNOSTIC_REPORT.md
+- See docs/SAFETY_AND_LIMITATIONS.md and docs/ai_ml/MODEL_DIAGNOSTIC_REPORT.md

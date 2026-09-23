@@ -140,11 +140,17 @@ from src.disease_modules.pcos import PCOSModule
 from src.data_models import SharedPhysiologicalFeatures
 module = PCOSModule()
 shared = SharedPhysiologicalFeatures(heart_rate=72, hrv_rmssd=48, activity_level=35, skin_temp_c=32.5, overall_quality=0.85)
-result = module.predict(shared, clinical={'bmi': 23.5}, history=[])
-assert result.signal in ['pcos_associated_risk', 'elevated_pcos_associated_risk']
-print(f'PCOS module OK: {result.signal} {result.level} confidence {result.confidence}')
+# Contract 1: wearable physiology alone must not produce a disease signal.
+gated = module.predict(shared, clinical={'bmi': 23.5}, history=[])
+assert gated.signal == 'insufficient_disease_evidence', gated.signal
+# Contract 2: with a guideline-shaped clinical context the module does score.
+supported = module.predict(shared, clinical={
+    'bmi': 23.5, 'age_years': 27, 'cycle_irregular': True, 'usual_cycle_length_days': 45,
+    'clinical_hyperandrogenism': True, 'exclusions_completed': True}, history=[])
+assert supported.signal not in ('insufficient_disease_evidence', 'error'), supported.signal
+print(f'PCOS module OK: gated={gated.signal} supported={supported.signal} {supported.level}')
 " 2>&1 | tee -a "$LOG_FILE"; then
-    check "PCOS module" "PASS" "Deterministic research logic works - real inference not file existence"
+    check "PCOS module" "PASS" "Evidence gate holds for wearable-only input and the module scores a supported clinical context - real inference"
 else
     check "PCOS module" "FAIL" "PCOS module failed"
 fi
@@ -196,7 +202,7 @@ fi
 echo "" | tee -a "$LOG_FILE"
 echo "--- Launchers ---" | tee -a "$LOG_FILE"
 if [[ -f "$PROJECT_ROOT/START.sh" ]] && [[ -x "$PROJECT_ROOT/START.sh" ]]; then
-    if "$PROJECT_ROOT/START.sh" help 2>&1 | grep -q "CHRONO-PCOS"; then
+    if "$PROJECT_ROOT/START.sh" help 2>&1 | grep -q "START.sh for menu"; then
         check "START.sh" "PASS" "Canonical launcher exists executable and help works - real execution"
     else
         check "START.sh" "WARN" "START.sh exists but help failed"

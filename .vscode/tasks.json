@@ -56,7 +56,7 @@
         {
             "label": "Run Diagnostics",
             "type": "shell",
-            "command": "./START.sh diagnostics",
+            "command": "./scripts/diagnostics/project_health.sh",
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -68,7 +68,7 @@
         {
             "label": "Build Patient APK",
             "type": "shell",
-            "command": "./scripts/build/build_patient_apk.sh",
+            "command": "./build_apks.sh patient",
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -80,7 +80,7 @@
         {
             "label": "Build Doctor APK",
             "type": "shell",
-            "command": "./scripts/build/build_doctor_apk.sh",
+            "command": "./build_apks.sh doctor",
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -92,7 +92,7 @@
         {
             "label": "Build All APKs",
             "type": "shell",
-            "command": "./scripts/build/build_all_apks.sh",
+            "command": "./build_apks.sh all",
             "group": "build",
             "presentation": {
                 "echo": true,

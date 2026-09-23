@@ -38,7 +38,8 @@ Never mix silently. Every JSON includes `"label": "SYNTHETIC"` etc.
 
 - `PCOS_data.csv` - Kaggle PCOS cohort (PUBLIC DATASET) - 541 rows, clinical variables, used for PCOS risk model training reference
 - `PCOS_infertility.csv` - Infertility subset (PUBLIC DATASET)
-- `wrist_ppg_during_exercise/` - PhysioNet wrist PPG during exercise (PUBLIC DATASET) - WFDB format, used for PPG quality model, source page withdrawn so local copy is only source
+- `wrist_ppg_during_exercise/` - PhysioNet wrist PPG during exercise (PUBLIC DATASET) - WFDB headers and
+  annotations only, `.dat` binaries not committed - used for PPG quality model, source page withdrawn so local copy is only source
 
 Optional datasets (links via `scripts/dataset_links.py`):
 - WESAD (stress)

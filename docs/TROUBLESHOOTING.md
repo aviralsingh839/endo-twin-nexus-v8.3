@@ -96,7 +96,7 @@ Fix:
 ```bash
 chmod +x *.sh
 chmod +x LAUNCH/*.sh
-chmod +x launchers/*.sh
+chmod +x LAUNCH/*.sh
 chmod +x BUILD_*.sh
 chmod +x LAUNCH/BUILD*.sh
 ./setup_garuda.sh  # Does chmod automatically
@@ -355,7 +355,7 @@ ls -lh DIST/android/
 - Read docs/INSTALLATION.md
 - Read docs/BUILD_GUIDE.md
 - Read docs/GARUDA_LAUNCH_GUIDE.md
-- Read docs/SHOWCASE_GUIDE.md
+- Read docs/PROJECT_STATUS.md
 - Read docs/ARCHITECTURE.md
 - Read docs/ANDROID_BUILD_GUIDE.md
 - Run ./LAUNCH/DIAGNOSTICS.sh and check logs/diagnostics.log

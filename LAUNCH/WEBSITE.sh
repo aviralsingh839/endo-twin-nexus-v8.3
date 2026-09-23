@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
-# If inside launchers/ or LAUNCH/ or launcher/, project root is parent
+# If inside LAUNCH/ or launcher/, project root is parent
 BASE_NAME="$(basename "$SCRIPT_DIR")"
 if [[ "$BASE_NAME" == "launchers" || "$BASE_NAME" == "LAUNCH" || "$BASE_NAME" == "launcher" ]]; then
     PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"

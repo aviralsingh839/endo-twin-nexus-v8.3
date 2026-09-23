@@ -8,7 +8,7 @@ Project supports:
 
 - Root: `COMPLETE_LAUNCHER.sh`, `SETUP.sh`, `DIAGNOSTICS.sh`, `BUILD_*.sh`
 - `LAUNCH/`: 20+ individual launchers + SETUP + BUILD + setup_garuda.sh
-- `launchers/`: Same as LAUNCH/ for compatibility
+
 - `launcher/main.py`: Complete Control Center GUI 1450x950 polished
 - Direct Python: `python launcher/main.py`, `python desktop/doctor_app/main_enhanced.py`, etc
 
@@ -69,7 +69,7 @@ Double-click any in `LAUNCH/`:
 
 All launchers:
 
-- Detect project root via SCRIPT_DIR PROJECT_ROOT BASE_NAME LAUNCH/launchers/ handling
+- Detect project root via SCRIPT_DIR PROJECT_ROOT BASE_NAME and LAUNCH/ handling
 - Use .venv/bin/python if available else python3
 - Log to logs/
 - Work from any directory (cd to project root)
@@ -129,7 +129,7 @@ All launchers handle being in:
 
 - Project root: `COMPLETE_LAUNCHER.sh` → PROJECT_ROOT = SCRIPT_DIR
 - LAUNCH/: `LAUNCH/DOCTOR_PC.sh` → BASE_NAME = LAUNCH → PROJECT_ROOT = SCRIPT_DIR/..
-- launchers/: `launchers/DOCTOR_PC.sh` → same
+- `LAUNCH/`: the launcher scripts (website, unified workstation)
 - Any subdirectory: via SCRIPT_DIR/.. logic
 
 Example:
@@ -183,7 +183,7 @@ Created by setup_garuda.sh and BUILD scripts mkdir -p DIST/android.
 ```bash
 chmod +x *.sh
 chmod +x LAUNCH/*.sh
-chmod +x launchers/*.sh
+chmod +x LAUNCH/*.sh
 ```
 
 Setup does this automatically.

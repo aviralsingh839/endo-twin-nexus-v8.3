@@ -77,7 +77,7 @@ Clearly distinguish OBSERVED DERIVED MODEL-INFERRED EXPERIMENTAL DEMO SIMULATED
 - Avoid definitive diagnosis medication prescriptions treatment as orders unsupported claims fabricated stats
 - Encourage professional consultation
 - Disclaimer Research / risk-screening output — not a medical diagnosis on every report
-- See docs/23_SAFETY_ETHICS.md
+- See docs/SAFETY_AND_LIMITATIONS.md
 
 ## Honest Metrics
 

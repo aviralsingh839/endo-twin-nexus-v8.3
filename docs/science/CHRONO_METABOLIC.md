@@ -34,7 +34,7 @@ Clearly identify: OBSERVED, DERIVED, MODEL-INFERRED, EXPERIMENTAL
 
 ## Implementation
 
-- disease_models/chrono_pcos/chrono_metabolic/pcos_chrono_metabolic.py, src/core/chrono_metabolic (if exists), docs/08_CHRONO_METABOLIC.md
+- disease_models/chrono_pcos/chrono_metabolic/pcos_chrono_metabolic.py, src/core/chrono_metabolic (if exists)
 - Combines circadian autonomic variability activity temp metabolic longitudinal into fingerprint with provenance explainability
 - Distinguishes established/derived/experimental/ML/clinical, explainability
 - Experimental research not diagnosis

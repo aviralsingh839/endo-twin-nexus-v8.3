@@ -69,7 +69,7 @@ class PrototypeLabWidget(QWidget):
         self.port_card = card(
             "Serial input",
             self.mode.port if self.mode.mode == "live" else "Synthetic stream",
-            "115200 baud • CRC-checked $CP/$CP2 in LIVE"
+            "115200 baud • CRC-checked $CP3 in LIVE (legacy $CP/$CP2 also parse)"
         )
         self.packet_card = card("Packets", "0", "Valid packets received by this workstation")
         self.rate_card = card("Packet rate", "—", "Observed valid packet rate")

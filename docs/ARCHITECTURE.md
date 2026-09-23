@@ -271,7 +271,7 @@ chrono-pcos-v8.1/
   BUILD_DOCTOR_APK.sh - Build Doctor APK 6.6K
   BUILD_ALL_APKS.sh - Wrapper 2.6K
   LAUNCH/ - 20+ launchers + SETUP + BUILD + setup_garuda.sh
-  launchers/ - Same as LAUNCH/
+
   launcher/main.py - Complete Control Center 1450x950 polished AppCard 320x180-400x220 WordWrap margins 20 scroll widgetResizable grid 3 cols status 4 cols footer wrapping Fusion non-blocking Popen
   desktop/doctor_app/main_enhanced.py - Doctor PC polished 1450x950 Dashboard Patients Signals Longitudinal Ultrasound AI/ML Reports Provenance Explanation Database Diagnostics
   desktop/doctor_app/patient_management.py - DoctorDashboard PatientManager PhysiologicalDataViewer AdvancedAnalysisViewer UltrasoundViewer LongitudinalViewer ReportGenerator

@@ -142,7 +142,7 @@ class FeatureVector:
     hr_zscore: Optional[float] = None
     rmssd_zscore: Optional[float] = None
     skin_temp_zscore: Optional[float] = None
-    gsr_zscore: Optional[float] = None
+    gsr_zscore: Optional[float] = None  # legacy slot: never populated
     resting_hr_zscore: Optional[float] = None
     activity_zscore: Optional[float] = None
     # FSR correction
@@ -321,7 +321,7 @@ class CircadianMetrics:
     hr_r2: float = 0.0
     hrv_r2: float = 0.0
     temp_r2: float = 0.0
-    gsr_r2: float = 0.0
+    gsr_r2: float = 0.0  # legacy slot: kept so old records deserialize; not computed
     activity_regular: float = 0.0
     sleep_regular: float = 0.0
     light_regular: float = 0.0
