@@ -1,7 +1,7 @@
 # Updating your local copy (Garuda / Arch)
 
 The current work lives on the branch **`arena/01a0ce2b-endo-twin-nexus-v8-3`**
-(tip at the time of writing: `5dc25c1`). `main` does **not** have it.
+(tip at the time of writing: `8d0b704`). `main` does **not** have it.
 
 ## 1. Pull
 
@@ -14,8 +14,8 @@ git pull --ff-only origin arena/01a0ce2b-endo-twin-nexus-v8-3
 git log --oneline -3
 ```
 
-Expect to see `5dc25c1 fix(build): register the ESP32 board index…` and
-`0089300 feat(hardware)!: retire the GSR channel…`.
+Expect to see `8d0b704 chore: drop dead docs…`, `5dc25c1 fix(build): register the ESP32
+board index…` and `0089300 feat(hardware)!: retire the GSR channel…`.
 
 If you have local changes you do not want to lose:
 
@@ -24,8 +24,9 @@ git stash -u          # before the checkout/pull
 git stash pop         # after
 ```
 
-The pull **deletes `src/signal_processing/gsr.py`** — that is intended, not a
-merge problem.
+The pull **deletes `src/signal_processing/gsr.py`** and a set of superseded docs and
+scripts — that is intended, not a merge problem. It also removes ~50 MB of
+re-downloadable PhysioNet `.dat` files from `chrono_pcos_project V8/`.
 
 ## 2. Verify the Python side
 
