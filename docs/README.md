@@ -17,7 +17,9 @@ verified and what is not, version timeline, and a short note per feature area.
 
 ## Hardware and live sensing
 
-- [WEARABLE_AND_MEGA_BUILD_MANUAL.md](WEARABLE_AND_MEGA_BUILD_MANUAL.md) — the physical build reference (enclosure, sensor placement, skin-contact probe, wiring, test order)
+- [CARDBOARD_POD_BUILD.md](CARDBOARD_POD_BUILD.md) — **start here**: the cardboard build (no battery, no screws), sensor placement for a real pulse, stills and trim test
+- [WEARABLE_AND_MEGA_BUILD_MANUAL.md](WEARABLE_AND_MEGA_BUILD_MANUAL.md) — reference: sensor placement logic, wiring, firmware, bench hub, acceptance
+- [MEGA_HUB_BUILD.md](MEGA_HUB_BUILD.md) — bench hub detail (use `CARDBOARD_POD_BUILD.md` section 7 with it)
 - [hardware/WIRING.md](hardware/WIRING.md) — pin-level wiring and probe placement
 - [HARDWARE_BUILD_GUIDE.md](HARDWARE_BUILD_GUIDE.md), [hardware/HARDWARE.md](hardware/HARDWARE.md)
 - [MEGA_HUB_BUILD.md](MEGA_HUB_BUILD.md), [hardware/MEGA_ESP_CONNECTION_V8_7.md](hardware/MEGA_ESP_CONNECTION_V8_7.md)

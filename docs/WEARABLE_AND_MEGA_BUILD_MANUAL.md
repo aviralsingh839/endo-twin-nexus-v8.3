@@ -3,6 +3,10 @@
 
 **Document purpose:** This is the single physical-build reference for the current prototype. It covers the wearable enclosure, sensor placement, wiring, cable routing, skin-contact temperature probe, assembly measurements, ESP32-S3 firmware, the Arduino Mega hub, testing, and final acceptance.
 
+**Step-by-step physical build:** `CARDBOARD_POD_BUILD.md` (cardboard, no battery, no screws,
+with figures and a PPG contact test). This manual keeps the reference material: sensor
+placement logic, wiring, firmware, bench hub, tests and acceptance.
+
 **Wear site:** the pod is worn on the **wrist** or the **shoulder** (upper arm / deltoid). Placement changes what several channels mean, so the site is set for the session (`ENDO_TWIN_WEAR_SITE=wrist|shoulder`, default wrist) and shown beside the numbers. Mounting notes for both sites, and a per-measurement table, live in `docs/WEAR_SITES.md`.
 
 **Prototype status:** educational/research hardware. It is not a medical device and the measurements are not diagnostic.
@@ -21,7 +25,7 @@ The active hardware is split into two units:
    - BH1750 ambient-light sensor
    - DS18B20 skin-temperature probe (skin contact, GPIO4)
    - external status LED
-   - battery/power system
+   - **USB power and data (no battery in v1)**
 
 2. **Mega Hub / Lab Box**
    - Arduino Mega 2560
@@ -33,683 +37,87 @@ The wearable and Mega are independent acquisition devices. They do not need to b
 
 ---
 
-# 2. WEARABLE POD: RECOMMENDED PHYSICAL SIZE
+# 2. WEARABLE POD — REFERENCE DIGEST
 
-Use these as **prototype enclosure targets**, not as the exact dimensions of every component.
+Physical build, cutting, folding and the PPG contact test live in **`CARDBOARD_POD_BUILD.md`**.
+This is the short version of what matters when you change anything.
 
-## Recommended enclosure
+## Enclosure target
 
 | Dimension | Target |
 |---|---:|
-| External length | 110 mm |
-| External width | 70 mm |
-| External height | 30 mm |
-| Internal usable length | ~100 mm |
-| Internal usable width | ~60 mm |
-| Internal usable height | ~24 mm |
-| Wrist strap width | 20–25 mm |
-| Recommended cable exit | 8–12 mm opening |
-| Skin-temperature probe lead | 150–350 mm |
+| External | 60 x 40 x 18 mm (a matchbox) |
+| Material | thin corrugated cardboard, 1.5-2 mm |
+| Strap | 20-25 mm elastic through two slots |
+| Probe lead | 150-350 mm, notch + internal slack |
+| Power | thin USB-C cable, no battery |
 
-A 110 × 70 × 30 mm enclosure leaves room for the development board, sensor breakouts, wiring, strain relief and a small protected battery/power section.
+The pod must be flat: only the PPG window and the temperature probe press on skin, and
+nothing on the far side of the limb is rigid.
 
-**Do not permanently cut the enclosure from an assumed ESP32-S3 board dimension.** ESP32-S3-DevKitC-1 revisions and header arrangements differ; measure the exact board you own and leave clearance around the USB connector and antenna. Espressif provides the official board dimension drawing and notes that both v1.0 and v1.1 exist. 
+## Sensor placement
 
-## Wearable orientation
+| Sensor | Position | Why |
+|---|---|---|
+| MAX30102 | flush in the skin face, Ø 12 mm window with a foam gasket | optical contact; the gasket seals ambient light |
+| DS18B20 probe | 20-30 mm from the pod along the same limb, taped in the middle | skin contact without pressing on the PPG site |
+| MPU6050 | rigidly on the board stack, pads keeping the pod level | motion must be the limb's, not the box's |
+| BH1750 | lid window, facing out | must not sit behind a sleeve or against skin |
+| BME280 | lid vents, away from the ESP32 | under clothing it measures microclimate, not the room |
 
-Use this orientation:
+Wrist: inner (volar) side over the artery, clear of the wrist bone. Upper arm: inner arm
+1-2 cm above the elbow crease, over the brachial artery, found by touch first. Strap
+tension: gasket compressed, skin not blanched. Full detail and the contact test are in
+the build guide; site-specific measurement meanings are in `WEAR_SITES.md`.
 
-```
-                TOP / OUTSIDE OF POD
-        ┌─────────────────────────────┐
-        │       BH1750 LIGHT          │
-        │          ▲                  │
-        │     BME280 VENT             │
-        │                             │
-        │   ESP32-S3 + wiring         │
-        │                             │
-        │        BATTERY              │
-        └─────────────────────────────┘
-          ═══════ WRIST STRAP ═══════
-
-                BOTTOM / SKIN SIDE
-        ┌─────────────────────────────┐
-        │       MAX30102              │
-        │     optical window          │
-        │          ↓                  │
-        └─────────────────────────────┘
-```
-
-The MAX30102 should face the skin and be mechanically stable. The BH1750 should face the environment rather than the wrist. The BME280 should be exposed to ambient air through vents and should not be buried next to the ESP32 regulator or battery.
-
-The BME280 provides temperature, humidity and pressure. The BH1750 provides ambient illuminance in lux. 
-
----
-
-# 3. SENSOR PLACEMENT
-
-## 3.1 ESP32-S3
-
-Place the ESP32-S3 near the center of the enclosure. The same enclosure is used for
-both wear sites; only the strap/armband and the probe placement change.
-
-
-Requirements:
-
-- USB connector faces a removable side panel.
-- Antenna end faces away from large metal objects and the battery where practical.
-- Do not cover the antenna with foil or a metal plate.
-- Leave at least 5 mm clearance around the board edges where wiring bends.
-- Use nylon/PLA/ABS standoffs or a small internal mounting plate.
-- Do not allow solder joints to touch the enclosure.
-
-The ESP32-S3-DevKitC-1 is designed to be used with jumper wires or mounted on a breadboard/prototype assembly. 
-
-## 3.2 MAX30102
-
-Recommended location: **underside of the pod**, approximately centered over the skin contact region.
-
-- Wrist: inner (volar) wrist, proximal to the wrist crease, clear of the bony ulnar head.
-- Shoulder: inner upper arm against skin, not through a sleeve and not on the outer
-  deltoid where contact is poor.
-
-
-Mounting:
-
-- sensor window facing skin;
-- no sharp solder pins exposed toward skin;
-- use a thin black foam/rubber gasket around the optical opening if ambient light causes artifacts;
-- do not overtighten the strap;
-- keep the module from sliding during motion.
-
-If your prototype is intended to measure from a finger instead of the wrist, put the MAX30102 in a small finger clip and route its I2C wiring back to the pod.
-
-## 3.3 MPU6050
-
-Place the MPU6050 close to the rigid center of the enclosure.
-
-Recommended:
-
-- X/Y axes aligned with the enclosure;
-- board mounted flat;
-- no flexible mounting;
-- document the orientation in the firmware/test record.
-
-The IMU is for movement/context, so it should move with the pod rather than hang on a loose wire.
-
-## 3.4 BME280
-
-Put the BME280 near a **side or top vent**, not against the ESP32 or battery.
-
-Recommended vent:
-
-- one or more openings of roughly 3–6 mm;
-- sensor positioned 5–10 mm behind the opening;
-- no direct skin contact;
-- no foam pressed over the sensor.
-
-The BME280 measures ambient environmental conditions. If it is enclosed beside a warm MCU or battery, its temperature reading can be biased.
-
-Common BME280 I2C addresses are 0x77 and 0x76 depending on the breakout configuration. 
-
-## 3.5 BH1750
-
-Place the BH1750 on the **top surface** of the pod.
-
-Create a clear optical window:
-
-- approximately 8–12 mm opening;
-- no opaque tape over the sensor;
-- sensor face flush or slightly recessed;
-- keep it away from the status LED.
-
-The BH1750 uses I2C; its common address is 0x23, with 0x5C available using the address pin. 
-
-## 3.6 DS18B20 skin-temperature probe
-
-The temperature channel is now the DS18B20 in **direct skin contact**. It replaced the
-GSR module; the GSR hardware is no longer fitted and no firmware reads it.
-
-Recommended placement:
-
-- probe taped or stitched against skin that stays in contact while the pod is worn.
-  Wrist: the inner forearm beside the pod. Shoulder: the inner upper arm, clear of the
-  armpit crease. Either way, flat against skin for the full length of the probe body;
-- at least 15 mm away from the MAX30102 optical window so it does not press on the PPG
-  site or block the finger/wrist surface the PPG needs;
-- at least 20 mm away from the ESP32-S3, the regulator and the battery — those parts run
-  warm and will bias the reading toward pod temperature instead of skin temperature;
-- on the shoulder, remember the arm is usually clothed: trapped warm air sits close to
-  the probe, so shoulder and wrist skin temperatures are not interchangeable numbers;
-- flat against skin over the full probe body, held by a thin adhesive patch or a
-  purpose-made low-profile tape. Do not bury it under thick foam or hot glue;
-- cable exits through a strain-relieved opening, with a service loop so pulling the lead
-  never pulls on the probe joint;
-- use the waterproof/stainless-sheathed probe variant if the pod is worn during
-  activity or near moisture.
-
-**Contact is what makes the number meaningful.** A probe hanging in air beside the wrist
-reads somewhere between skin and ambient and will drift with room temperature; a probe
-pressed flat against skin tracks skin temperature within its own accuracy limits.
-
-Limits to record with every session:
-
-- skin temperature is **not** core temperature and lags it, and it differs between
-  wrist and shoulder — compare within one site only;
-- it is affected by ambient temperature, airflow, clothing, perfusion and probe pressure;
-- the DS18B20 datasheet accuracy applies to the sensor, not to the skin-contact site;
-- one probe is fitted, so `temp1` is always `nan`, and the firmware raises status bit 3
-  when the probe is missing or falls off.
-
----
-
-# 4. SKIN-CONTACT PROBE: SAFETY AND HANDLING
-
-The DS18B20 is a passive sensing element: it is read by the ESP32-S3 and drives no
-current into the body. Body-contact rules are simpler than they were for the retired
-electrode circuit, but they still apply:
-
-- the probe, its cable and its adhesive patch must not press hard enough to mark or
-  irritate skin, and should be removed periodically during long sessions;
-- keep the probe and its cable away from the mains and from any mains-powered bench
-  equipment; run body-contact sessions from battery power;
-- do not use damaged probes or probes with cracked sheaths on skin;
-- do not place the probe over broken skin, a rash or a mole for repeated sessions;
-- confirm the probe is electrically isolated from the pod's charging path (charge with
-  the probe removed, or use an isolated charger);
-- the DQ pull-up resistor (4.7 kΩ) sits on the 3V3 rail, so keep the probe wiring away
-  from any point that can be energised at a higher voltage.
-
-The purpose is to log a skin-temperature trend on a research prototype, not to measure
-body temperature for any clinical decision.
-
----
-
-# 5. ESP32-S3 WIRING
-
-## 5.1 Main pin assignment
+## Wiring
 
 | Device | Signal | ESP32-S3 |
 |---|---|---|
-| MAX30102 | SDA | GPIO8 |
-| MAX30102 | SCL | GPIO9 |
-| MPU6050 | SDA | GPIO8 |
-| MPU6050 | SCL | GPIO9 |
-| BME280 | SDA | GPIO8 |
-| BME280 | SCL | GPIO9 |
-| BH1750 | SDA | GPIO8 |
-| BH1750 | SCL | GPIO9 |
-| DS18B20 probe | DQ (data) | GPIO4 (OneWire, 4.7 kΩ pull-up to 3V3) |
+| MAX30102 / MPU6050 / BME280 / BH1750 | SDA | GPIO8 |
+| MAX30102 / MPU6050 / BME280 / BH1750 | SCL | GPIO9 |
+| DS18B20 probe | DQ | GPIO4, 4.7 kΩ pull-up to 3V3 |
 | Status LED | control | GPIO2 |
-| All sensors | GND | ESP32 GND |
-| I2C sensors | VCC | 3.3 V-compatible supply |
 
-GPIO8/GPIO9 are used as the dedicated I2C bus in the current firmware. The ESP32-S3-DevKitC-1 exposes GPIOs for peripheral connections; consult the exact board revision's official pin layout before final enclosure drilling. 
+Addresses: MAX30102 0x57, MPU6050 0x68, BME280 0x76/0x77, BH1750 0x23/0x5C. Three-wire
+(normal) power for the probe, not parasite power. Pin-level tables: `hardware/WIRING.md`.
 
-## 5.2 I2C topology
+## Power
 
-All four digital sensors share the same two lines:
+v1 has **no battery**: one thin USB-C cable carries power and data, so nothing is
+charged on the body and nothing needs to be swapped mid-session. If a battery is added
+later, use a protected cell with a proper regulator, keep it out of the 20 mm near the
+probe (heat bias), and keep body-contact sessions on an isolated, battery-only supply.
 
-```
-ESP32-S3 GPIO8 SDA ───── MAX30102 SDA
-                    ├── MPU6050 SDA
-                    ├── BME280 SDA
-                    └── BH1750 SDA
+## Firmware and frame
 
-ESP32-S3 GPIO9 SCL ───── MAX30102 SCL
-                    ├── MPU6050 SCL
-                    ├── BME280 SCL
-                    └── BH1750 SCL
+- Source: `hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
+- Reads MAX30102 IR/red, MPU6050, the DS18B20 skin probe (non-blocking, once per second),
+  BME280 and BH1750; 20 Hz `$CP3` frames with XOR CRC; USB serial; Wi-Fi SoftAP
+  `ENDO-TWIN-S3` / `endotwins3`, TCP 7777; PING / WHOAMI / LED commands.
+- Channels the board does not carry (microphone, ECG, FSR) are sent as `-1`, never as 0.
+- Frame and status bits: `WIRE_FORMAT_CP3.md`.
 
-ESP32-S3 3V3 ──────────── sensor VCC
-ESP32-S3 GND ──────────── sensor GND
-```
-
-Expected addresses:
-
-- MAX30102: 0x57
-- MPU6050: usually 0x68
-- BME280: 0x76 or 0x77
-- BH1750: 0x23 or 0x5C
-
-There is no address collision between these defaults.
-
-## 5.3 DS18B20 skin-temperature probe
-
-Use **three-wire (normal) power**, not parasite power: it is more tolerant of long
-probe leads and does not need a strong pull-up during conversion.
-
-```
-DS18B20 VDD (red)   ───────── ESP32-S3 3V3
-DS18B20 GND (black) ───────── ESP32-S3 GND
-DS18B20 DQ  (data)  ───────── ESP32-S3 GPIO4
-4.7 kΩ resistor     ───────── between DQ and 3V3   (required)
-```
-
-Note the pull-up: without it the probe usually returns `DEVICE_DISCONNECTED_C` and the
-firmware sets status bit 3. GPIO4 is the pin the GSR module used to occupy; no other
-peripheral uses it.
-
-Probe lead lengths up to a few metres work with normal power and a 4.7 kΩ pull-up; keep
-the lead short (150–350 mm) so it can be strain-relieved inside or beside the pod.
-
----
-
-# 6. WIRING AND CABLE LENGTH
-
-For the first prototype:
-
-| Cable | Recommended length |
-|---|---:|
-| I2C sensor branch | 80–150 mm |
-| BME280 branch | 80–120 mm |
-| BH1750 branch | 80–150 mm |
-| DS18B20 skin-probe lead | 150–350 mm |
-| Status LED | 80–150 mm |
-| Battery lead | 100–200 mm |
-
-Keep I2C wires short and grouped. Keep the probe lead separated from noisy digital/power wiring where practical.
-
-Use a common ground.
-
-For the wearable prototype, avoid long loose Dupont jumpers. After bench validation, replace them with secured flexible wire and strain relief.
-
----
-
-# 7. POWER
-
-For development:
-
-- USB power is acceptable for bench testing without body electrodes.
-- For any body-contact session, use a suitable battery-powered isolated supply.
-- The ESP32-S3 DevKitC-1 supports USB power as well as 5V/GND or 3V3/GND supply options; do not simultaneously feed conflicting power sources. 
-
-Do not place an unprotected Li-ion cell directly on the wearable's 3.3V rail.
-
-Use an appropriate protected battery and regulator/power-management board for the final prototype.
-
----
-
-# 8. WEARABLE INTERNAL LAYOUT
-
-Recommended top-to-bottom arrangement:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  [BH1750 optical window]      [BME280 vent]            │
-│                                                         │
-│  ┌───────────────┐      ┌─────────────────────────┐    │
-│  │ ESP32-S3      │      │ 4.7 kΩ pull-up + JST    │    │
-│  │               │      │ probe connector ────────┼───┼──► skin probe
-│  └───────────────┘      └─────────────────────────┘    │
-│                                                         │
-│  ┌───────────┐             ┌──────────────────────┐    │
-│  │ MPU6050   │             │ protected battery /  │    │
-│  └───────────┘             │ power section       │    │
-│                            └──────────────────────┘    │
-│                                                         │
-│  Side: USB + power switch + strain-relieved cables     │
-└─────────────────────────────────────────────────────────┘
-                       BOTTOM
-              ┌─────────────────────┐
-              │      MAX30102       │
-              │      ↓ skin         │
-              └─────────────────────┘
-```
-
-Keep the BME280 and BH1750 away from the ESP32 regulator and battery.
-
----
-
-# 9. WEARABLE ASSEMBLY ORDER
-
-### Step 1 — Prepare the enclosure
-
-Drill/cut:
-
-- USB opening;
-- power switch opening if used;
-- BH1750 optical window;
-- BME280 ventilation opening;
-- DS18B20 probe lead exit (strain-relieved);
-- optional status LED opening;
-- four small mounting holes or standoffs if using a mounting plate.
-
-### Step 2 — Mount the ESP32-S3
-
-Use nylon screws/standoffs or a removable mounting plate.
-
-Do not glue directly over the ESP32 module or antenna.
-
-### Step 3 — Build the I2C bus
-
-Connect GPIO8 to all SDA pins.
-
-Connect GPIO9 to all SCL pins.
-
-Connect 3.3V and GND.
-
-Do not run separate random I2C buses unless the firmware is changed.
-
-### Step 4 — Mount MAX30102
-
-Place it on the bottom face.
-
-Check that the optical window can make stable skin contact.
-
-### Step 5 — Mount MPU6050
-
-Fix it rigidly.
-
-Mark the board's X/Y direction on the enclosure so orientation is documented.
-
-### Step 6 — Mount BME280
-
-Put it next to the ventilation opening.
-
-Do not cover it with hot glue, foam or conformal coating.
-
-### Step 7 — Mount BH1750
-
-Place it under the top optical window.
-
-The sensor must see ambient light.
-
-### Step 8 — Install the skin-temperature probe
-
-Fit the 4.7 kΩ pull-up between DQ and 3V3 on a small piece of perfboard or inline in the
-connector housing, then run three wires to the probe.
-
-Use a JST or similar connector at the pod wall so the probe can be replaced without
-opening the enclosure.
-
-Add a service loop and a strain relief so a pulled probe lead cannot load the solder
-joint. Keep the probe at least 20 mm from the ESP32, regulator and battery.
-
-### Step 9 — Add status LED
-
-GPIO2 → 220 Ω resistor → LED anode.
-
-LED cathode → GND.
-
-### Step 10 — Secure all wiring
-
-Use:
-
-- heat-shrink;
-- cable ties;
-- adhesive cable anchors;
-- JST connectors where possible.
-
-No wire should be able to pull directly on a sensor solder joint.
-
----
-
-# 10. SKIN-TEMPERATURE PROBE MOUNTING
-
-Recommended prototype:
-
-```
-        WEARABLE POD (wrist strap or upper-arm band)
-              │
-        strain-relieved exit
-              │
-      ┌───────┴────────┐
-      │  probe body    │  flat against skin, thin tape
-      │  150–350 mm    │  ≥ 15 mm from PPG window
-      └───────┬────────┘  ≥ 20 mm from ESP32 / battery
-              │
-        skin contact site
-        (wrist: inner forearm | shoulder: inner upper arm)
-```
-
-Contact checklist:
-
-- the full probe body lies flat on skin, not on top of the strap seam or a bone ridge;
-- the adhesive patch is thin; thick foam insulates the probe from skin and adds lag;
-- the probe cannot slide or lift when the limb moves — test by moving the arm and
-  watching the reported temperature for a step back toward ambient;
-- the cable cannot tug the probe when the arm moves.
-
-Record with every session:
-
-- wear site (wrist or shoulder) and probe site/side (left/right forearm, wrist, upper arm);
-- how it was fixed (patch, tape, strap pocket) and for how long;
-- ambient/room temperature at the start (BME280 `roomT`);
-- whether the probe was replaced or repositioned mid-session;
-- the `status` bit 3 state, so a probe that fell off is visible in the recording.
-
-This makes later comparisons reproducible, and makes it obvious when a temperature
-change is a contact problem rather than a physiological one.
-
----
-
-# 11. CURRENT ESP32-S3 FIRMWARE
-
-Source:
-
-`hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
-
-The firmware:
-
-- reads MAX30102 IR/red;
-- reads MPU6050 acceleration/gyro;
-- reads the DS18B20 skin probe once per second (non-blocking conversion);
-- reads BME280 temperature/humidity/pressure;
-- reads BH1750 lux;
-- emits canonical CP3 at approximately 20 Hz;
-- validates data through an XOR CRC;
-- provides USB serial;
-- starts Wi-Fi SoftAP;
-- provides TCP port 7777;
-- supports PING;
-- supports WHOAMI;
-- supports LED commands.
-
-Network:
-
-- SSID: `ENDO-TWIN-S3`
-- password: `endotwins3`
-- default AP address: normally `192.168.4.1`
-- TCP port: `7777`
-
----
-
-# 12. BUILD AND FLASH
-
-Install the ESP32 Arduino core:
+Build and flash:
 
 ```bash
-arduino-cli core update-index
-arduino-cli core install esp32:esp32
+bash scripts/build/build_firmware.sh          # installs cores + libraries, then compiles
+arduino-cli board list                        # find the port
+arduino-cli upload -p /dev/ttyACM0 --fqbn esp32:esp32:esp32s3 hardware/esp32s3/endo_twin_wearable
 ```
 
-Install required libraries:
+## Test order
 
-```bash
-arduino-cli lib install "SparkFun MAX3010x Pulse and Proximity Sensor Library"
-arduino-cli lib install "Adafruit MPU6050"
-arduino-cli lib install "Adafruit Unified Sensor"
-arduino-cli lib install "BH1750"
-arduino-cli lib install "Adafruit BME280 Library"
-arduino-cli lib install "OneWire"
-arduino-cli lib install "DallasTemperature"
-```
-
-Compile:
-
-```bash
-arduino-cli compile \
-  --fqbn esp32:esp32:esp32s3 \
-  hardware/esp32s3/endo_twin_wearable
-```
-
-Find the USB port:
-
-```bash
-arduino-cli board list
-```
-
-Upload, replacing `/dev/ttyACM0` with the actual port:
-
-```bash
-arduino-cli upload \
-  -p /dev/ttyACM0 \
-  --fqbn esp32:esp32:esp32s3 \
-  hardware/esp32s3/endo_twin_wearable
-```
-
-Monitor:
-
-```bash
-arduino-cli monitor -p /dev/ttyACM0 -c baudrate=115200
-```
-
-Expected startup information includes the ESP32-S3 AP address and TCP server status.
-
----
-
-Wire format reference: `docs/WIRE_FORMAT_CP3.md`.
-
-# 13. CP3 PACKET
-
-The active packet is **CP3** — CP2 with the retired `gsr` field removed:
-
-```
-$CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
-```
-
-CP2 is still accepted by the host parser so recordings made before the change keep
-loading, and the Android clients accept both. Current firmware only ever emits CP3.
-
-Wearable meanings:
-
-| Field | Wearable source |
-|---|---|
-| ir | MAX30102 |
-| red | MAX30102 |
-| ax/ay/az | MPU6050 |
-| gx/gy/gz | MPU6050 |
-| temp0 | DS18B20 skin-contact probe (°C, NAN until the first conversion) |
-| temp1 | `nan` - only one probe is fitted |
-| micRaw / micRms / micPitch | `-1` - not installed |
-| ecg | -1 |
-| fsr | -1 |
-| lux | BH1750 |
-| roomT | BME280 |
-| hum | BME280 |
-| press | BME280 |
-| buttons | 0 |
-| status | firmware quality/status bits |
-| crc | XOR CRC |
-
-The Android TCP parser accepts both formats: 24 fields for CP3, 25 for legacy CP2.
-
----
-
-# 14. SENSOR TEST ORDER
-
-Never assemble everything permanently before testing.
-
-## Test 1 — ESP32-S3 alone
-
-Verify:
-
-- powers on;
-- USB serial works;
-- board does not reset continuously.
-
-## Test 2 — I2C scan
-
-Verify:
-
-- MAX30102;
-- MPU6050;
-- BME280;
-- BH1750.
-
-Expected addresses are listed above.
-
-## Test 3 — MAX30102
-
-Verify:
-
-- IR changes when the optical sensor is covered;
-- red changes with contact;
-- no permanent saturation.
-
-## Test 4 — MPU6050
-
-Verify:
-
-- X/Y/Z change when the pod is rotated;
-- gyro changes when rotated.
-
-## Test 5 — BME280
-
-Verify:
-
-- room temperature is plausible;
-- humidity changes when the sensor is exposed;
-- pressure is nonzero.
-
-## Test 6 — BH1750
-
-Verify:
-
-- lux rises under brighter light;
-- sensor is not blocked by enclosure material.
-
-## Test 7 — DS18B20 skin probe
-
-Start the pod and watch `temp0` in the stream.
-
-Verify:
-
-- `temp0` is a plausible skin-range number (roughly 28–36 °C depending on site and room);
-- it is not `nan` and not `85` (85 °C is the DS18B20 power-on value - it means the
-  firmware read the scratchpad before a conversion finished);
-- pinch the probe between two fingers for ~30 s: the reading should climb toward
-  ~33–35 °C, then fall back toward ambient when released;
-- unplug the probe: `temp0` becomes `nan` and status bit 3 (value 8) sets;
-- `roomT` from the BME280 and `temp0` must not track each other exactly — if they do,
-  the probe is reading pod/ambient air rather than skin.
-
-Do not interpret `temp0` as core body temperature.
-
-## Test 8 — CP3
-
-Verify:
-
-```
-$CP3,...,<CRC>
-$CP3,...,<CRC>
-$CP3,...,<CRC>
-```
-
-at approximately 20 packets/second.
-
-## Test 9 — Wi-Fi
-
-Connect the phone to:
-
-```
-ENDO-TWIN-S3
-```
-
-Password:
-
-```
-endotwins3
-```
-
-Then connect the app to:
-
-```
-192.168.4.1:7777
-```
-
----
+1. Board alone: powers on, serial works, no reset loop.
+2. I2C scan: all four addresses present.
+3. MAX30102: IR responds to covering the window; no permanent saturation.
+4. MPU6050: axes respond to rotation.
+5. BME280 / BH1750: plausible values, not blocked by the enclosure.
+6. DS18B20: skin-range value, responds to fingers, `nan` + status bit 3 when unplugged,
+   never a steady 85 °C.
+7. `$CP3` frames at ~20 packets/second with a valid CRC.
+8. Wi-Fi: phone joins the AP, TCP client connects, PING answers.
+9. PPG contact test on the intended wear site (`CARDBOARD_POD_BUILD.md`, section 6).
 
 # 15. MEGA HUB / LAB BOX
 
@@ -852,7 +260,7 @@ The two controllers can be tested independently.
 
 ### Wearable
 
-- [ ] enclosure approximately 110 × 70 × 30 mm
+- [ ] enclosure approximately 60 × 40 × 18 mm (cardboard, per the build guide)
 - [ ] ESP32-S3 firmly mounted
 - [ ] USB accessible
 - [ ] antenna area unobstructed
@@ -860,11 +268,11 @@ The two controllers can be tested independently.
 - [ ] MPU6050 rigidly mounted
 - [ ] BME280 has ambient-air vent
 - [ ] BH1750 has clear optical window
-- [ ] skin-temperature probe connector strain relieved
+- [ ] probe cable notch strain relieved, slack loop inside the pod
 - [ ] probe sites labelled in the session log
 - [ ] all grounds common
 - [ ] no exposed sharp conductive parts
-- [ ] battery protected and secured
+- [ ] USB cable anchored at two points, pod cannot be tugged
 - [ ] no loose wires
 
 ### Firmware
@@ -899,7 +307,7 @@ The two controllers can be tested independently.
 2. Do not use GPIO numbers from an ordinary ESP32 DevKit for the ESP32-S3.
 3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. 
 
-4. Keep BME280 thermally isolated from the ESP32 and battery.
+4. Keep BME280 thermally isolated from the ESP32 (and from any future battery).
 5. Keep BH1750 optically exposed.
 6. Keep the probe lead strain relieved and the pull-up resistor fitted.
 7. Treat skin temperature as a contact-dependent research channel: it is not core

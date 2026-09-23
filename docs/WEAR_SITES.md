@@ -58,8 +58,14 @@ together.
   the pod pressed by a bag strap or seat belt, and the probe lifting at one edge so it
   reads trapped warm air.
 
-Full build detail for the pod itself: `WEARABLE_AND_MEGA_BUILD_MANUAL.md` and
-`hardware/WIRING.md`. This page is about *where it goes and what that does to the numbers*.
+Build the pod: `CARDBOARD_POD_BUILD.md` (cardboard, USB powered, with the PPG contact
+test). Reference manual: `WEARABLE_AND_MEGA_BUILD_MANUAL.md`; wiring: `hardware/WIRING.md`.
+
+**On the upper arm, verify the pulse before trusting the numbers.** The site is harder
+than the wrist: the study evidence, the contact test and the gain adjustments are in
+`CARDBOARD_POD_BUILD.md`, section 6. If the upper arm cannot hold a signal for your arm
+(cold, hairy or fleshy arms often cannot), wear the wrist for that session instead - and
+record which one you used.
 
 ## What each measurement means on each site
 

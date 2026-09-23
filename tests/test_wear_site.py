@@ -145,3 +145,40 @@ def test_config_declares_the_default_site():
     from src import config
 
     assert config.WEAR_SITE in wear_site.WEAR_SITES
+
+
+def test_cardboard_build_guide_is_complete():
+    """The physical build has one entry point: the cardboard guide."""
+    guide = (REPO / "docs/CARDBOARD_POD_BUILD.md").read_text(encoding="utf-8")
+    for needle in (
+        "no battery",              # v1 scope
+        "Contact test",            # the verification the user must run
+        "upper arm",               # both sites covered
+        "gasket",                  # the optical seal
+        "USB",                     # power path
+        "Strap tension",
+    ):
+        assert needle.lower() in guide.lower(), f"build guide lacks {needle!r}"
+    # every figure it references exists
+    import re
+
+    for ref in re.findall(r"\]\(images/wearable/([^)]+)\)", guide):
+        assert (REPO / "docs/images/wearable" / ref).is_file(), f"missing figure {ref}"
+    # the reference manual points at it and no longer claims a battery in v1
+    manual = (REPO / "docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md").read_text(encoding="utf-8")
+    assert "CARDBOARD_POD_BUILD.md" in manual
+    assert "USB power and data (no battery in v1)" in manual
+    # docs index exposes it
+    assert "CARDBOARD_POD_BUILD.md" in (REPO / "docs/README.md").read_text(encoding="utf-8")
+
+
+def test_upper_arm_ppg_limits_are_stated_with_evidence():
+    """The guide must not claim the upper arm works unconditionally."""
+    guide = (REPO / "docs/CARDBOARD_POD_BUILD.md").read_text(encoding="utf-8")
+    assert "wrist" in guide.lower()
+    assert "saturating" in guide.lower()
+    assert "0x24" in guide            # the gain value the firmware actually uses
+    assert "0x3F" in guide            # the alternative it tells you to try
+    assert "(https://" in guide       # cited study, not a bare assertion
+    firmware = (REPO / "hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino").read_text(encoding="utf-8")
+    assert "setPulseAmplitudeIR(0x24)" in firmware, "guide quotes a gain the firmware no longer uses"

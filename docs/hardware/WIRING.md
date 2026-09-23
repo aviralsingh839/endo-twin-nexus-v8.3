@@ -1,7 +1,8 @@
 # ENDO-TWIN NEXUS — Current Wiring
 
-Wire format reference: `docs/WIRE_FORMAT_CP3.md`. Wear-site mounting and what each
-channel means on the wrist versus the shoulder: `docs/WEAR_SITES.md`.
+Physical build with figures: `docs/CARDBOARD_POD_BUILD.md`. Wire format:
+`docs/WIRE_FORMAT_CP3.md`. Wear-site mounting and what each channel means on the wrist
+versus the shoulder: `docs/WEAR_SITES.md`.
 
 The complete physical construction, enclosure dimensions, sensor placement, skin-probe
 mounting, and Mega hub assembly are documented in:

@@ -2,6 +2,7 @@
 
 The complete current physical assembly guide is:
 
+`docs/CARDBOARD_POD_BUILD.md` (cardboard build, with figures) and the reference manual
 `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`
 
 It covers the ESP32-S3 wearable, sensor placement, dimensions, wiring, skin-temperature probe, Mega hub and validation procedure.
