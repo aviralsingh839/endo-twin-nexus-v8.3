@@ -1,0 +1,60 @@
+name: ENDO-TWIN UI Quality Gate
+
+on:
+  push:
+    branches:
+      - ui/endo-twin-nexus-professional-redesign
+    paths:
+      - 'src/ui/**'
+      - 'desktop/**'
+      - 'launcher/**'
+      - 'website/**'
+      - 'android/**'
+      - 'docs/UI_*.md'
+      - '.github/workflows/ui_quality.yml'
+  pull_request:
+    paths:
+      - 'src/ui/**'
+      - 'desktop/**'
+      - 'launcher/**'
+      - 'website/**'
+      - 'android/**'
+      - 'docs/UI_*.md'
+      - '.github/workflows/ui_quality.yml'
+
+jobs:
+  python-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax check UI Python
+        run: |
+          python -m compileall -q src/ui desktop launcher
+          python -m py_compile launcher/main.py
+      - name: Validate required UI documentation
+        run: |
+          test -s docs/UI_MASTER_AUDIT.md
+          test -s docs/UI_DESIGN_SYSTEM.md
+          test -s docs/UI_ARCHITECTURE.md
+          test -s docs/UI_COMPONENT_CATALOG.md
+          test -s docs/UI_RESPONSIVE_GUIDE.md
+          test -s docs/UI_HARDWARE_UX.md
+      - name: Check stale branch/identity references
+        run: |
+          ! grep -R -n --exclude-dir=.git 'arena/01a0ab67-chrono-pcos-v8-1' website docs/UI_*.md
+          ! grep -R -n --exclude-dir=.git 'chrono-pcos-v8.1' website docs/UI_*.md
+
+  website-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate website assets
+        run: |
+          test -s website/index.html
+          test -s website/style.css
+          test -s website/script.js
+          grep -q 'ENDO-TWIN NEXUS' website/index.html
+          grep -q 'prefers-reduced-motion' website/style.css
