@@ -12,7 +12,7 @@ menu(){
   cat <<'EOF'
 ============================================================
 ENDO-TWIN NEXUS V8.7
-Patient + Doctor + Prototype Lab + Live Sensor Workstation
+Unified Scientific Workstation • Patient + Doctor + Research + Live Sensor
 ============================================================
   1) Unified Workstation (Patient + Doctor + Prototype Lab)
   2) Doctor Workstation
@@ -29,7 +29,7 @@ Patient + Doctor + Prototype Lab + Live Sensor Workstation
 EOF
   read -r -p "Select [1-11]: " choice || exit 0
   case "$choice" in
-   1) runpy "$ROOT/desktop/unified_workstation.py" ;;
+   1) runpy -m src.ui.main_window ;;
    2) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
    3) runpy "$ROOT/desktop/patient_app/main.py" ;;
    4) runpy "$ROOT/apps/main/main_app.py" ;;
@@ -48,7 +48,7 @@ EOF
 MODE=""; [[ $# -ge 1 ]] && MODE="$1"; [[ -n "$MODE" ]] || MODE=menu
 case "$MODE" in
  menu) menu ;;
- unified|workstation) runpy "$ROOT/desktop/unified_workstation.py" ;;
+ unified|workstation) runpy -m src.ui.main_window ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
  patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
  endo-twin|endo|general) runpy "$ROOT/apps/main/main_app.py" ;;
