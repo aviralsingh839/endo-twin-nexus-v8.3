@@ -166,7 +166,7 @@ private fun MetricCard(title: String, value: String, detail: String, provenance:
 
 @Composable
 private fun DemoBanner() {
-    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF17273A)), shape = RoundedCornerShape(18.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101F34)), shape = RoundedCornerShape(22.dp), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Row(
             Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,14 +189,14 @@ private fun DemoBanner() {
 private fun HomeScreen(patientId: String) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Good to see you.", style = MaterialTheme.typography.displaySmall)
+                Text("Good to see you.", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.ExtraBold)
                 Text(
-                    "Understand your physiological patterns over time.",
+                    "Your health, patterns and signals — in one place.",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyLarge
                 )
