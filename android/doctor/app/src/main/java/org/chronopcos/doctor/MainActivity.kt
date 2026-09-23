@@ -254,6 +254,8 @@ private fun PatientWorkspace(patient: DemoPatient) {
                 item { TrendCard("Heart rate", "88 bpm", listOf(82f,85f,87f,84f,91f,88f,89f), "MEASURED") }
                 item { TrendCard("HRV • RMSSD", "31 ms", listOf(35f,32f,30f,36f,28f,31f,31f), "DERIVED") }
                 item { TrendCard("Skin temperature", "32.7 °C", listOf(32.5f,32.7f,32.6f,32.8f,32.7f), "MEASURED") }
+                item { SectionCard("Personal baseline", "1-hour calibration", "Quality-gated baseline is established before longitudinal interpretation; later high-quality observations adapt the personal reference.") }
+                item { SectionCard("CHRONO-PCOS screening", "Research signal", "LOWER / ELEVATED / INSUFFICIENT_DATA states can be shown when the screening engine has enough quality-gated data. Not a diagnosis or calibrated probability.") }
                 item { SectionCard("Research interpretation", "Not a diagnosis", "Sensor observations, clinical inputs and disease-model context remain separate.") }
             }
             "Physiology" -> {
@@ -326,8 +328,8 @@ private fun MiniTrend(values: List<Float>) {
 private fun ModelPage() {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { PageTitle("AI / Models", "Transparent research model registry") }
-        item { SectionCard("CHRONO-PCOS", "Research module", "First disease-specific module inside ENDO-TWIN. Clinical validation is NOT ESTABLISHED.") }
-        item { SectionCard("Evidence gate", "Enabled", "Disease-specific context is required; wearable physiology is contextual rather than diagnostic.") }
+        item { SectionCard("CHRONO-PCOS", "Research screening module", "One-hour baseline + longitudinal physiology can provide a research screening signal. Clinical validation is NOT ESTABLISHED.") }
+        item { SectionCard("Evidence gate", "Quality + provenance", "Wearable physiology is contextual. Clinical inputs, imaging and patient-reported criteria remain separately labelled and are not silently replaced by sensor data.") }
         item { SectionCard("Uncertainty", "Visible", "Data quality, missing evidence, model version and limitations should remain beside results.") }
         item { SectionCard("Validation", "NOT ESTABLISHED", "Synthetic metrics are never promoted to clinical performance.") }
     }
