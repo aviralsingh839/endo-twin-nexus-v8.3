@@ -244,79 +244,152 @@ class MainWindow(QMainWindow):
     def _build_overview_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
         root = QVBoxLayout(content)
+        root.setSpacing(12)
 
-        # Headline
-        head = QHBoxLayout()
-        self.risk_gauge = GaugeWidget("Overall Research Signal")
-        head.addWidget(self.risk_gauge, 2)
+        hero = QFrame()
+        hero.setObjectName("ScienceHero")
+        hv = QVBoxLayout(hero)
+        hv.setContentsMargins(20, 17, 20, 17)
+        row = QHBoxLayout()
+        left = QVBoxLayout()
+        eyebrow = QLabel("ENDO-TWIN NEXUS  •  MULTIMODAL PHYSIOLOGY")
+        eyebrow.setObjectName("HeroEyebrow")
+        left.addWidget(eyebrow)
+        h = QLabel("Scientific Command Center")
+        h.setObjectName("HeroTitle")
+        left.addWidget(h)
+        desc = QLabel("A unified workspace for acquisition, personal calibration, longitudinal physiology, CHRONO-PCOS research signals and auditable evidence.")
+        desc.setObjectName("HeroSubtitle")
+        desc.setWordWrap(True)
+        left.addWidget(desc)
+        row.addLayout(left, 1)
+        right = QVBoxLayout()
+        right.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.mode_label = QLabel("●  NO STREAM")
+        self.mode_label.setObjectName("HeroStatus")
+        right.addWidget(self.mode_label, 0, Qt.AlignmentFlag.AlignRight)
+        self.baseline_label = QLabel("BASELINE  •  1 HOUR CALIBRATION")
+        self.baseline_label.setObjectName("HeroStatus")
+        right.addWidget(self.baseline_label, 0, Qt.AlignmentFlag.AlignRight)
+        self.confidence_label = QLabel("Model confidence —")
+        self.confidence_label.setObjectName("HeroMetric")
+        right.addWidget(self.confidence_label, 0, Qt.AlignmentFlag.AlignRight)
+        row.addLayout(right)
+        hv.addLayout(row)
+        root.addWidget(hero)
 
-        meta_box = QGroupBox("Status")
-        mb = QVBoxLayout(meta_box)
-        self.confidence_label = QLabel("Model Confidence: -")
-        self.quality_label = QLabel("Data Quality: -")
-        self.coverage_label = QLabel("Coverage: -")
-        self.baseline_label = QLabel("Baseline: No baseline")
-        self.mode_label = QLabel("Mode: NO STREAM")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
-        for w in [self.confidence_label, self.quality_label, self.coverage_label, self.baseline_label, self.mode_label]:
-            w.setObjectName("BigValue")
-            mb.addWidget(w)
-        head.addWidget(meta_box, 1)
-        root.addLayout(head)
-
-        # Vitals
-        key_box = QGroupBox("Key Vitals (Live)")
-        vg = QGridLayout(key_box)
+        cards_row = QGridLayout()
+        cards_row.setSpacing(9)
         self.cards = {}
         for i, (key, title, unit) in enumerate([
             ("hr", "Heart Rate", "bpm"),
             ("hrv", "HRV RMSSD", "ms"),
-            ("temp", "Skin Temp", "°C"),
+            ("temp", "Skin Temperature", "°C"),
             ("activity", "Activity", "%"),
             ("gsr", "GSR", "raw"),
-            ("stress", "Stress", "%"),
-            ("sleep", "Sleep", ""),
-            ("quality", "Signal Quality", "%"),
-            ("recovery", "Recovery", "%"),
+            ("stress", "Stress Index", "%"),
         ]):
             card = VitalCard(title, unit)
             self.cards[key] = card
-            vg.addWidget(card, i // 3, i % 3)
-        root.addWidget(key_box)
+            cards_row.addWidget(card, 0, i)
+        root.addLayout(cards_row)
 
-        # Shared features summary
-        shared_box = QGroupBox("Shared Physiological Representation (Core Engine)")
-        sb = QVBoxLayout(shared_box)
+        scientific = QGridLayout()
+        scientific.setSpacing(9)
+
+        baseline_box = QFrame()
+        baseline_box.setObjectName("ScienceCard")
+        bv = QVBoxLayout(baseline_box)
+        bv.setContentsMargins(14, 12, 14, 12)
+        bv.addWidget(QLabel("PERSONAL BASELINE", objectName="CardEyebrow"))
+        self.baseline_science = QLabel("CALIBRATING • first-hour quality-gated window")
+        self.baseline_science.setObjectName("CardValue")
+        self.baseline_science.setWordWrap(True)
+        bv.addWidget(self.baseline_science)
+        self.baseline_detail = QLabel("The system learns the participant's own physiological reference before longitudinal interpretation.")
+        self.baseline_detail.setObjectName("SmallMuted")
+        self.baseline_detail.setWordWrap(True)
+        bv.addWidget(self.baseline_detail)
+
+        pcos_box = QFrame()
+        pcos_box.setObjectName("ScienceCard")
+        pv = QVBoxLayout(pcos_box)
+        pv.setContentsMargins(14, 12, 14, 12)
+        pv.addWidget(QLabel("CHRONO-PCOS  •  RESEARCH SCREENING", objectName="CardEyebrow"))
+        self.pcos_science = QLabel("INSUFFICIENT DATA")
+        self.pcos_science.setObjectName("CardValue")
+        pv.addWidget(self.pcos_science)
+        self.pcos_detail = QLabel("Wearable physiology is contextual evidence. This surface never represents a wearable reading as a diagnosis.")
+        self.pcos_detail.setObjectName("SmallMuted")
+        self.pcos_detail.setWordWrap(True)
+        pv.addWidget(self.pcos_detail)
+
+        quality_box = QFrame()
+        quality_box.setObjectName("ScienceCard")
+        qv = QVBoxLayout(quality_box)
+        qv.setContentsMargins(14, 12, 14, 12)
+        qv.addWidget(QLabel("EVIDENCE & PROVENANCE", objectName="CardEyebrow"))
+        self.quality_label = QLabel("DATA QUALITY  —")
+        self.quality_label.setObjectName("CardValue")
+        qv.addWidget(self.quality_label)
+        self.coverage_label = QLabel("Coverage —")
+        self.coverage_label.setObjectName("SmallMuted")
+        qv.addWidget(self.coverage_label)
+        qv.addWidget(QLabel("MEASURED → DERIVED → MODEL-INFERRED", objectName="ProvenanceLine"))
+
+        scientific.addWidget(baseline_box, 0, 0)
+        scientific.addWidget(pcos_box, 0, 1)
+        scientific.addWidget(quality_box, 0, 2)
+        root.addLayout(scientific)
+
+        signal_box = QFrame()
+        signal_box.setObjectName("ScienceCard")
+        sv = QVBoxLayout(signal_box)
+        sv.setContentsMargins(14, 12, 14, 12)
+        sv.addWidget(QLabel("LIVE MULTIMODAL STREAM", objectName="CardEyebrow"))
         self.shared_text = QTextEdit()
         self.shared_text.setReadOnly(True)
-        self.shared_text.setMaximumHeight(200)
-        self.shared_text.setPlaceholderText("Shared features appear here...")
-        sb.addWidget(self.shared_text)
-        root.addWidget(shared_box)
+        self.shared_text.setMinimumHeight(145)
+        self.shared_text.setPlaceholderText("PPG • ECG • GSR • temperature • motion • environmental channels will appear here.")
+        sv.addWidget(self.shared_text)
+        root.addWidget(signal_box)
 
-        # Quick signals
-        signals_box = QGroupBox("Health Signals Summary")
-        sig_layout = QHBoxLayout(signals_box)
+        signals_box = QFrame()
+        signals_box.setObjectName("ScienceCard")
+        sig_layout = QVBoxLayout(signals_box)
+        sig_layout.setContentsMargins(14, 12, 14, 12)
+        sig_layout.addWidget(QLabel("RESEARCH SIGNAL MATRIX", objectName="CardEyebrow"))
         self.signal_labels = {}
-        for mod in ["pcos", "sleep", "cardiometabolic", "autonomic"]:
-            g = QGroupBox(mod.upper())
-            vl = QVBoxLayout(g)
-            lbl = QLabel("No data")
+        matrix = QGridLayout()
+        matrix.setSpacing(7)
+        for i, mod in enumerate(["pcos", "sleep", "cardiometabolic", "autonomic"]):
+            cell = QFrame()
+            cell.setObjectName("SignalCell")
+            vl = QVBoxLayout(cell)
+            vl.setContentsMargins(10, 9, 10, 9)
+            title = QLabel(mod.upper())
+            title.setObjectName("SignalTitle")
+            vl.addWidget(title)
+            lbl = QLabel("WAITING FOR QUALITY-GATED DATA")
+            lbl.setObjectName("SmallMuted")
             lbl.setWordWrap(True)
             vl.addWidget(lbl)
             self.signal_labels[mod] = lbl
-            sig_layout.addWidget(g)
+            matrix.addWidget(cell, i // 2, i % 2)
+        sig_layout.addLayout(matrix)
         root.addWidget(signals_box)
 
-        # Disclaimer
-        disc = QLabel(DISCLAIMER + " This system learns what is normal for an individual first, then looks for persistent deviations.")
+        disc = QLabel(DISCLAIMER + "  •  Wearable data alone cannot diagnose PCOS/PCOD or other disease.")
         disc.setWordWrap(True)
-        disc.setObjectName("SmallMuted")
+        disc.setObjectName("WarningText")
         root.addWidget(disc)
 
         scroll.setWidget(content)
