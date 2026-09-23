@@ -1,6 +1,7 @@
 # ENDO-TWIN NEXUS — Current Wiring
 
-Wire format reference: `docs/WIRE_FORMAT_CP3.md`.
+Wire format reference: `docs/WIRE_FORMAT_CP3.md`. Wear-site mounting and what each
+channel means on the wrist versus the shoulder: `docs/WEAR_SITES.md`.
 
 The complete physical construction, enclosure dimensions, sensor placement, skin-probe
 mounting, and Mega hub assembly are documented in:
@@ -25,8 +26,9 @@ emits the canonical `$CP3` frame over USB serial and TCP.
 
 ## Skin-temperature probe
 
-The DS18B20 probe sits in **direct skin contact** — inner forearm beside the pod, or the
-wrist strap surface next to the pod. It replaced the GSR module, which is no longer
+The DS18B20 probe sits in **direct skin contact** — inner forearm beside the pod on the
+wrist, or the inner upper arm when the pod is worn on the shoulder (see
+`docs/WEAR_SITES.md` for both sites). It replaced the GSR module, which is no longer
 fitted.
 
 Wire it as three-wire (normal) power, not parasite power:

@@ -13,6 +13,7 @@ series. Details live in the topic docs listed in `docs/README.md`.
 | Area | State |
 |---|---|
 | Wearable hardware | ESP32-S3-DevKitC-1: MAX30102 PPG, MPU6050 IMU, DS18B20 skin-contact probe, BH1750, BME280. Build: `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md` |
+| Wear site | Wrist or shoulder (upper arm), set per session and recorded with it; per-channel meaning differs by site: `docs/WEAR_SITES.md` |
 | Bench hub | Arduino Mega lab hub (PPG/IMU/temp/light/env + OLED); bench bring-up variant in `hardware/arduino/chrono_pcos_mega_firmware/` |
 | Wire format | `$CP3` (24 parts). Legacy `$CP2`/`$CP` still parse. See `docs/WIRE_FORMAT_CP3.md` |
 | Retired | GSR/EDA channel and its code - removed; storage slots kept nullable so old databases open |

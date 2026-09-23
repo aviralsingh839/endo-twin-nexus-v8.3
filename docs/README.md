@@ -22,10 +22,11 @@ verified and what is not, version timeline, and a short note per feature area.
 - [HARDWARE_BUILD_GUIDE.md](HARDWARE_BUILD_GUIDE.md), [hardware/HARDWARE.md](hardware/HARDWARE.md)
 - [MEGA_HUB_BUILD.md](MEGA_HUB_BUILD.md), [hardware/MEGA_ESP_CONNECTION_V8_7.md](hardware/MEGA_ESP_CONNECTION_V8_7.md)
 - [hardware/ESP8266_SENSOR_POD.md](hardware/ESP8266_SENSOR_POD.md) — the older Wi-Fi pod
+- [WEAR_SITES.md](WEAR_SITES.md) — wrist or shoulder mounting, and what each measurement means on each site
 - [WIRE_FORMAT_CP3.md](WIRE_FORMAT_CP3.md) — the `$CP3` frame, legacy `$CP2`, status bits
 - [LIVE_SENSOR_PROCESSING.md](LIVE_SENSOR_PROCESSING.md) — live path from packet to feature
 - [PROTOTYPE_LAB.md](PROTOTYPE_LAB.md), [WORKSTATIONS_AND_CONNECTION.md](WORKSTATIONS_AND_CONNECTION.md)
-- [PUBLIC_3_DAY_TEST_PROTOCOL.md](PUBLIC_3_DAY_TEST_PROTOCOL.md)
+- [PUBLIC_3_DAY_TEST_PROTOCOL.md](PUBLIC_3_DAY_TEST_PROTOCOL.md) — fix the wear site for every participant
 
 ## Science and models
 

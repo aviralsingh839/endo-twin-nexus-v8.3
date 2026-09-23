@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.core.wear_site import active_site
 from src.utils.history_store import HistoryStore
 
 
@@ -92,7 +93,7 @@ class PublicStudyManager:
                 "circadian": feature.circadian_stability_index,
                 "signal_quality": feature.signal_quality,
             },
-            extra_json='{"provenance":"REAL","study":"PUBLIC_3_DAY"}',
+            extra_json='{"provenance":"REAL","study":"PUBLIC_3_DAY","wear_site":"%s"}' % active_site(),
         )
 
     def daily_summary(self) -> list[dict]:

@@ -92,6 +92,10 @@ The CP3 stream contains:
 - quality/status information;
 - timestamp and CRC.
 
+Every participant uses **one wear site for the whole test** (wrist or shoulder).
+Record it with the participant; do not switch mid-test, and do not pool wrist and
+shoulder results (`docs/WEAR_SITES.md`).
+
 The MAX30102 is an optical heart-rate/pulse-oximetry sensor intended for wearable applications. The underlying IC itself is not intended for direct skin contact; the wearable should use an appropriate cover/encapsulation over the optical sensor. 
 
 The BME280 provides temperature, humidity and pressure and is intended for low-power mobile/wearable applications. 

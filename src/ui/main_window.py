@@ -634,7 +634,7 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact\nDetects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data\nBad data must not silently become model input.")
+        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact\nDetects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data\nBad data must not silently become model input.\nWear site matters: the same channel reads differently on the wrist and on the shoulder, so the session site is recorded and trends are compared within one site only (docs/WEAR_SITES.md).")
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -817,6 +817,8 @@ class MainWindow(QMainWindow):
             "- Model confidence vs data quality vs clinical validation separated\n\n"
             "Hardware:\n"
             "- Wearable S3 pod: MAX30102 + MPU6050 + DS18B20 skin temp (+ BME280/BH1750) - GSR retired\n"
+            "- Worn on the wrist or the shoulder (upper arm) - the site is recorded with the session\n"
+            "  and shown beside the numbers (docs/WEAR_SITES.md); baselines are site-specific\n"
             "- Mega Hub: expanded experimental sensors - PRESERVED\n"
             "- Software gracefully handles missing sensors - IMPLEMENTED\n"
         )

@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from src.core.wear_site import active_site, site_tag
 from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.packet_parser import decode_status_flags
 from src.signal_processing.imu import IMUProcessor
@@ -179,7 +180,8 @@ class StreamingFeatureProcessor:
             "room_temp_c":sample.room_temp_c,
             "humidity_pct":sample.humidity_pct,
             "pressure_hpa":sample.pressure_hpa,
-            "provenance":"DEMO_DATA" if sample.source=="demo" else "MEASURED",
+            "wear_site":active_site(),
+            "provenance":("DEMO_DATA" if sample.source=="demo" else "MEASURED")+" • "+site_tag(),
             "gating":"USABLE" if usable else "QUALITY_GATE",
             "derived_provenance":"DERIVED"
         }

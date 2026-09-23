@@ -3,6 +3,8 @@
 
 **Document purpose:** This is the single physical-build reference for the current prototype. It covers the wearable enclosure, sensor placement, wiring, cable routing, skin-contact temperature probe, assembly measurements, ESP32-S3 firmware, the Arduino Mega hub, testing, and final acceptance.
 
+**Wear site:** the pod is worn on the **wrist** or the **shoulder** (upper arm / deltoid). Placement changes what several channels mean, so the site is set for the session (`ENDO_TWIN_WEAR_SITE=wrist|shoulder`, default wrist) and shown beside the numbers. Mounting notes for both sites, and a per-measurement table, live in `docs/WEAR_SITES.md`.
+
 **Prototype status:** educational/research hardware. It is not a medical device and the measurements are not diagnostic.
 
 ---
@@ -88,7 +90,9 @@ The BME280 provides temperature, humidity and pressure. The BH1750 provides ambi
 
 ## 3.1 ESP32-S3
 
-Place the ESP32-S3 near the center of the enclosure.
+Place the ESP32-S3 near the center of the enclosure. The same enclosure is used for
+both wear sites; only the strap/armband and the probe placement change.
+
 
 Requirements:
 
@@ -103,7 +107,12 @@ The ESP32-S3-DevKitC-1 is designed to be used with jumper wires or mounted on a 
 
 ## 3.2 MAX30102
 
-Recommended location: **underside of the pod**, approximately centered over the wrist/skin contact region.
+Recommended location: **underside of the pod**, approximately centered over the skin contact region.
+
+- Wrist: inner (volar) wrist, proximal to the wrist crease, clear of the bony ulnar head.
+- Shoulder: inner upper arm against skin, not through a sleeve and not on the outer
+  deltoid where contact is poor.
+
 
 Mounting:
 
@@ -163,12 +172,15 @@ GSR module; the GSR hardware is no longer fitted and no firmware reads it.
 
 Recommended placement:
 
-- probe taped or stitched against skin that stays in contact while the pod is worn —
-  the inner forearm beside the pod, or the wrist strap surface next to the pod;
+- probe taped or stitched against skin that stays in contact while the pod is worn.
+  Wrist: the inner forearm beside the pod. Shoulder: the inner upper arm, clear of the
+  armpit crease. Either way, flat against skin for the full length of the probe body;
 - at least 15 mm away from the MAX30102 optical window so it does not press on the PPG
   site or block the finger/wrist surface the PPG needs;
 - at least 20 mm away from the ESP32-S3, the regulator and the battery — those parts run
   warm and will bias the reading toward pod temperature instead of skin temperature;
+- on the shoulder, remember the arm is usually clothed: trapped warm air sits close to
+  the probe, so shoulder and wrist skin temperatures are not interchangeable numbers;
 - flat against skin over the full probe body, held by a thin adhesive patch or a
   purpose-made low-profile tape. Do not bury it under thick foam or hot glue;
 - cable exits through a strain-relieved opening, with a service loop so pulling the lead
@@ -182,7 +194,8 @@ pressed flat against skin tracks skin temperature within its own accuracy limits
 
 Limits to record with every session:
 
-- skin temperature is **not** core temperature and lags it;
+- skin temperature is **not** core temperature and lags it, and it differs between
+  wrist and shoulder — compare within one site only;
 - it is affected by ambient temperature, airflow, clothing, perfusion and probe pressure;
 - the DS18B20 datasheet accuracy applies to the sensor, not to the skin-contact site;
 - one probe is fitted, so `temp1` is always `nan`, and the firmware raises status bit 3
@@ -437,7 +450,7 @@ No wire should be able to pull directly on a sensor solder joint.
 Recommended prototype:
 
 ```
-        WEARABLE POD (wrist / forearm strap)
+        WEARABLE POD (wrist strap or upper-arm band)
               │
         strain-relieved exit
               │
@@ -447,20 +460,20 @@ Recommended prototype:
       └───────┬────────┘  ≥ 20 mm from ESP32 / battery
               │
         skin contact site
-        (inner forearm, or wrist beside the pod)
+        (wrist: inner forearm | shoulder: inner upper arm)
 ```
 
 Contact checklist:
 
 - the full probe body lies flat on skin, not on top of the strap seam or a bone ridge;
 - the adhesive patch is thin; thick foam insulates the probe from skin and adds lag;
-- the probe cannot slide or lift when the wrist moves — test by moving the arm and
+- the probe cannot slide or lift when the limb moves — test by moving the arm and
   watching the reported temperature for a step back toward ambient;
 - the cable cannot tug the probe when the arm moves.
 
 Record with every session:
 
-- probe site and side (left/right forearm, wrist);
+- wear site (wrist or shoulder) and probe site/side (left/right forearm, wrist, upper arm);
 - how it was fixed (patch, tape, strap pocket) and for how long;
 - ambient/room temperature at the start (BME280 `roomT`);
 - whether the probe was replaced or repositioned mid-session;
@@ -885,11 +898,14 @@ The two controllers can be tested independently.
 1. Do not mix the old ESP8266 pin map with this ESP32-S3 design.
 2. Do not use GPIO numbers from an ordinary ESP32 DevKit for the ESP32-S3.
 3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. 
+
 4. Keep BME280 thermally isolated from the ESP32 and battery.
 5. Keep BH1750 optically exposed.
 6. Keep the probe lead strain relieved and the pull-up resistor fitted.
 7. Treat skin temperature as a contact-dependent research channel: it is not core
    temperature, and a loose probe reads the room, not the wearer.
+7b. Keep one wear site per session and record it. Wrist and shoulder numbers are not
+    comparable, and a site change means a new baseline (docs/WEAR_SITES.md).
 8. Never treat wearable data alone as a medical diagnosis.
 9. Test every sensor separately before sealing the enclosure.
 10. Record the exact board revision, sensor breakout version, wiring, probe site and firmware commit for every experimental session.

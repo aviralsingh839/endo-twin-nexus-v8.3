@@ -32,6 +32,12 @@ RECONNECT_RETRY_S = 3.0
 STALE_DATA_TIMEOUT_S = 6.0
 WIFI_BRIDGE_DEFAULT_PORT = 7777
 
+# Wearable placement. The pod is worn on the wrist or on the shoulder (upper arm);
+# the site changes what several channels mean and how they may be compared, so it is
+# recorded with the session. Override per session with ENDO_TWIN_WEAR_SITE=wrist|shoulder.
+# See src/core/wear_site.py and docs/WEAR_SITES.md.
+WEAR_SITE = "wrist"
+
 # Baseline / first-hour personalization
 # The first personal baseline is captured after one hour of quality-gated observation.
 # This is an engineering calibration window, not a clinical reference interval.

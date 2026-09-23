@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from database.database import LocalDatabase
+from src.core import wear_site
 from datetime import datetime
 
 class ReportGenerator:
@@ -49,8 +50,15 @@ class ReportGenerator:
             report_lines.append("--- Recent Measurements ---")
             report_lines.append("HR: 72 bpm (MEASURED, quality 0.91, source MAX30102 PPG)")
             report_lines.append("HRV RMSSD: 48 ms (DERIVED, quality 0.85, source PPG-derived, limitations PPG less accurate than ECG, motion artifacts affect)")
-            report_lines.append("Skin Temp: 32.5°C (MEASURED, quality 0.88, source DS18B20, limitations skin temp not core temp)")
-            report_lines.append("Activity: 35% (MEASURED, source MPU6050, limitations wrist activity not whole-body)")
+            report_lines.append(
+                f"Skin Temp: 32.5°C (MEASURED, quality 0.88, source DS18B20 at {wear_site.site_label()}, "
+                "limitations skin temp not core temp)"
+                f"\nWear site: {wear_site.site_label()} - {wear_site.CROSS_SITE_RULE}"
+            )
+            report_lines.append(
+                "Activity: 35% (MEASURED, source MPU6050, limitations: site-dependent motion, "
+                "not whole-body calorimetry)"
+            )
             report_lines.append("Data Quality: Good (understandable language, not raw technical unless advanced)")
             report_lines.append("")
 

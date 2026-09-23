@@ -109,13 +109,13 @@ class PrototypeLabWidget(QWidget):
         grid.setSpacing(10)
         self.modules = {}
         specs = [
-            ("PPG / MAX30102", "PPG", "IR + RED waveform, pulse quality"),
+            ("PPG / MAX30102", "PPG", "IR + RED waveform, pulse quality - mount on skin, wrist or upper arm"),
             ("IMU / MPU6050", "IMU", "Acceleration + gyroscope"),
-            ("DS18B20", "TEMP", "Temperature validity"),
+            ("DS18B20", "TEMP", "Skin-contact temperature validity at the chosen wear site"),
             ("ECG / AD8232", "ECG", "Raw ECG + lead-off state"),
             ("FSR", "FSR", "Pressure/contact context"),
             ("MAX4466", "MIC", "RMS + experimental pitch"),
-            ("BH1750 / BME280", "ENV", "Light / room environment"),
+            ("BH1750 / BME280", "ENV", "Light / environment - clothing changes what these see (docs/WEAR_SITES.md)"),
         ]
         for i, (name, key, detail) in enumerate(specs):
             box = QFrame()

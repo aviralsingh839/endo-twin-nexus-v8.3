@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from database.database import LocalDatabase
+from src.core.wear_site import active_site, site_caption
 from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
@@ -489,9 +490,12 @@ class DoctorWindow(QMainWindow):
         live.setObjectName("liveSignal")
         head.addWidget(live)
         sv.addLayout(head)
-        hint = QLabel("Multimodal stream • PPG / EDA / temperature / motion")
+        hint = QLabel("Multimodal stream • PPG / skin temperature / motion")
         hint.setObjectName("muted")
         sv.addWidget(hint)
+        site_hint = QLabel(site_caption())
+        site_hint.setObjectName("muted")
+        sv.addWidget(site_hint)
 
         self.dashboard_signal_charts = {}
         signal_defs = [
@@ -1590,7 +1594,9 @@ class DoctorWindow(QMainWindow):
                 big.setText(self._fmt(value, suffix, 1))
                 if value is not None:
                     chart.set_value(value)
-        self._log_event("Feature update", f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')}")
+        self._log_event("Feature update",
+                        f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')} • "
+                        f"{row.get('wear_site', active_site())}")
 
     def _open_case(self, pid: str):
         self.current_case = None

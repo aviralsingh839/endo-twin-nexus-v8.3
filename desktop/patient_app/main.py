@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.core.wear_site import active_site
 from src.core.adaptive_learning import AdaptiveWearableModel
 from src.ui.learning_panel import LearningStatusPanel
 from desktop.demo_data import DEMO_CASES
@@ -562,7 +563,9 @@ class PatientWindow(QMainWindow):
                     self.charts[title].set_value(value)
         if hasattr(self, "measure_chart") and row.get("activity_level") is not None:
             self.measure_chart.set_value(row["activity_level"])
-            self.measure_status.setText(f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')} • {len(row.get('status_flags', []))} status flag(s)")
+            self.measure_status.setText(
+                f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')} • "
+                f"{row.get('wear_site', active_site())} • {len(row.get('status_flags', []))} status flag(s)")
 
 
 def run():
