@@ -3,10 +3,13 @@ package org.chronopcos.doctor.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 
 private val ClinicalLightColors = lightColorScheme(
     primary = Color(0xFF0B6670),
@@ -45,11 +48,30 @@ private val ClinicalTypography = Typography().run {
     )
 }
 
+private val ClinicalShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(10.dp),
+    extraLarge = RoundedCornerShape(12.dp)
+)
+
+object EndoTwinSemanticColors {
+    val live = Color(0xFF237A57)
+    val demo = Color(0xFFA66A00)
+    val measured = Color(0xFF0B6670)
+    val derived = Color(0xFF315B84)
+    val model = Color(0xFF6D628A)
+    val unavailable = Color(0xFF667483)
+    val error = Color(0xFFB33A3A)
+}
+
 @Composable
 fun EndoTwinTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = ClinicalLightColors,
         typography = ClinicalTypography,
+        shapes = ClinicalShapes,
         content = content
     )
 }
