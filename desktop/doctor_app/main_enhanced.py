@@ -461,6 +461,17 @@ class DoctorWindow(QMainWindow):
             self.dash_kpis[a] = labels[1]
         o.addLayout(g)
 
+        # Personalization + PCOS research-screening status
+        status_grid = QGridLayout()
+        status_grid.setSpacing(9)
+        self.baseline_status_card = card("PERSONAL BASELINE", "1 HOUR", "Quality-gated calibration before interpretation", accent="#28d5ee")
+        self.pcos_screen_status_card = card("CHRONO-PCOS SCREENING", "WAITING", "Research signal • not a diagnosis", accent="#b083ff")
+        self.personalization_status_card = card("ADAPTATION", "READY AFTER BASELINE", "High-quality observations update the personal reference", accent="#45e5b3")
+        status_grid.addWidget(self.baseline_status_card, 0, 0)
+        status_grid.addWidget(self.pcos_screen_status_card, 0, 1)
+        status_grid.addWidget(self.personalization_status_card, 0, 2)
+        o.addLayout(status_grid)
+
         # Main analysis row
         split = QSplitter(Qt.Orientation.Horizontal)
         split.setChildrenCollapsible(False)
@@ -619,6 +630,20 @@ class DoctorWindow(QMainWindow):
         self.dash_kpis["Live Devices"].setText("1 / 1" if self.mode.mode == "live" else "Demo")
         self.dash_kpis["Data Collected"].setText(f"{self.packet_count:,} pkts" if self.packet_count else "Ready")
         self.dash_kpis["AI Analyses"].setText(str(sum(1 for c in rows if c.tier in ("High", "Elevated"))) if demo else "—")
+
+        baseline_ready = bool(getattr(self, "latest_row", None) and self.latest_row.get("baseline_available"))
+        if hasattr(self, "baseline_status_card"):
+            labels = self.baseline_status_card.findChildren(QLabel)
+            if len(labels) >= 2:
+                labels[1].setText("READY" if baseline_ready else "1 HOUR")
+        if hasattr(self, "pcos_screen_status_card"):
+            labels = self.pcos_screen_status_card.findChildren(QLabel)
+            if len(labels) >= 2:
+                labels[1].setText("DATA READY" if baseline_ready else "WAITING")
+        if hasattr(self, "personalization_status_card"):
+            labels = self.personalization_status_card.findChildren(QLabel)
+            if len(labels) >= 2:
+                labels[1].setText("ACTIVE" if baseline_ready else "LOCKED UNTIL BASELINE")
 
         # Live signal values/charts
         if self.latest_row:
