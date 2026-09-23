@@ -12,36 +12,36 @@ FONT_FAMILY = '"Inter", "Segoe UI", "Helvetica Neue", "Arial", sans-serif'
 PAINTER_FONT = "Inter"
 
 # Neutral foundation
-BG = "#F6F8FB"
-BG_TOP = "#FFFFFF"
-PANEL = "#FFFFFF"
-PANEL_ALT = "#F9FBFD"
-PANEL_HOVER = "#F1F5F9"
-TRACK = "#E7ECF2"
-PLOT_BG = "#FBFCFE"
+BG = "#050C16"
+BG_TOP = "#091625"
+PANEL = "#0B1828"
+PANEL_ALT = "#0F2237"
+PANEL_HOVER = "#142B44"
+TRACK = "#17304A"
+PLOT_BG = "#07121F"
 
 # Structure
-BORDER = "#D8E0E8"
-BORDER_LIGHT = "#C5CFDA"
+BORDER = "#203852"
+BORDER_LIGHT = "#31516E"
 
 # Text
-TEXT = "#17212B"
-TEXT_MUTED = "#667483"
+TEXT = "#EAF4FF"
+TEXT_MUTED = "#8EA4B8"
 
 # Brand: restrained scientific teal/blue
-ACCENT = "#0B6670"
-ACCENT_STRONG = "#167D88"
-ACCENT_DEEP = "#0B5962"
-INDIGO = "#315B84"
-VIOLET = "#6D628A"
-PINK = "#A45B78"
+ACCENT = "#18C7E8"
+ACCENT_STRONG = "#24D6F2"
+ACCENT_DEEP = "#0B6F89"
+INDIGO = "#7185FF"
+VIOLET = "#A27BFF"
+PINK = "#F06FAE"
 
 # Semantic
-GREEN = "#237A57"
-GREEN_BRIGHT = "#2E8B66"
-YELLOW = "#A66A00"
-ORANGE = "#B65E13"
-RED = "#B33A3A"
+GREEN = "#32D6A0"
+GREEN_BRIGHT = "#45E5B3"
+YELLOW = "#F4C95D"
+ORANGE = "#FF9F5B"
+RED = "#FF647C"
 
 # Layout tokens — keep screens aligned to the same 4px rhythm.
 SPACE_1, SPACE_2, SPACE_3, SPACE_4 = 4, 8, 12, 16
