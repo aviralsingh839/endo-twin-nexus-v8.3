@@ -41,7 +41,7 @@ def generate(fv: FeatureVector, profile: UserProfile, result: RiskResult) -> Lis
     add = lambda domain, prio, text: recs.append(Recommendation(domain, prio, text))  # noqa: E731
 
     if not fv.baseline_available:
-        add("baseline", 1, "Complete a 5-minute calm baseline so personalized ranges and risk confidence improve.")
+        add("baseline", 1, "Complete the one-hour quality-gated baseline so personalized ranges and risk confidence improve.")
     if fv.signal_quality < 0.5:
         add("signal_quality", 1, "PPG/sensor contact looks weak, re-seat the fingertip sensor and reduce movement.")
     if fv.anomaly_score >= 30:
