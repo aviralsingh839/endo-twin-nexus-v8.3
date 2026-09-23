@@ -9,6 +9,7 @@ data/chrono_pcos.db
 data/chrono_twin_nexus.db
 data/raw/
 data/baselines/
+data/adaptive/
 data/training_audit.jsonl
 data/ai_config.json
 *.db-shm

@@ -67,6 +67,44 @@ skipped rule is how a contrast regression gets back in.
 
 Both checks run in `.github/workflows/ui_quality.yml`.
 
+### Wiring the checks into CI
+
+The two steps below belong in the `python-ui` job of
+`.github/workflows/ui_quality.yml`, after the existing
+`Check stale branch/identity references` step. They are listed here because
+tooling without `workflows` permission cannot edit that file — paste them in
+by hand:
+
+```yaml
+      - name: Accessibility contrast audit
+        run: python3 scripts/diagnostics/a11y_contrast_audit.py
+```
+
+```yaml
+      - name: Install test runner
+        run: python -m pip install --quiet pytest
+      - name: Accessibility regression tests
+        run: python -m pytest -q tests/test_accessibility_contrast.py
+```
+
+Optional, in the `website-ui` job, to catch a redesigned portal that drops the
+affordances:
+
+```yaml
+      - name: Validate website accessibility affordances
+        run: |
+          # WCAG 1.4.4 text resize, 1.4.10 reflow, 1.4.11 focus appearance,
+          # 2.4.1 bypass blocks, 2.4.7 focus visible.
+          grep -q 'class="skip-link"' website/index.html
+          grep -q 'data-text-scale="xlarge"' website/index.html
+          grep -q ':focus-visible' website/style.css
+          grep -q 'forced-colors: active' website/style.css
+          grep -q 'prefers-contrast: more' website/style.css
+          test "$(grep -c '<main id="main">' website/index.html)" = "1"
+          test "$(grep -c '</main>' website/index.html)" = "1"
+          ! grep -q 'min-width: 560px' website/style.css
+```
+
 ---
 
 ## What each surface does

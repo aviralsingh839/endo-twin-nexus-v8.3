@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from src.config import APP_VERSION, APP_VERSION_LABEL, APP_NAME, APP_TAGLINE, UserProfile, DATA_DIR
 from src.data_models import FeatureVector, SensorSample, SharedPhysiologicalFeatures
 from src.core.personal_baseline import PersonalBaselineEngine
+from src.core.adaptive_learning import AdaptiveWearableModel
 from src.core.longitudinal_engine import LongitudinalEngine
 from src.core.feature_extraction import RealtimeFeatureExtractor
 from src.core.shared_features import SharedFeatureExtractor
@@ -41,10 +42,11 @@ from src.explainability.explanation_engine import ExplanationEngine
 from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.network_reader import NetworkReader
 from src.ui.theme import (DARK_QSS, ACCENT_STRONG, GREEN, ORANGE, RED,
-                          YELLOW, TEXT_MUTED)
+                          YELLOW, TEXT_MUTED, TEXT)
 from src.ui.gauges import GaugeWidget
 from src.ui.vital_cards import VitalCard
 from src.ui.live_plots import TimeSeriesPlot
+from src.ui.learning_panel import LearningStatusPanel
 from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
@@ -63,8 +65,12 @@ class MainWindow(QMainWindow):
         # Core engines
         self.profile = UserProfile()
         self.baseline_engine = PersonalBaselineEngine()
+        # One continually-learning model per wearer. Its state lives in
+        # data/adaptive/<id>/ and is resumed on the next launch.
+        self.adaptive_model = AdaptiveWearableModel("local-workspace")
         self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
-        self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
+        self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine,
+                                                  learner=self.adaptive_model)
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
         self.fusion_engine = FusionEngine()
         self.explanation_engine = ExplanationEngine()
@@ -523,6 +529,13 @@ class MainWindow(QMainWindow):
         self.baseline_comparison.setReadOnly(True)
         self.baseline_comparison.setPlaceholderText("Current vs baseline comparison...")
         root.addWidget(self.baseline_comparison)
+
+        # Continual-learning status: tier, wearing time, what unlocks next, history.
+        self.learning_panel = LearningStatusPanel(palette={
+            "text": TEXT, "muted": TEXT_MUTED, "accent": ACCENT_STRONG,
+            "good": GREEN, "warn": YELLOW, "bad": RED,
+        })
+        root.addWidget(self.learning_panel)
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
@@ -1082,13 +1095,20 @@ class MainWindow(QMainWindow):
             if hasattr(self, "quality_label"):
                 self.quality_label.setText(f"DATA QUALITY  {fusion_result.confidence_breakdown.get('data_quality', 0):.2f}")
 
-            # Baseline status
+            # Baseline + continual-learning status
+            learning = self.adaptive_model.status()
             if self.baseline_engine.has_baseline:
-                self.baseline_label.setText(f"Baseline: YES (conf {self.baseline_engine.baseline.confidence:.2f}, {self.baseline_engine.baseline.days_covered} days)")
+                self.baseline_label.setText(
+                    f"Baseline: YES (conf {self.baseline_engine.baseline.confidence:.2f}, "
+                    f"{self.baseline_engine.baseline.days_covered} days)  •  "
+                    f"model {learning['tier'].upper()} v{learning['model_version']}")
                 self.baseline_label.setStyleSheet(f"color: {GREEN};")
             else:
-                self.baseline_label.setText("Baseline: CALIBRATING - need ~1 hour quality-gated data")
+                self.baseline_label.setText(
+                    f"Baseline: CALIBRATING - need ~1 hour quality-gated data  •  "
+                    f"model {learning['tier'].upper()} ({learning['worn_hours']:.1f} h worn)")
                 self.baseline_label.setStyleSheet(f"color: {YELLOW};")
+            self.learning_panel.update_from(learning)
 
             # Data quality tab
             self.quality_text.setText(

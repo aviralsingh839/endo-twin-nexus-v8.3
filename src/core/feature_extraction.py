@@ -16,6 +16,7 @@ from src.config import BASELINE_CAPTURE_S, BASELINE_MIN_DURATION_S, BASELINE_MIN
 from src.data_models import FeatureVector, SensorSample
 from src.core.quality_control import SensorQualityControl
 from src.core.personal_baseline import PersonalBaselineEngine
+from src.core.adaptive_learning import AdaptiveWearableModel
 from src.core.shared_features import SharedFeatureExtractor
 from src.signal_processing.ppg import PPGProcessor
 from src.signal_processing.imu import IMUProcessor
@@ -28,9 +29,14 @@ from src.utils.quality import completeness_score
 class RealtimeFeatureExtractor:
     """Streaming feature extractor with quality control."""
 
-    def __init__(self, profile: UserProfile | None = None, baseline_engine: Optional[PersonalBaselineEngine] = None):
+    def __init__(self, profile: UserProfile | None = None, baseline_engine: Optional[PersonalBaselineEngine] = None,
+                 learner: Optional[AdaptiveWearableModel] = None):
         self.profile = profile or DEFAULT_PROFILE
         self.baseline_engine = baseline_engine or PersonalBaselineEngine()
+        # Continual self-learning layer. When present it keeps updating for as long as
+        # the device is worn, and its norms take precedence over the frozen snapshot.
+        self.learner = learner
+        self.learning_events: list = []
         self.quality_control = SensorQualityControl()
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
 
@@ -202,12 +208,12 @@ class RealtimeFeatureExtractor:
             fv.baseline_age_s = now - self.baseline_engine.baseline.captured_at
             fv.baseline_completeness = 1.0
             fv.baseline_confidence = self.baseline_engine.baseline.confidence
-            fv.hr_zscore = self.baseline_engine.zscore("hr_bpm", fv.hr_bpm)
-            fv.rmssd_zscore = self.baseline_engine.zscore("rmssd_ms", fv.rmssd_ms)
-            fv.skin_temp_zscore = self.baseline_engine.zscore("skin_temp_c", fv.skin_temp_c)
-            fv.gsr_zscore = self.baseline_engine.zscore("gsr_tonic", fv.gsr_tonic)
-            fv.resting_hr_zscore = self.baseline_engine.zscore("resting_hr_bpm", fv.resting_hr_bpm)
-            fv.activity_zscore = self.baseline_engine.zscore("activity_level", fv.activity_level)
+            fv.hr_zscore = self._z("hr_bpm", fv.hr_bpm, now)
+            fv.rmssd_zscore = self._z("rmssd_ms", fv.rmssd_ms, now)
+            fv.skin_temp_zscore = self._z("skin_temp_c", fv.skin_temp_c, now)
+            fv.gsr_zscore = self._z("gsr_tonic", fv.gsr_tonic, now)
+            fv.resting_hr_zscore = self._z("resting_hr_bpm", fv.resting_hr_bpm, now)
+            fv.activity_zscore = self._z("activity_level", fv.activity_level, now)
         else:
             elapsed = now - self.start_time
             if not self.auto_captured and elapsed >= BASELINE_CAPTURE_S:
@@ -234,9 +240,29 @@ class RealtimeFeatureExtractor:
         except Exception:
             pass
 
+        # Continual learning happens after the row has been scored, so a sample is
+        # never compared against a norm it has already been folded into.
+        self.learning_events = []
+        if self.learner is not None:
+            try:
+                self.learning_events = self.learner.observe(fv)
+            except Exception:
+                self.learning_events = []
+
         self.last_feature = fv
         self.feature_history.append(fv)
         return fv
+
+    def _z(self, metric: str, value: Optional[float], ts: float) -> Optional[float]:
+        """Personal z-score from the continually-learned norm, else the frozen snapshot."""
+        if self.learner is not None:
+            try:
+                z = self.learner.z(metric, value, at_ts=ts)
+            except Exception:
+                z = None
+            if z is not None:
+                return z
+        return self.baseline_engine.zscore(metric, value)
 
     def ppg_waveform(self, last_s: float = 20.0):
         return self.ppg.waveform(last_s=last_s)

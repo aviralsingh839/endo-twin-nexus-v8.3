@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -16,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.core.adaptive_learning import AdaptiveWearableModel
+from src.ui.learning_panel import LearningStatusPanel
 from desktop.demo_data import DEMO_CASES
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
@@ -32,9 +35,15 @@ class PatientWindow(QMainWindow):
         self.mode = mode
         self.case = DEMO_CASES[0]
         self.latest_row = None
+        self._last_learning_events = []
         self.note_text = ""
         self.metric_labels = {}
         self.charts = {}
+
+        # One continually-learning model for this patient workspace. State is local:
+        # data/adaptive/<wearer>/wearable_model.json.
+        self.wearer_id = self.case.patient.lower().replace(" ", "-")
+        self.adaptive = AdaptiveWearableModel(self.wearer_id)
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7778)
         self.bridge.start()
@@ -299,6 +308,16 @@ class PatientWindow(QMainWindow):
         right = QFrame()
         right.setObjectName("card")
         rv = QVBoxLayout(right)
+        # Continual-learning panel: current tier, wearing hours, what unlocks next, the
+        # promotion/rollback history, and the two wearer-reported label buttons that the
+        # supervised head may learn from. Colours come from this app's own contrast-audited
+        # palette (desktop/workstation_theme.py).
+        self.learning_panel = LearningStatusPanel(
+            palette={"text": "#eef7ff", "muted": "#9db4cb", "accent": "#5fddff",
+                     "good": "#5ce9be", "warn": "#ffdf9e", "bad": "#ffb3bd"},
+            allow_labels=True, on_label=self._log_label)
+        self.learning_panel.update_from(self.adaptive.status())
+        rv.addWidget(self.learning_panel)
         rv.addWidget(section_header("What changed?", "Compare repeated observations instead of a single value."))
         if self.mode.mode == "demo":
             rv.addWidget(QLabel("Your demo case is shown with synthetic values to demonstrate the timeline and reporting workflow."))
@@ -507,8 +526,28 @@ class PatientWindow(QMainWindow):
     def _on_error(self, msg):
         self.side_state.setText("ERROR • " + msg)
 
+    def _log_label(self, symptom: bool):
+        """Wearer-reported event: the only thing the supervised head can learn from."""
+        row = self.latest_row
+        recorded = self.adaptive.record_label(
+            "wearer-reported", target=bool(symptom), at=time.time(), features=row)
+        if recorded:
+            self.learning_panel.set_label_feedback(
+                f"Recorded a {'symptom' if symptom else 'normal'} label locally. "
+                f"Supervised head: {self.adaptive.status()['head']['status']}.", "good")
+        else:
+            self.learning_panel.set_label_feedback(
+                "Not recorded: no recent measurement to attach this label to. "
+                "Start a stream first.", "warn")
+        if self.latest_row is not None:
+            self.learning_panel.update_from(self.adaptive.status())
+
     def _on_features(self, row):
         self.latest_row = row
+        events = self.adaptive.observe(row)
+        if hasattr(self, "learning_panel"):
+            self.learning_panel.update_from(self.adaptive.status())
+        self._last_learning_events = events
         q = row.get("signal_quality")
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
