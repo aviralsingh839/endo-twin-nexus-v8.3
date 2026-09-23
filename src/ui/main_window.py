@@ -94,41 +94,84 @@ class MainWindow(QMainWindow):
         self.risk_timer.timeout.connect(self._update_risk)
         self.risk_timer.start(2000)
 
-        # Build reference-style workstation shell:
-        # dark ENDO-TWIN top bar + compact connection strip + persistent left navigation.
+        # Unified ENDO-TWIN scientific workstation shell.
         central = QWidget()
         self.setCentralWidget(central)
         shell = QVBoxLayout(central)
-        shell.setContentsMargins(12, 12, 12, 12)
+        shell.setContentsMargins(14, 14, 14, 14)
         shell.setSpacing(10)
 
-        header = QFrame()
-        header.setObjectName("AppHeader")
-        hl = QHBoxLayout(header)
-        hl.setContentsMargins(14, 10, 14, 10)
-        brand_col = QVBoxLayout()
+        topbar = QFrame()
+        topbar.setObjectName("WorkstationTopbar")
+        top = QHBoxLayout(topbar)
+        top.setContentsMargins(16, 12, 16, 12)
+        brand = QVBoxLayout()
         title = QLabel("ENDO-TWIN NEXUS")
         title.setObjectName("AppTitle")
-        subtitle = QLabel("Personalized Physiological Modelling Platform")
+        subtitle = QLabel("UNIFIED SCIENTIFIC WORKSTATION  •  Sense  •  Model  •  Predict  •  Personalize")
         subtitle.setObjectName("AppSubtitle")
-        brand_col.addWidget(title)
-        brand_col.addWidget(subtitle)
-        hl.addLayout(brand_col)
-        hl.addStretch()
-        self.top_mode = QLabel("NO STREAM")
+        brand.addWidget(title)
+        brand.addWidget(subtitle)
+        top.addLayout(brand)
+        top.addStretch()
+        self.top_mode = QLabel("●  NO STREAM")
         self.top_mode.setObjectName("StatusPill")
-        self.top_quality = QLabel("DATA QUALITY —")
+        self.top_quality = QLabel("QUALITY  —")
         self.top_quality.setObjectName("StatusPill")
+        self.top_baseline = QLabel("BASELINE  •  1 HOUR")
+        self.top_baseline.setObjectName("StatusPill")
         self.top_patient = QLabel("NO PATIENT")
         self.top_patient.setObjectName("StatusPill")
-        hl.addWidget(self.top_mode)
-        hl.addWidget(self.top_quality)
-        hl.addWidget(self.top_patient)
-        shell.addWidget(header)
+        for pill in (self.top_mode, self.top_quality, self.top_baseline, self.top_patient):
+            top.addWidget(pill)
+        shell.addWidget(topbar)
+
+        workspace = QHBoxLayout()
+        workspace.setSpacing(10)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("WorkstationSidebar")
+        sidebar.setFixedWidth(218)
+        nav = QVBoxLayout(sidebar)
+        nav.setContentsMargins(10, 12, 10, 12)
+        nav.setSpacing(5)
+
+        nav_brand = QLabel("RESEARCH CONTROL")
+        nav_brand.setObjectName("SidebarEyebrow")
+        nav.addWidget(nav_brand)
 
         self.tabs = QTabWidget()
-        self.tabs.setTabPosition(QTabWidget.TabPosition.West)
         self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().hide()
+        pages = [
+            ("⌂", "Command Center"),
+            ("◉", "Personal Baseline"),
+            ("∿", "Trends & Analysis"),
+            ("✦", "CHRONO-PCOS / Signals"),
+            ("◌", "Data Quality"),
+            ("＋", "Clinical Inputs"),
+            ("▣", "Ultrasound"),
+            ("◇", "AI Explainability"),
+            ("▤", "Research Reports"),
+            ("✓", "Validation"),
+            ("◫", "Participant Study"),
+        ]
+        self._nav_buttons = []
+        for idx, (icon, label) in enumerate(pages):
+            btn = QPushButton(f"{icon}   {label}")
+            btn.setObjectName("WorkstationNav")
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked=False, i=idx: self._select_workstation_page(i))
+            nav.addWidget(btn)
+            self._nav_buttons.append(btn)
+        nav.addStretch()
+
+        nav_note = QLabel("RESEARCH PROTOTYPE\nNot a diagnostic device")
+        nav_note.setObjectName("SidebarNote")
+        nav_note.setWordWrap(True)
+        nav.addWidget(nav_note)
+        workspace.addWidget(sidebar)
+
         self.tabs.addTab(self._build_overview_tab(), "Dashboard")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
         self.tabs.addTab(self._build_trends_tab(), "Trends & Analysis")
@@ -140,14 +183,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_report_tab(), "Reports")
         self.tabs.addTab(self._build_validation_tab(), "Validation")
         self.tabs.addTab(self._build_public_study_tab(), "3-Day Study")
+        workspace.addWidget(self.tabs, 1)
+        shell.addLayout(workspace, 1)
 
-        layout.addWidget(self.tabs, 1)
-
-        # Status bar
-        self.status_label = QLabel(f"{APP_NAME} V8.3 | {APP_TAGLINE} | {DISCLAIMER}")
+        self.status_label = QLabel(f"{APP_NAME} • {APP_VERSION_LABEL} • {DISCLAIMER}")
         self.status_label.setObjectName("SmallMuted")
-        shell.addWidget(self.tabs, 1)
         shell.addWidget(self.status_label)
+        self._select_workstation_page(0)
 
         if start_demo:
             self.start_demo()
@@ -155,6 +197,13 @@ class MainWindow(QMainWindow):
             self.connect_serial(port)
         if net:
             self.connect_network(net)
+
+    def _select_workstation_page(self, index: int):
+        if not hasattr(self, "tabs"):
+            return
+        self.tabs.setCurrentIndex(int(index))
+        for i, button in enumerate(getattr(self, "_nav_buttons", [])):
+            button.setChecked(i == index)
 
     def _build_header(self):
         box = QGroupBox(f"{APP_NAME} V8.3 - {APP_TAGLINE}")
