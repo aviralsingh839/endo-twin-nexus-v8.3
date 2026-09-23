@@ -127,4 +127,6 @@ class PublicStudyManager:
     def export_csv(self, path: Path | str) -> int:
         if not self.study:
             return 0
-        df = self.store.features_for_session(self.study.session_id)\n        df.to_csv(path, index=False)\n        return len(df)
+        df = self.store.features_for_session(self.study.session_id)
+        df.to_csv(path, index=False)
+        return len(df)
