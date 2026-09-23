@@ -21,7 +21,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from src.config import DATA_DIR, BASELINE_MIN_DAYS, BASELINE_ROLLING_WINDOW_DAYS
+from src.config import DATA_DIR, BASELINE_MIN_DAYS, BASELINE_ROLLING_WINDOW_DAYS, BASELINE_MIN_DURATION_S
 from src.data_models import FeatureVector
 
 
@@ -202,7 +202,7 @@ class PersonalBaselineEngine:
         self._updates_since_save = 0
         self.load()
 
-    def capture_from_features(self, features: Iterable[FeatureVector], min_samples: int = 60) -> PersonalBaseline:
+    def capture_from_features(self, features: Iterable[FeatureVector], min_samples: int = 60, min_duration_s: float | None = None) -> PersonalBaseline:
         rows = [f for f in features if f is not None]
         if len(rows) < min_samples:
             raise ValueError(f"Not enough samples for calibration ({len(rows)} < {min_samples}). Need at least 5 min calm data.")
@@ -210,6 +210,11 @@ class PersonalBaselineEngine:
         ts = [f.timestamp_s for f in rows]
         if not ts:
             raise ValueError("No timestamps")
+
+        # The production first-hour calibration requires real elapsed coverage.
+        # Tests/advanced callers can omit min_duration_s for short synthetic fixtures.
+        if min_duration_s is not None and len(ts) > 1 and (max(ts) - min(ts)) < float(min_duration_s):
+            raise ValueError(f"Calibration window is too short ({max(ts) - min(ts):.0f}s < {float(min_duration_s):.0f}s). Keep the wearable on for about one hour.")
 
         # Calculate days covered
         if len(ts) > 1:
