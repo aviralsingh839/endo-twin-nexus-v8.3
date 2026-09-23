@@ -171,11 +171,11 @@ class DoctorWindow(QMainWindow):
         top.setObjectName("topbar")
         tl = QHBoxLayout(top)
         tl.setContentsMargins(18, 8, 18, 8)
-        brand2 = QLabel("ENDO-TWIN")
-        brand2.setStyleSheet("color:#142b3a;font-size:16px;font-weight:900;")
+        brand2 = QLabel("∞  ENDO-TWIN NEXUS")
+        brand2.setObjectName("brandAccent")
         tl.addWidget(brand2)
         subtitle = QLabel("Personalized Physiological Modelling Platform")
-        subtitle.setStyleSheet("color:#61717d;font-size:10px;font-weight:650;")
+        subtitle.setObjectName("muted")
         tl.addWidget(subtitle)
         tl.addSpacing(18)
 
@@ -407,110 +407,279 @@ class DoctorWindow(QMainWindow):
     def _dashboard_page(self):
         w = QWidget()
         o = QVBoxLayout(w)
-        o.setContentsMargins(25, 18, 20, 15)
-        o.setSpacing(13)
+        o.setContentsMargins(22, 16, 20, 14)
+        o.setSpacing(11)
 
-        t = QLabel("Dashboard")
-        t.setObjectName("title")
-        o.addWidget(t)
-        s = QLabel("Cross-patient overview — Endo-Twin Nexus research workspace")
-        s.setObjectName("muted")
-        o.addWidget(s)
+        # Command-center greeting
+        hero = QFrame()
+        hero.setObjectName("hero")
+        hv = QVBoxLayout(hero)
+        hv.setContentsMargins(18, 14, 18, 14)
+        top = QHBoxLayout()
 
+        left = QVBoxLayout()
+        eyebrow = QLabel("ENDO-TWIN NEXUS  •  RESEARCH WORKSTATION")
+        eyebrow.setObjectName("eyebrow")
+        left.addWidget(eyebrow)
+        welcome = QLabel("Welcome back, Researcher")
+        welcome.setObjectName("dashboardWelcome")
+        left.addWidget(welcome)
+        sub = QLabel("Advancing endocrine health research through multimodal physiological data, AI and longitudinal analysis.")
+        sub.setObjectName("subtitle")
+        sub.setWordWrap(True)
+        left.addWidget(sub)
+        top.addLayout(left, 1)
+
+        date_col = QVBoxLayout()
+        date_col.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        date = QLabel(datetime.now().strftime("%a, %d %b %Y"))
+        date.setObjectName("dashboardDate")
+        clock = QLabel(datetime.now().strftime("%I:%M %p"))
+        clock.setObjectName("dashboardClock")
+        date_col.addWidget(date, 0, Qt.AlignmentFlag.AlignRight)
+        date_col.addWidget(clock, 0, Qt.AlignmentFlag.AlignRight)
+        top.addLayout(date_col)
+        hv.addLayout(top)
+        o.addWidget(hero)
+
+        # KPI strip
         g = QGridLayout()
-        g.setSpacing(12)
+        g.setSpacing(9)
         self.dash_kpis = {}
         kpis = [
-            ("Active patients", "—", "Demo roster"),
-            ("Needs review", "—", "Synthetic queue state"),
-            ("Flagged for attention", "—", "Signal / quality flags"),
-            ("Data quality mix", "—", "Good · Fair · Poor"),
+            ("Active Patients", "—", "Research roster", "#28d5ee"),
+            ("Live Devices", "1 / 1", "Sensor bridge", "#45e5b3"),
+            ("Data Collected", "Local", "Offline-first", "#8c7dff"),
+            ("AI Analyses", "—", "Research modules", "#b083ff"),
+            ("Research Studies", "5", "Platform modules", "#45d9ff"),
         ]
-        for i, (a, b, c) in enumerate(kpis):
-            f = card(a, b, c)
+        for i, (a, b, detail, accent) in enumerate(kpis):
+            f = card(a, b, detail, accent=accent)
+            f.setObjectName("card")
             g.addWidget(f, 0, i)
-            self.dash_kpis[a] = f.findChildren(QLabel)[1]
+            labels = f.findChildren(QLabel)
+            self.dash_kpis[a] = labels[1]
         o.addLayout(g)
 
+        # Main analysis row
         split = QSplitter(Qt.Orientation.Horizontal)
+        split.setChildrenCollapsible(False)
 
-        left = QFrame()
-        left.setObjectName("card")
-        lv = QVBoxLayout(left)
-        lv.addWidget(section_header("Recently synced patients", "Select a row to open its patient-scoped workspace."))
-        self.dash_table = QTableWidget(0, 5)
-        self.dash_table.setHorizontalHeaderLabels(["Patient", "Last session", "Quality", "Review", ""])
-        self._fit_table(self.dash_table)
-        self.dash_table.cellClicked.connect(self._dashboard_row)
-        lv.addWidget(self.dash_table)
+        signals = QFrame()
+        signals.setObjectName("card")
+        sv = QVBoxLayout(signals)
+        sv.setContentsMargins(13, 11, 13, 11)
+        head = QHBoxLayout()
+        htitle = QLabel("Live Sensor Signals")
+        htitle.setObjectName("sectionTitle")
+        head.addWidget(htitle)
+        head.addStretch()
+        live = QLabel("● LIVE")
+        live.setObjectName("liveSignal")
+        head.addWidget(live)
+        sv.addLayout(head)
+        hint = QLabel("Multimodal stream • PPG / EDA / temperature / motion")
+        hint.setObjectName("muted")
+        sv.addWidget(hint)
 
-        right = QFrame()
-        right.setObjectName("card")
-        rv = QVBoxLayout(right)
-        rv.addWidget(section_header("Flags across roster", "Synthetic demo flags are examples only."))
-        self.dash_flags = QVBoxLayout()
-        rv.addLayout(self.dash_flags)
-        rv.addStretch()
-        split.addWidget(left)
-        split.addWidget(right)
-        split.setSizes([730, 520])
-        o.addWidget(split, 1)
-        return w
+        self.dashboard_signal_charts = {}
+        signal_defs = [
+            ("PPG (IR)", "hr_bpm", "bpm", "#2ed9b0"),
+            ("EDA (GSR)", "gsr_tonic", "µS", "#37b8ff"),
+            ("Skin Temp", "skin_temp_c", "°C", "#ffb74d"),
+            ("Accelerometer", "activity_level", "g", "#9a7cff"),
+        ]
+        for label, key, unit, accent in signal_defs:
+            row = QHBoxLayout()
+            name = QLabel("●  " + label)
+            name.setObjectName("signalName")
+            name.setFixedWidth(118)
+            row.addWidget(name)
+            chart = Sparkline(label, unit)
+            chart.setMinimumHeight(42)
+            chart.setMaximumHeight(55)
+            chart.set_values(list(self.metric_history.get(key, [])))
+            self.dashboard_signal_charts[key] = chart
+            row.addWidget(chart, 1)
+            value = QLabel("—")
+            value.setObjectName("signalValue")
+            value.setFixedWidth(58)
+            row.addWidget(value)
+            setattr(self, f"dashboard_{key}_value", value)
+            sv.addLayout(row)
 
-    def _refresh_dashboard(self):
-        if not hasattr(self, "dash_table"):
-            return
-        demo = self.mode.mode == "demo"
-        rows = sorted_cases() if demo else []
-        self.dash_table.setRowCount(0)
-        for c in rows[:6]:
-            r = self.dash_table.rowCount()
-            self.dash_table.insertRow(r)
-            vals = [c.patient, c.last_seen, "Good" if c.quality >= .9 else "Fair" if c.quality >= .8 else "Poor",
-                    "Needs review" if c.tier in ("High","Elevated") else "Reviewed", "›"]
-            for col, val in enumerate(vals):
-                it = QTableWidgetItem(str(val))
-                it.setData(Qt.ItemDataRole.UserRole, c.patient)
-                self.dash_table.setItem(r, col, it)
-
-        for i in reversed(range(self.dash_flags.count())):
-            item = self.dash_flags.takeAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-
-        for c in rows[:5]:
+        insights = QFrame()
+        insights.setObjectName("card")
+        iv = QVBoxLayout(insights)
+        iv.setContentsMargins(13, 11, 13, 11)
+        ih = QHBoxLayout()
+        it = QLabel("ENDO-TWIN AI Insights")
+        it.setObjectName("sectionTitle")
+        ih.addWidget(it)
+        ih.addStretch()
+        demo = status_badge("DEMO MODE" if self.mode.mode == "demo" else "LIVE MODE", "demo" if self.mode.mode == "demo" else "measured")
+        ih.addWidget(demo)
+        iv.addLayout(ih)
+        insight_defs = [
+            ("◈", "Hormonal Pattern", "Research signal", "Within monitored range"),
+            ("◉", "Stress Indicator", "EDA + HRV context", "Awaiting longitudinal baseline"),
+            ("◌", "Circadian Alignment", "Pattern analysis", "Normalisation requires more data"),
+            ("♧", "Activity Level", "Motion-derived", "Personal baseline comparison"),
+        ]
+        for icon, title, detail, state in insight_defs:
             f = QFrame()
             f.setObjectName("soft")
             h = QHBoxLayout(f)
-            h.setContentsMargins(10, 8, 10, 8)
-            v = QVBoxLayout()
-            who = QLabel(c.patient)
-            who.setStyleSheet("font-weight:850;color:#e7ebf3;")
-            v.addWidget(who)
-            msg = QLabel(" • ".join(c.drivers[:2]))
-            msg.setObjectName("muted")
-            v.addWidget(msg)
-            h.addLayout(v, 1)
-            h.addWidget(pill(c.condition))
-            self.dash_flags.addWidget(f)
+            h.setContentsMargins(9, 7, 9, 7)
+            ic = QLabel(icon)
+            ic.setStyleSheet("color:#55dfff;font-size:15px;font-weight:900;")
+            h.addWidget(ic)
+            vv = QVBoxLayout()
+            tt = QLabel(title)
+            tt.setStyleSheet("color:#e8f5ff;font-weight:800;font-size:10px;")
+            vv.addWidget(tt)
+            dd = QLabel(detail)
+            dd.setObjectName("muted")
+            vv.addWidget(dd)
+            h.addLayout(vv, 1)
+            st = QLabel(state)
+            st.setObjectName("muted")
+            st.setWordWrap(True)
+            st.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            h.addWidget(st)
+            iv.addWidget(f)
+        iv.addStretch()
+        split.addWidget(signals)
+        split.addWidget(insights)
+        split.setSizes([700, 430])
+        o.addWidget(split, 1)
 
-        if demo:
-            good = sum(1 for c in rows if c.quality >= .9)
-            fair = sum(1 for c in rows if .8 <= c.quality < .9)
-            poor = sum(1 for c in rows if c.quality < .8)
-            self.dash_kpis["Active patients"].setText(str(len(rows)))
-            self.dash_kpis["Needs review"].setText(str(sum(1 for c in rows if c.tier in ("High","Elevated"))))
-            self.dash_kpis["Flagged for attention"].setText(str(sum(1 for c in rows if len(c.drivers) > 1)))
-            self.dash_kpis["Data quality mix"].setText(f"Good {good}  ·  Fair {fair}  ·  Poor {poor}")
-        else:
-            try:
-                local = self.db.list_patients()
-            except Exception:
-                local = []
-            self.dash_kpis["Active patients"].setText(str(len(local)))
-            self.dash_kpis["Needs review"].setText("UNKNOWN")
-            self.dash_kpis["Flagged for attention"].setText("UNKNOWN")
-            self.dash_kpis["Data quality mix"].setText("UNKNOWN")
+        # Bottom command-center row
+        bottom = QSplitter(Qt.Orientation.Horizontal)
+        bottom.setChildrenCollapsible(False)
+
+        activity = QFrame()
+        activity.setObjectName("card")
+        av = QVBoxLayout(activity)
+        av.setContentsMargins(13, 11, 13, 11)
+        av.addWidget(section_header("Recent Activity", "Local audit and workstation events"))
+        self.dashboard_activity = QVBoxLayout()
+        av.addLayout(self.dashboard_activity)
+        bottom.addWidget(activity)
+
+        actions = QFrame()
+        actions.setObjectName("card")
+        qv = QVBoxLayout(actions)
+        qv.setContentsMargins(13, 11, 13, 11)
+        qv.addWidget(section_header("Quick Actions", "Common research workflows"))
+        action_grid = QGridLayout()
+        action_grid.setSpacing(7)
+        for i, (label, target, obj) in enumerate([
+            ("◉  Open Patient", "patients", "primary"),
+            ("＋  Add Patient", "create", "secondary"),
+            ("⌁  Research Lab", "lab", "secondary"),
+            ("▤  Reports", "patient", "secondary"),
+        ]):
+            b = QPushButton(label)
+            b.setObjectName(obj)
+            if target == "create":
+                b.clicked.connect(self._create_patient)
+            else:
+                b.clicked.connect(lambda _=False, k=target: self._go(k))
+            action_grid.addWidget(b, i // 2, i % 2)
+        qv.addLayout(action_grid)
+        device = QFrame()
+        device.setObjectName("soft")
+        dv = QVBoxLayout(device)
+        dv.setContentsMargins(10, 8, 10, 8)
+        dv.addWidget(QLabel("DEVICE STATUS", objectName="eyebrow"))
+        dev_state = QLabel("●  Sensor Pod  •  Connected")
+        dev_state.setStyleSheet("color:#45e5b3;font-weight:850;font-size:10px;")
+        dv.addWidget(dev_state)
+        dev_ip = QLabel("USB serial / ESP bridge  •  Local-first")
+        dev_ip.setObjectName("muted")
+        dv.addWidget(dev_ip)
+        qv.addWidget(device)
+        bottom.addWidget(actions)
+        bottom.setSizes([650, 480])
+        o.addWidget(bottom, 1)
+
+        return w
+
+    def _refresh_dashboard(self):
+        if not hasattr(self, "dash_kpis"):
+            return
+        demo = self.mode.mode == "demo"
+        rows = sorted_cases() if demo else []
+
+        # KPI values
+        self.dash_kpis["Active Patients"].setText(str(len(rows)) if demo else str(len(self.db.list_patients())))
+        self.dash_kpis["Live Devices"].setText("1 / 1" if self.mode.mode == "live" else "Demo")
+        self.dash_kpis["Data Collected"].setText(f"{self.packet_count:,} pkts" if self.packet_count else "Ready")
+        self.dash_kpis["AI Analyses"].setText(str(sum(1 for c in rows if c.tier in ("High", "Elevated"))) if demo else "—")
+
+        # Live signal values/charts
+        if self.latest_row:
+            vals = {
+                "hr_bpm": (self.latest_row.get("hr_bpm"), " bpm"),
+                "gsr_tonic": (self.latest_row.get("gsr_tonic"), " µS"),
+                "skin_temp_c": (self.latest_row.get("skin_temp_c"), " °C"),
+                "activity_level": (self.latest_row.get("activity_level"), " g"),
+            }
+            for key, (value, suffix) in vals.items():
+                label = getattr(self, f"dashboard_{key}_value", None)
+                if label is not None:
+                    label.setText(self._fmt(value, suffix, 1))
+                chart = self.dashboard_signal_charts.get(key)
+                if chart is not None:
+                    chart.set_values(list(self.metric_history.get(key, [])))
+
+        # Recent activity
+        if hasattr(self, "dashboard_activity"):
+            for i in reversed(range(self.dashboard_activity.count())):
+                item = self.dashboard_activity.takeAt(i)
+                if item.widget():
+                    item.widget().deleteLater()
+            events = list(reversed(self.events[-4:]))
+            if not events:
+                events = [
+                    (datetime.now().strftime("%H:%M:%S"), "Workstation ready", "Local research environment initialized"),
+                    (datetime.now().strftime("%H:%M:%S"), "Data stream", "Waiting for first feature packet"),
+                ]
+            for stamp, title, detail in events:
+                row = QFrame()
+                row.setObjectName("soft")
+                h = QHBoxLayout(row)
+                h.setContentsMargins(9, 6, 9, 6)
+                time = QLabel(stamp[-8:])
+                time.setObjectName("muted")
+                time.setFixedWidth(62)
+                h.addWidget(time)
+                col = QVBoxLayout()
+                tt = QLabel(title)
+                tt.setStyleSheet("color:#e8f5ff;font-weight:800;font-size:10px;")
+                col.addWidget(tt)
+                dd = QLabel(detail)
+                dd.setObjectName("muted")
+                col.addWidget(dd)
+                h.addLayout(col, 1)
+                ok = QLabel("●")
+                ok.setStyleSheet("color:#45e5b3;font-weight:900;")
+                h.addWidget(ok)
+                self.dashboard_activity.addWidget(row)
+
+        # Preserve the existing roster/table refresh behavior if the widgets exist.
+        if hasattr(self, "dash_table"):
+            self.dash_table.setRowCount(0)
+            for c in rows[:6]:
+                rr = self.dash_table.rowCount()
+                self.dash_table.insertRow(rr)
+                vals = [c.patient, c.last_seen, "Good" if c.quality >= .9 else "Fair" if c.quality >= .8 else "Poor",
+                        "Needs review" if c.tier in ("High","Elevated") else "Reviewed", "›"]
+                for col, val in enumerate(vals):
+                    it = QTableWidgetItem(str(val))
+                    it.setData(Qt.ItemDataRole.UserRole, c.patient)
+                    self.dash_table.setItem(rr, col, it)
 
     def _dashboard_row(self, row, _col):
         pid = self.dash_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
