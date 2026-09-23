@@ -413,3 +413,28 @@ footer strong { color: white; }
   .nav-links.is-open { display:flex; }
   .nav-links a { color:var(--text-muted); }
 }
+
+
+/* ENDO-TWIN NEXUS professional system pass — 2026-09 */
+:root{
+  --page:#f6f8fb;--surface:#fff;--surface-alt:#f9fbfd;--ink:#17212b;--muted:#667483;
+  --line:#d8e0e8;--line-strong:#c5cfda;--teal:#0b6670;--teal-strong:#167d88;
+  --blue:#315b84;--success:#237a57;--warning:#a66a00;--danger:#b33a3a;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:10px;--shadow-flat:0 1px 2px rgba(23,33,43,.05);
+}
+body{background:var(--page);color:var(--ink);font-family:Inter,"Noto Sans","Segoe UI",Arial,sans-serif;line-height:1.6}
+header{background:rgba(255,255,255,.97);border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(23,33,43,.06);padding:.65rem 0}
+.logo h1{color:var(--ink);font-size:1.35rem;letter-spacing:-.35px}.logo .version{color:var(--teal);font-size:.72rem}
+.nav-links a{color:var(--muted);border-radius:var(--radius-sm);padding:6px 9px}.nav-links a:hover{color:var(--ink);background:#eef5f6}
+.hero{background:#142b3a;padding:4.25rem 0 3rem;text-align:left}.hero-content{max-width:1120px}.hero h2{font-size:clamp(2.2rem,4vw,3.4rem);letter-spacing:-1.8px}.tagline{color:#8edbd0;font-size:1rem;letter-spacing:2px}.subtitle{max-width:900px;color:#d4dde3}.platform-badge{border-radius:var(--radius-sm);background:#203f4b;border-color:#416872;color:#b9ebe3}
+.disclaimer{border-radius:var(--radius-sm);background:#332c17;border-color:#665522;color:#f1cb70}
+.btn{border-radius:var(--radius-sm);padding:.7rem 1.15rem}.btn.primary{background:var(--teal);box-shadow:none}.btn.primary:hover{background:var(--teal-strong);transform:none}.btn.secondary{background:transparent;border-color:#60727e}.btn.secondary:hover{background:#203f4b;transform:none}
+.architecture-preview{border-radius:var(--radius-md);background:#0f2531;border-color:#38505c;box-shadow:none;padding:1.25rem}
+.section{padding:3.5rem 0}.section.alt{background:#f1f4f7;border-color:var(--line)}.section h2{color:var(--ink);font-size:2rem}.section h3{color:#253746}
+.card,.tech-card,.app-card{border-radius:var(--radius-md);box-shadow:var(--shadow-flat);padding:1.25rem}.card:hover,.tech-card:hover,.app-card:hover{transform:none;box-shadow:0 2px 7px rgba(23,33,43,.08);border-color:var(--line-strong)}
+.flow-step,.timeline-content,.provider-card{border-radius:var(--radius-md);box-shadow:none}.flow-step:hover,.provider-card:hover{box-shadow:0 2px 7px rgba(23,33,43,.06)}
+.flow-step{border-left-width:3px;padding:1.15rem}.flow-step small{border-radius:4px}.timeline-dot{border-radius:50%;box-shadow:none}.timeline-content{padding:1rem}
+.warning-box{background:#fff8e8;border-radius:var(--radius-md);box-shadow:none}
+footer{background:#142b3a}
+@media(max-width:768px){.hero{text-align:left;padding:3rem 0 2.25rem}.container{padding:0 16px}.section{padding:2.5rem 0}.card,.tech-card,.app-card{padding:1rem}.architecture-preview{overflow:auto}.architecture-preview pre{min-width:560px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
