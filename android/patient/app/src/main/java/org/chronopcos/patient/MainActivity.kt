@@ -232,7 +232,7 @@ private fun HomeScreen(patientId: String, alias: String) {
         item {
             Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("3-day wearable observation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("1-hour personal baseline + ongoing observation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("The participant wears the ESP sensor pod during ordinary daily life. The app records timestamped CP2 packets locally and keeps the participant de-identified.")
                     ProvenanceBadge("REAL ACQUISITION ONLY", "measured")
                 }
@@ -244,7 +244,7 @@ private fun HomeScreen(patientId: String, alias: String) {
                 "Start the 3-day study and keep the phone connected to ENDO-TWIN-S3.",
                 "A persistent notification shows that recording is active.",
                 "The app records raw CP2 packets locally and reconnects after temporary Wi-Fi loss.",
-                "After Day 3, export the study and run baseline/longitudinal analysis on the desktop."
+                "After the first quality-gated hour, the app can show the personal baseline status; ongoing observations update longitudinal context."
             ).forEachIndexed { i, text ->
                 Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
@@ -274,8 +274,18 @@ private fun HealthScreen(patientId: String) {
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Baseline status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Waiting for the three-day observation window. The baseline is calculated from collected observations rather than a fixed population reference.")
-                    ProvenanceBadge("BASELINE: NOT READY", "warn")
+                    Text("Waiting for the first one-hour quality-gated observation window. The baseline is calculated from this participant's measurements rather than a fixed population reference.")
+                    ProvenanceBadge("BASELINE: 1 HOUR • NOT READY", "warn")
+                }
+            }
+        }
+        item {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("CHRONO-PCOS screening signal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("After the one-hour baseline and adequate signal quality, the research engine can present LOWER RESEARCH SIGNAL, ELEVATED RESEARCH SIGNAL, or INSUFFICIENT DATA.")
+                    ProvenanceBadge("RESEARCH ONLY • NOT A DIAGNOSIS", "warn")
+                    Text("A wearable signal cannot establish PCOS/PCOD. Clinical assessment remains required.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
