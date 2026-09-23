@@ -287,3 +287,64 @@ QCheckBox::indicator:checked {{ background: qlineargradient(x1:0, y1:0, x2:1, y2
 QToolTip {{ background: {PANEL_ALT}; color: {TEXT}; border: 1px solid {BORDER_LIGHT};
             padding: 7px; border-radius: 7px; font-size: 10pt; }}
 """
+
+
+/* ENDO-TWIN V8.7 visual refinement */
+QLabel { background: transparent; }
+QWidget#CentralRoot {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #07111f,stop:0.55 #09182a,stop:1 #0d1e32);
+}
+QFrame#AppHeader {
+    background: #0f1c30;
+    border: 1px solid #263a5b;
+    border-radius: 18px;
+}
+QLabel#AppTitle {
+    font-size: 25pt;
+    font-weight: 800;
+    color: #f5f9ff;
+    letter-spacing: 1px;
+}
+QLabel#AppSubtitle {
+    font-size: 10.5pt;
+    color: #8fa5c4;
+}
+QLabel#StatusPill {
+    padding: 6px 12px;
+    border-radius: 14px;
+    background: #11243b;
+    border: 1px solid #2b466c;
+    color: #9bc8ff;
+}
+QGroupBox {
+    background: #101f35;
+    border: 1px solid #263b5c;
+    border-radius: 18px;
+    margin-top: 14px;
+    padding: 14px;
+}
+QTabBar {
+    background: transparent;
+}
+QTabBar::tab {
+    padding: 10px 15px;
+    min-width: 92px;
+    border-radius: 10px;
+    background: #0d1a2d;
+}
+QTabBar::tab:selected {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2d7fdc,stop:1 #735cf0);
+    color: white;
+    font-weight: 700;
+}
+QPushButton {
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-weight: 700;
+}
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTimeEdit {
+    min-height: 34px;
+}
+QTextEdit, QPlainTextEdit {
+    background: #0b182a;
+}
