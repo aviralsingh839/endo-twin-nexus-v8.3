@@ -32,9 +32,12 @@ RECONNECT_RETRY_S = 3.0
 STALE_DATA_TIMEOUT_S = 6.0
 WIFI_BRIDGE_DEFAULT_PORT = 7777
 
-# Baseline
-BASELINE_CAPTURE_S = 300.0
-BASELINE_MIN_SAMPLES = 60
+# Baseline / first-hour personalization
+# The first personal baseline is captured after one hour of quality-gated observation.
+# This is an engineering calibration window, not a clinical reference interval.
+BASELINE_CAPTURE_S = 3600.0
+BASELINE_MIN_DURATION_S = 3300.0  # allow small gaps while still requiring ~55 min coverage
+BASELINE_MIN_SAMPLES = 300
 BASELINE_MIN_DAYS = 3  # minimum days for stable longitudinal baseline
 BASELINE_ROLLING_WINDOW_DAYS = 14
 BASELINE_CONFIDENCE_MIN_OBS = 30
