@@ -9,6 +9,12 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
 command -v arduino-cli >/dev/null || { echo "ERROR: arduino-cli is required."; exit 1; }
 
+# The ESP32 core is not in Arduino's default index; register Espressif's first so
+# `core install esp32:esp32` can resolve. config add is skipped when already set.
+ESP32_INDEX="https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+arduino-cli config dump 2>/dev/null | grep -q "package_esp32_index.json" \
+  || arduino-cli config add board_manager.additional_urls "$ESP32_INDEX"
+
 arduino-cli core update-index
 arduino-cli core install arduino:avr
 arduino-cli core install esp32:esp32
