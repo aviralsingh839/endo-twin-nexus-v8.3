@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-CHRONO-PCOS V8.3+ Complete Control Center - Professional Edition
+ENDO-TWIN NEXUS Engineering Engineering Control Center
 Garuda Linux Click-to-Launch System
-Sense • Model • Predict • Personalize • Connect
+Sense • Model • Predict • Personalize
 
 Fixed: No clipped text, responsive layouts, proper margins, scroll areas, minimum sizes, dynamic resizing
 """
@@ -306,7 +306,7 @@ if PYSIDE_AVAILABLE:
             log_file = project_root / "logs" / "launcher.log"
             try:
                 with open(log_file, "a") as f:
-                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Launching {self.launcher_name}.sh from Control Center\n")
+                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} Launching {self.launcher_name}.sh from Engineering Control Center\n")
             except:
                 pass
             try:
@@ -324,7 +324,7 @@ if PYSIDE_AVAILABLE:
     class ControlCenter(QMainWindow):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("CHRONO-PCOS V8.3+ → ENDO-TWIN COMPLETE CONTROL CENTER - Sense • Model • Predict • Personalize • Connect")
+            self.setWindowTitle("ENDO-TWIN NEXUS → ENDO-TWIN COMPLETE CONTROL CENTER - Sense • Model • Predict • Personalize")
             self.resize(1450, 950)
             self.setMinimumSize(1200, 800)
 
@@ -353,12 +353,12 @@ if PYSIDE_AVAILABLE:
             title.setStyleSheet("font-size: 28px; font-weight: bold; color: white; background: transparent; border: none;")
             header_layout.addWidget(title)
 
-            subtitle1 = QLabel("CHRONO-PCOS is First Disease Model - Complete Control Center")
+            subtitle1 = QLabel("CHRONO-PCOS is First Disease Model - Engineering Engineering Control Center")
             subtitle1.setAlignment(Qt.AlignCenter)
             subtitle1.setStyleSheet("font-size: 16px; font-weight: 600; color: #cbd5e1; background: transparent; border: none; letter-spacing: 1px;")
             header_layout.addWidget(subtitle1)
 
-            subtitle2 = QLabel("Understand your physiological patterns over time - Sense • Model • Predict • Personalize • Connect")
+            subtitle2 = QLabel("Understand your physiological patterns over time - Sense • Model • Predict • Personalize")
             subtitle2.setAlignment(Qt.AlignCenter)
             subtitle2.setStyleSheet("font-size: 12px; color: #0ea5e9; font-weight: 600; background: transparent; border: none; letter-spacing: 2px;")
             header_layout.addWidget(subtitle2)
@@ -519,7 +519,7 @@ if PYSIDE_AVAILABLE:
             footer3.setStyleSheet("font-size: 10px; color: #64748b; background: transparent; border: none;")
             footer_layout.addWidget(footer3)
 
-            footer4 = QLabel("Double-click LAUNCH/ individual .sh for direct launch, or use this Control Center - All launchers auto-detect project root, use .venv/bin/python, work from any directory, log to logs/ - Multi-Patient Safety DEMO-001/002/003 isolation OK - No cross-contamination database level")
+            footer4 = QLabel("Double-click LAUNCH/ individual .sh for direct launch, or use this Engineering Control Center - All launchers auto-detect project root, use .venv/bin/python, work from any directory, log to logs/ - Multi-Patient Safety DEMO-001/002/003 isolation OK - No cross-contamination database level")
             footer4.setAlignment(Qt.AlignCenter)
             footer4.setWordWrap(True)
             footer4.setStyleSheet("font-size: 10px; color: #64748b; background: transparent; border: none;")
@@ -542,10 +542,10 @@ if PYSIDE_AVAILABLE:
 
 def main():
     if not PYSIDE_AVAILABLE:
-        print("PySide6 not available, falling back to console Control Center")
+        print("PySide6 not available, falling back to console Engineering Control Center")
         print("="*70)
-        print("CHRONO-PCOS V8.3+ COMPLETE CONTROL CENTER")
-        print("Sense • Model • Predict • Personalize • Connect")
+        print("ENDO-TWIN NEXUS COMPLETE CONTROL CENTER")
+        print("Sense • Model • Predict • Personalize")
         print("="*70)
         statuses = get_status()
         for k, v in statuses.items():
