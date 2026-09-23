@@ -12,7 +12,7 @@ from typing import Deque, Optional
 
 import numpy as np
 
-from src.config import BASELINE_CAPTURE_S, BASELINE_MIN_SAMPLES, DEFAULT_PROFILE, UserProfile
+from src.config import BASELINE_CAPTURE_S, BASELINE_MIN_DURATION_S, BASELINE_MIN_SAMPLES, DEFAULT_PROFILE, UserProfile
 from src.data_models import FeatureVector, SensorSample
 from src.core.quality_control import SensorQualityControl
 from src.core.personal_baseline import PersonalBaselineEngine
@@ -66,7 +66,7 @@ class RealtimeFeatureExtractor:
         now = time.time()
         rows = [f for f in self.feature_history if now - f.timestamp_s <= window_s]
         try:
-            bl = self.baseline_engine.capture_from_features(rows, min_samples=BASELINE_MIN_SAMPLES)
+            bl = self.baseline_engine.capture_from_features(rows, min_samples=BASELINE_MIN_SAMPLES, min_duration_s=BASELINE_MIN_DURATION_S)
             self.auto_captured = False
             self.last_capture_error = None
             return True
@@ -151,7 +151,7 @@ class RealtimeFeatureExtractor:
         if fv.gsr_tonic is not None:
             quality_parts.append(1.0)
         fv.signal_quality = float(np.mean(quality_parts)) if quality_parts else 0.0
-        fv.baseline_completeness = min(1.0, (now - self.start_time) / (5 * 60.0))
+        fv.baseline_completeness = min(1.0, (now - self.start_time) / BASELINE_CAPTURE_S)
 
         # Sleep estimate - simple heuristic
         import datetime as _dt
@@ -213,7 +213,7 @@ class RealtimeFeatureExtractor:
             if not self.auto_captured and elapsed >= BASELINE_CAPTURE_S:
                 recent = [f for f in self.feature_history if now - f.timestamp_s <= BASELINE_CAPTURE_S]
                 if recent and float(np.mean([f.signal_quality for f in recent])) >= 0.5:
-                    self.auto_captured = self.capture_baseline()
+                    self.auto_captured = self.capture_baseline(window_s=BASELINE_CAPTURE_S)
                     fv.baseline_available = self.baseline_engine.has_baseline
                     fv.baseline_completeness = 1.0 if self.baseline_engine.has_baseline else fv.baseline_completeness
 
