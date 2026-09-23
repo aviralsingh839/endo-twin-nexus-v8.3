@@ -23,8 +23,8 @@ Clearly distinguish OBSERVED DERIVED MODEL-INFERRED EXPERIMENTAL DEMO SIMULATED
 - PPG-derived HRV less accurate than ECG, motion artifacts affect
 - Skin temp not core temp, affected environment, DS18B20 skin temp room temp temp slope
 - Wrist activity not whole-body calorimetry, MPU6050 motion ax ay az gx gy gz motion index activity level
-- GSR raw tonic phasic, affected environment
-- MAX30102 PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP2
+- , affected environment
+- MAX30102 PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP3
 - Quality affected by motion, pressure, skin tone
 - Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
 

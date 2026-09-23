@@ -74,7 +74,7 @@ Verified behaviour (simulated, `scripts/demo_self_learning.py`):
 
 ## 3. The supervised head
 
-Seven features (`hr_z, rmssd_z, temp_z, gsr_z, activity_z, hour_sin, hour_cos`), fed
+Six features (`hr_z, rmssd_z, temp_z, activity_z, hour_sin, hour_cos` - the GSR feature left with the GSR hardware), fed
 only by labels the wearer logs. It is deliberately hard to switch on:
 
 * ≥ 20 labels with ≥ 5 in each class;

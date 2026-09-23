@@ -1,14 +1,14 @@
 # 15 - Public Website - V8.3+
 
 ## Overview
-Public website structure Home tagline, What is, Problem, How it Works flow Sensors→Signal Processing→Feature Extraction→Multimodal AI→Chrono-Metabolic Fingerprinting→Risk Screening→Doctor Review, Technology Arduino/PPG/HR/HRV/GSR/motion/temp/ultrasound/AI/signal processing, Patient App, Doctor App, Care Discovery, Research hypothesis/methodology, Benefits without unsupported claims, Safety limitations, Privacy local-first, Documentation links to 25 docs.
+Public website structure Home tagline, What is, Problem, How it Works flow Sensors→Signal Processing→Feature Extraction→Multimodal AI→Chrono-Metabolic Fingerprinting→Risk Screening→Doctor Review, Technology Arduino/PPG/HR/HRV/motion/temp/ultrasound/AI/signal processing, Patient App, Doctor App, Care Discovery, Research hypothesis/methodology, Benefits without unsupported claims, Safety limitations, Privacy local-first, Documentation links to 25 docs.
 
 ## Structure
 - Home: tagline Sense•Model•Predict•Personalize•Connect, subtitle research ecosystem, disclaimer Research Prototype Not Medical Diagnosis, CTA Learn More View Apps GitHub, architecture preview Sensors→...→Doctor Review
 - What is: What it IS (research prototype, risk pre-screening, educational, local-first, patient+doctor+care+website) and What it IS NOT (not medical device, not diagnostic, not replacement, not claiming diagnose)
 - Problem: PCOS/PCOD challenges, need for accessible research tools, not diagnosis
 - How it Works: flow-diagram 9 steps icons Sensors Signal Processing Feature Extraction Personal Baseline Longitudinal Multimodal AI Chrono-Metabolic Fingerprinting Risk Screening Doctor Review
-- Technology: 3 cards Arduino (Nano pod MAX30102 MPU6050 DS18B20 GSR 20Hz $CP2, Mega hub ECG mic FSR BME280 OLED), Signal Processing (filtering baseline artifact quality missing handling feature extraction baseline calibration), AI/ML (PCOSModule SleepModule CardiometabolicModule AutonomicModule fusion chrono-metabolic fingerprint model transparency no fake confidence)
+- Technology: 3 cards Arduino (ESP32-S3 wearable pod MAX30102 MPU6050 DS18B20 skin temp 20Hz $CP3, Mega hub ECG mic FSR BME280 OLED), Signal Processing (filtering baseline artifact quality missing handling feature extraction baseline calibration), AI/ML (PCOSModule SleepModule CardiometabolicModule AutonomicModule fusion chrono-metabolic fingerprint model transparency no fake confidence)
 - Patient App: dashboard/profile/measurements/symptoms/cycle/results/reports/sharing/find care Kivy offline SQLite APK Buildozer accessibility large readable multilingual-ready offline-first local-first
 - Doctor App: Doctor PC (dashboard/patient management/physiological data/advanced analysis/ultrasound/longitudinal/notes/reports professional dense PySide6 PyQtGraph) Doctor Android mobile companion patient list/search/profiles/recent measurements/trends/screening results/ultrasound/reports/notes/follow-up not duplicate full PC
 - Care Discovery: Nearby example provider cards demo View Directions Contact, verification status verified/pending/unverified/demo never falsely label, OSM directions no API key offline-first, provider directory separate from private records

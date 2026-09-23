@@ -211,7 +211,7 @@ class EndoTwinMainApp:
                 {
                     "id": "todays_measurements",
                     "title": "Today's Measurements",
-                    "description": "HR, HRV, activity, temperature, GSR - MEASURED with quality, source, timestamp, artifact detection",
+                    "description": "HR, HRV, activity, temperature - MEASURED with quality, source, timestamp, artifact detection",
                     "action": "View Measurements",
                     "category": "general"
                 },

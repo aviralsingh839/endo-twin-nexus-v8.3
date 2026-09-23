@@ -48,7 +48,6 @@ data class PhysiologicalData(
     val hr: String, // HR 72 bpm MEASURED quality 0.91 source MAX30102
     val hrv: String, // HRV RMSSD 48 ms DERIVED quality 0.85 limitations PPG less accurate than ECG
     val ppg: String,
-    val gsr: String,
     val temperature: String,
     val motion: String,
     val quality: Double,

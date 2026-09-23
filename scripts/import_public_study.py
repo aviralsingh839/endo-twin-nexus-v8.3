@@ -68,7 +68,7 @@ def main() -> int:
                             "rmssd": fv.rmssd_ms,
                             "spo2": fv.spo2_pct,
                             "skin_temp": fv.skin_temp_c,
-                            "gsr": fv.gsr_tonic,
+                            "gsr": None,  # retired channel; column kept nullable
                             "motion": fv.motion_index,
                             "activity": fv.activity_level,
                             "stress": fv.stress_index,

@@ -10,7 +10,6 @@ from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, Q
 
 from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.packet_parser import decode_status_flags
-from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.imu import IMUProcessor
 from src.signal_processing.ppg import PPGProcessor
 from src.signal_processing.temperature import TemperatureProcessor
@@ -99,11 +98,9 @@ class StreamingFeatureProcessor:
     def __init__(self):
         self.ppg=PPGProcessor(history_s=180,fs_hz=20.0)
         self.imu=IMUProcessor(history_s=180,fs_hz=20.0)
-        self.gsr=GSRProcessor(history_s=600,fs_hz=10.0)
         self.temp=TemperatureProcessor(history_s=3600)
         self.samples=0
         self.last_emit=0.0
-        self.last_gsr_ts=0.0
         self.last_temp_ts=0.0
         self.times=deque(maxlen=60)
 
@@ -120,9 +117,6 @@ class StreamingFeatureProcessor:
         self.imu.add_sample(ts,sample.ax_g,sample.ay_g,sample.az_g,sample.gx_dps,sample.gy_dps,sample.gz_dps)
 
         # Do not oversample slower channels merely because the transport packet is faster.
-        if self.last_gsr_ts<=0.0 or ts-self.last_gsr_ts>=0.10:
-            self.gsr.add_sample(ts,sample.gsr_raw)
-            self.last_gsr_ts=ts
         if self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0:
             self.temp.add_sample(ts,sample.temp_c)
             self.last_temp_ts=ts
@@ -133,24 +127,23 @@ class StreamingFeatureProcessor:
 
         motion=self.imu.features(10.0)
         ppg=self.ppg.features(motion_index=motion["motion_index"])
-        gsr=self.gsr.features(60.0)
         temp=self.temp.features(300.0)
 
         ppg_q=float(ppg.get("ppg_quality") or 0.0)
         flags=decode_status_flags(int(sample.status))
         ppg_absent=any("PPG finger absent" in x for x in flags)
         ppg_sat=any("PPG saturated" in x for x in flags)
-        gsr_bad=any("GSR saturated" in x for x in flags)
         temp_bad=any("DS18B20 error" in x for x in flags)
 
         if ppg_absent: ppg_q*=0.35
         if ppg_sat: ppg_q*=0.50
 
-        gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>1018 else 1.0
         temp_q=0.0 if temp_bad else (1.0 if temp.get("skin_temp_c") is not None else 0.0)
         motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45))
 
-        quality=max(0.0,min(1.0,0.65*ppg_q+0.12*gsr_q+0.10*temp_q+0.13*motion_q))
+        # Signal quality weights renormalised over the channels that still exist
+        # (the GSR term was 0.12 of the former 1.00 total).
+        quality=max(0.0,min(1.0,0.74*ppg_q+0.11*temp_q+0.15*motion_q))
         usable=quality>=0.45 and not ppg_absent and not ppg_sat
 
         hr=ppg.get("hr_bpm") if usable else None
@@ -172,8 +165,6 @@ class StreamingFeatureProcessor:
             "spo2_pct":spo2,
             "skin_temp_c":temp.get("skin_temp_c"),
             "temp_slope_c_per_min":temp.get("temp_slope_c_per_min",0.0),
-            "gsr_tonic":gsr.get("gsr_tonic"),
-            "gsr_phasic_per_min":gsr.get("gsr_phasic_per_min",0.0),
             "motion_index":motion.get("motion_index",0.0),
             "activity_level":motion.get("activity_level",0.0),
             "signal_quality":quality,
@@ -181,7 +172,6 @@ class StreamingFeatureProcessor:
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
-            "gsr_raw":sample.gsr_raw,
             "status_flags":flags,
             "source":sample.source,
             "status":int(sample.status),

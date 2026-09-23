@@ -125,7 +125,6 @@ class ExplanationEngine:
             f"- Day/night activity ratio: {shared.day_night_activity_ratio:.2f}",
             "",
             "Stress / Autonomic:",
-            f"- GSR: {shared.gsr_tonic}",
             f"- Stress index: {shared.stress_index:.0f}%",
             f"- Autonomic imbalance: {shared.autonomic_imbalance:.0f}%",
             f"- Recovery: {shared.recovery_score:.0f}%",

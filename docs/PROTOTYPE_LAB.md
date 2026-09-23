@@ -39,8 +39,7 @@ It exposes:
 - observed packet rate;
 - PPG state/quality;
 - IMU state and motion;
-- temperature validity;
-- GSR state;
+- temperature validity (skin probe contact);
 - ECG raw/lead-off state;
 - FSR context;
 - microphone state;
@@ -53,7 +52,7 @@ Select **LIVE SENSOR MODE** at workstation startup.
 
 1. Power the Arduino and connect USB.
 2. Confirm the expected serial port.
-3. Verify that $CP/$CP2 packets are arriving.
+3. Verify that $CP/$CP3 packets are arriving.
 4. Keep the board/IMU stable.
 5. Keep a steady finger on MAX30102 during the test.
 6. Start **Run 15 s Module Test**.
@@ -83,9 +82,8 @@ Test the modules in this order:
 1. I2C bus
 2. MAX30102
 3. MPU6050
-4. DS18B20
-5. GSR
-6. OLED
+4. DS18B20 skin probe
+5. OLED
 7. LEDs/buzzer/buttons
 8. BME280
 9. BH1750

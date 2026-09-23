@@ -44,9 +44,9 @@ CHRONO-TWIN NEXUS V8.3 uses multiple datasets, clearly labelled.
 
 - **Source:** `src/utils/synthetic.py` `generate_synthetic_cohort`
 - **Label:** SYNTHETIC
-- **Subjects:** 10, diverse baselines age 16-45, BMI 18.5-32, RHR 60-80, HRV 30-60, temp 31.5-33.5, GSR 400-600, activity 20-50, sleep 6.5-8.5, cycle 21-35 days, 20% irregular
+- **Subjects:** 10, diverse baselines age 16-45, BMI 18.5-32, RHR 60-80, HRV 30-60, temp 31.5-33.5, activity 20-50, sleep 6.5-8.5, cycle 21-35 days, 20% irregular
 - **Timeline:** 30 days, 12 samples/day, realistic longitudinal variation not random
-- **Features per sample:** hr_bpm, resting_hr_bpm, rmssd_ms, skin_temp_c, gsr_tonic, activity_level, sleep_duration_h, sleep_regularity, circadian_stability_index, stress_index, signal_quality, scenario, label SYNTHETIC
+- **Features per sample:** hr_bpm, resting_hr_bpm, rmssd_ms, skin_temp_c, activity_level, sleep_duration_h, sleep_regularity, circadian_stability_index, stress_index, signal_quality, scenario, label SYNTHETIC
 - **Scenarios mix:** stable 40%, gradual 20%, persistent 15%, temporary 15%, recovery 10%
 - **Realism:** individual baselines, circadian modulation, sensor noise, missing data 2%, motion artifacts 3%, gradual changes, temporary disturbances, recovery periods
 - **Files:** `data/synthetic/cohort/SYNTH_000.json` ... `SYNTH_009.json`
@@ -59,8 +59,8 @@ CHRONO-TWIN NEXUS V8.3 uses multiple datasets, clearly labelled.
 - **Scenarios:**
   1. scenario_1_stable: stable, LOW CHANGE SIGNAL, physiology within normal variation
   2. scenario_2_gradual: gradual, EARLY CHANGE SIGNAL, parameter slowly moves away, hr_slope 0.12 bpm/day, hrv -0.25
-  3. scenario_3_persistent: persistent, PERSISTENT MULTIMODAL SIGNAL, multiple signals abnormal extended, start day 20, HR +8, HRV -12, temp +0.4, activity -10, GSR +80, sleep -0.8h
-  4. scenario_4_temporary: temporary, TEMPORARY EVENT not disease, brief change then return, days 30-33 HR +15, HRV -15, GSR +120
+  3. scenario_3_persistent: persistent, PERSISTENT MULTIMODAL SIGNAL, multiple signals abnormal extended, start day 20, HR +8, HRV -12, temp +0.4, activity -10, sleep -0.8h
+  4. scenario_4_temporary: temporary, TEMPORARY EVENT not disease, brief change then return, days 30-33 HR +15, HRV -15, temp +0.6
   5. scenario_5_sensor_failure: sensor_failure, LOW SENSOR CONFIDENCE, one sensor stops, must not be interpreted as physiological, day 25 HR missing 70% or flatline quality 0.2
   6. scenario_6_recovery: recovery, RECOVERY TREND, abnormal returns toward baseline, start day 10 duration 25 days
 - **Timeline:** 60 days, 24 samples/day, 1440 points per scenario

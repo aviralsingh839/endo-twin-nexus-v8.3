@@ -118,11 +118,11 @@ class DiseaseModule(ABC):
 **Keeps and improves V8.1 pipeline.**
 
 **Inputs:**
-- Age, BMI, menstrual-cycle info, clinical variables, glucose/metabolic where available, HR, HRV, activity, sleep/circadian, temp trends, GSR/stress, ultrasound structured features
+- Age, BMI, menstrual-cycle info, clinical variables, glucose/metabolic where available, HR, HRV, activity, sleep/circadian, temp trends, stress, ultrasound structured features
 
 **Distinguishes:**
 1. Clinical-variable prediction (age, BMI, cycle regularity)
-2. Wearable physiological signals (HR, HRV, activity, temp, GSR, sleep)
+2. Wearable physiological signals (HR, HRV, activity, temp, sleep)
 3. Ultrasound-derived features (CLINICALLY-ENTERED or IMAGE-DERIVED, quality-gated, UNKNOWN until validated dataset)
 4. Combined/fused research estimate (with provenance breakdown)
 
@@ -131,7 +131,7 @@ class DiseaseModule(ABC):
 - metabolic: insulin-resistance tendency proxy (BMI, glucose, sleep, stress)
 - glucose: manual glucose risk (optional)
 - bp: manual BP risk (optional)
-- stress_autonomic: HR/HRV/GSR-derived
+- stress_autonomic: HR/HRV-derived
 - sleep: sleep/wake quality
 - circadian: cosinor rhythm stability
 - temperature_rhythm: skin-temp rhythm disruption
@@ -218,11 +218,10 @@ overall = 0.30*rhr + 0.25*hrv + 0.25*activity + 0.20*metabolic + baseline_penalt
 ### Module D - Autonomic / Stress Regulation
 
 **Uses:**
-- HRV, resting HR, GSR, activity, sleep, temp
+- HRV, resting HR, activity, sleep, temp
 
 **Assesses:**
 - HRV: >=50 good, 35-50 moderate, 20-35 reduced, <20 low
-- GSR: uses baseline deviation if available, else absolute >700 high, >550 moderate
 - Stress index: direct
 
 **Acute vs Persistent Separation:**
@@ -235,7 +234,7 @@ overall = 0.30*rhr + 0.25*hrv + 0.25*activity + 0.20*metabolic + baseline_penalt
 
 **Overall:**
 ```
-overall = 0.35*hrv + 0.25*gsr + 0.40*stress + (10 if persistent else 0)
+overall = 0.467*hrv + 0.533*stress + (10 if persistent else 0)   # was 0.35/0.25/0.40 before the GSR component was removed
 ```
 
 **Signals:**
@@ -335,4 +334,4 @@ Every module's `limitations()` method returns explicit research-only disclaimer:
 - PCOS: requires Rotterdam criteria, wearable alone cannot diagnose, ultrasound UNKNOWN until validated dataset, not clinically validated
 - Sleep: not diagnosis, does not replace polysomnography, wearable approximate, needs multiple days, not clinically validated
 - Cardiometabolic: not diabetes/hypertension/CVD diagnosis, HR/HRV influenced by many factors, activity trends need multiple days, clinical data user-entered not validated, not clinically validated
-- Autonomic: not mental-health diagnosis, HRV/GSR influenced by many factors, acute signals normal, persistent needs multiple days, not psychiatric diagnosis, not clinically validated
+- Autonomic: not mental-health diagnosis, HRV influenced by many factors, acute signals normal, persistent needs multiple days, not psychiatric diagnosis, not clinically validated

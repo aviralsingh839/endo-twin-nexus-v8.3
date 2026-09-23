@@ -25,8 +25,7 @@ class UncertaintyModel:
                     "per_channel": {
                         "ppg": 0.91,
                         "motion": 0.8,
-                        "temp": 0.88,
-                        "gsr": 0.75
+                        "temp": 0.88
                     },
                     "reason_codes": ["Motion artifact at 12:03", "Baseline drift at 12:05"],
                     "artifact_flags": 2,

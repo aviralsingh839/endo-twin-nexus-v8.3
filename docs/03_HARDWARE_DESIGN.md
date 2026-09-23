@@ -2,12 +2,12 @@
 
 ## Wearable Pod (Nano)
 - MCU: Arduino Nano
-- Sensors: MAX30102 PPG (HR, SpO2, pulse amplitude), MPU6050 (ax,ay,az,gx,gy,gz, motion index), DS18B20 (skin temp), GSR (raw, tonic, phasic)
+- Sensors: MAX30102 PPG (HR, SpO2, pulse amplitude), MPU6050 (ax,ay,az,gx,gy,gz, motion index), DS18B20 (skin temp, probe in skin contact)
 - Sampling: 20Hz
-- Protocol: $CP2 packet, CRC XOR, fields ir, red, hr, spo2, gsr, ax,ay,az, etc.
+- Protocol: $CP3 packet, CRC XOR, fields ir, red, ax, ay, az, temp0, temp1, status, etc.
 - Power: LiPo + charging
 - Wiring: See WEARABLE_POD_BUILD.md, HARDWARE_BUILD_GUIDE.md
-- Firmware: Arduino sketch, 20Hz loop, $CP2 generation
+- Firmware: Arduino sketch, 20Hz loop, $CP3 generation
 
 ## Lab Hub (Mega)
 - MCU: Arduino Mega 2560
@@ -19,13 +19,13 @@
 - MAX30102: PPG IR+RED, HR bpm, SpO2 %, pulse amplitude, quality - established
 - MPU6050: accelerometer + gyroscope, motion index, activity level - established
 - DS18B20: skin temp C, room temp C, temp slope - established
-- GSR: galvanic skin response, tonic/phasic - established
+- Skin temperature: DS18B20 probe in skin contact - established
 
 ## Quality Considerations
 - PPG quality affected by motion, pressure, skin tone, ambient light
 - HRV from PPG less accurate than ECG
 - Skin temp not core temp, affected by environment
-- GSR affected by sweat, electrode contact
+- Skin temperature affected by probe contact and ambient conditions
 
 ## Failure Handling
 - Sensor unavailable: graceful handling, notify, demo mode

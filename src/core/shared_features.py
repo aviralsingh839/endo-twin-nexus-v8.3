@@ -12,7 +12,6 @@ shared_features = {
   sleep_duration,
   sleep_regularity,
   temperature_trend,
-  gsr,
   circadian_features,
   recovery_features,
   baseline_deviation,
@@ -55,7 +54,6 @@ class SharedFeatureExtractor:
             skin_temp_c=fv.skin_temp_c,
             temperature_trend_c_per_day=fv.temp_slope_c_per_min * 1440.0 if fv.temp_slope_c_per_min else 0.0,
             temperature_rhythm_disruption=fv.temperature_rhythm_disruption,
-            gsr_tonic=fv.gsr_tonic,
             stress_index=fv.stress_index,
             autonomic_imbalance=fv.autonomic_imbalance,
             overall_quality=fv.signal_quality,
@@ -63,7 +61,9 @@ class SharedFeatureExtractor:
 
         # Baseline deviations
         if self.baseline_engine and self.baseline_engine.has_baseline:
-            for metric in ["hr_bpm", "rmssd_ms", "skin_temp_c", "gsr_tonic", "activity_level"]:
+            # The GSR channel was retired with the GSR hardware; the
+            # remaining channels are the ones the wearable actually measures.
+            for metric in ["hr_bpm", "rmssd_ms", "skin_temp_c", "activity_level"]:
                 z = self.baseline_engine.zscore(metric, getattr(fv, metric, None))
                 if z is not None:
                     shared.baseline_deviations[metric] = float(z)
@@ -82,7 +82,6 @@ class SharedFeatureExtractor:
                 "hr": fv.signal_quality,
                 "hrv": fv.signal_quality,
                 "temp": fv.signal_quality,
-                "gsr": fv.signal_quality,
                 "activity": fv.signal_quality,
             }
 

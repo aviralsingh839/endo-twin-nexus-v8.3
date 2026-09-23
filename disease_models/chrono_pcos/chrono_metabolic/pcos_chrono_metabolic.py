@@ -103,7 +103,7 @@ class PCOSChronoMetabolic:
             {
                 "name": "autonomic_pcos",
                 "display_name": "Autonomic PCOS Research Signal",
-                "description": "Autonomic dysregulation research signal - HRV RMSSD + GSR",
+                "description": "Autonomic dysregulation research signal - HRV RMSSD",
                 "category": "pcos_specific + experimental_research",
                 "provenance": "MODEL-INFERRED",
                 "explainability": "RMSSD reflects parasympathetic"
@@ -111,7 +111,7 @@ class PCOSChronoMetabolic:
             {
                 "name": "metabolic_pcos",
                 "display_name": "Metabolic PCOS Context",
-                "description": "Metabolic context may relate to PCOS - multimodal HR, HRV, activity, temp, GSR hypothesized",
+                "description": "Metabolic context may relate to PCOS - multimodal HR, HRV, activity, temp hypothesized",
                 "category": "pcos_specific + experimental_research",
                 "provenance": "MODEL-INFERRED",
                 "limitations": "Experimental, not clinical metabolic measurement"

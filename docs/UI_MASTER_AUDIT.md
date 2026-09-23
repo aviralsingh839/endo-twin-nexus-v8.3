@@ -8,7 +8,7 @@ The repository is a multi-surface research platform: PySide6 desktop workstation
 
 ## Product-wide constraints
 
-- Preserve the canonical CP2 packet contract and parser.
+- Preserve the canonical CP3 packet contract and parser.
 - Preserve DEMO/LIVE separation and provenance labels.
 - Preserve patient-scoped data access and research-only wording.
 - Do not invent unavailable sensors or clinical validation.
@@ -48,7 +48,7 @@ MetricCard, StatusBadge, DeviceCard, SensorCard, ConnectionBadge, SignalQuality,
 
 ## Files to preserve unless a concrete UI reason exists
 
-Scientific core, database, CP2 parser/network readers, model registry, acquisition services, test fixtures, protocol code and safety/guardrail logic.
+Scientific core, database, CP3 parser/network readers, model registry, acquisition services, test fixtures, protocol code and safety/guardrail logic.
 
 ## Validation checklist
 
@@ -58,7 +58,7 @@ Scientific core, database, CP2 parser/network readers, model registry, acquisiti
 - Doctor Gradle build when Android SDK/JDK are available
 - Website static checks/browser smoke test
 - Launcher startup/command exit-state verification
-- Hardware protocol/CP2 parser compatibility checks
+- Hardware protocol/CP3 parser compatibility checks
 - Responsive review at 320/375/390/430/768/1024/1280/1440/1920 widths
 
 ## Audit conclusion

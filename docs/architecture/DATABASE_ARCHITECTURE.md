@@ -38,7 +38,7 @@ Use: foreign keys, migrations, repositories, transactions, indexes, validation. 
 - `database/database.py` - Original DB LocalDatabase
 - `database/endo_twin_database.py` - ENDO-TWIN DB EndoTwinDatabase with DEMO_DATA DEMO-001,002,003 clearly labeled, patient_id DEMO-xxx is_demo=1 label DEMO_DATA, HR 72/78/68 intentionally different data
 - `database/security.py` - Security AuthManager hash_password PBKDF2, EncryptionManager Fernet if available else PROTOTYPE_ENCRYPTED base64 labeled, RoleManager PATIENT/DOCTOR/ADMIN permissions
-- SQLite tables: patients/profiles/symptoms/cycles/sensor_sessions/PPG/HRV/GSR/motion/temp/quality/ultrasound/model_results/analysis_results/reports/doctor_notes/providers/supplies/audit/access - matches required list
+- SQLite tables: patients/profiles/symptoms/cycles/sensor_sessions/PPG/HRV/motion/temp/quality/ultrasound/model_results/analysis_results/reports/doctor_notes/providers/supplies/audit/access - matches required list
 - Local-first, no upload private health to public website, default no cloud
 - Portability: controlled export/import/backup/restore/encrypted package deliberate not automatic
 

@@ -74,7 +74,7 @@ class ShowcaseRunner:
                 log += f"Demo patient created: {patient['anonymous_id']} Age {patient['age_years']} BMI {patient['bmi']} USER-ENTERED DEMO\n"
                 self.demo_patient_id = pid
             elif action == "patient_workflow":
-                log += "Patient Workflow: Dashboard Ready, Profile USER-ENTERED minimal, Measurements guided PPG HR HRV GSR motion temp quality\n"
+                log += "Patient Workflow: Dashboard Ready, Profile USER-ENTERED minimal, Measurements guided PPG HR HRV motion temp quality\n"
             elif action == "sensor":
                 session_id = self.db.create_session(patient_id=getattr(self, 'demo_patient_id', 'demo'), source="DEMO_SIMULATED", label="DEMO", notes="Simulated sensor")
                 log += f"Sensor session: {session_id} source DEMO_SIMULATED label DEMO\n"

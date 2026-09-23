@@ -23,7 +23,7 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 │                                                                         │
 │  SENSING LAYER                                                          │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
-│  │ MAX30102 │ │ MPU6050  │ │ DS18B20  │ │ GSR      │ │ ECG/BME  │      │
+│  │ MAX30102 │ │ MPU6050  │ │ DS18B20  │ │ ECG/BME  │      │
 │  │ PPG IR+RED│ │ Motion  │ │ Temp     │ │ Skin     │ │ Proposed │      │
 │  │ HR HRV   │ │ Activity│ │ Skin Temp│ │ Tonic    │ │          │      │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘      │
@@ -32,7 +32,7 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 │                            │                                            │
 │  TRANSPORT LAYER                                                       │
 │  ┌──────────────────────────────────────────────────────────┐          │
-│  │ Serial $CP2 CRC XOR 20Hz packet parsing reconnection    │          │
+│  │ Serial $CP3 CRC XOR 20Hz packet parsing reconnection    │          │
 │  │ Demo mode simulated sensor without physical sensors      │          │
 │  └──────────────────────┬───────────────────────────────────┘          │
 │                         │                                               │
@@ -40,7 +40,7 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 │  ┌──────────────────────────────────────────────────────────┐          │
 │  │ Quality Control 0-1 per channel ppg motion temp reason   │          │
 │  │ Filtering bandpass 0.5-4Hz PPG lowpass baseline motion   │          │
-│  │ Baseline Removal PPG drift GSR tonic/phasic temp         │          │
+│  │ Baseline Removal PPG drift  temp         │          │
 │  │ Artifact Detection motion MPU6050 correlation amplitude  │          │
 │  │ Missing Handling short gaps interpolation quality penalty│          │
 │  │ Feature Extraction established derived experimental      │          │
@@ -52,11 +52,11 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 │  │ Personal Baseline mean median std MAD rolling confidence │          │
 │  │ Longitudinal 6 scenarios stable gradual persistent temp  │          │
 │  │ Circadian HR/HRV 24h pattern disruption                  │          │
-│  │ Autonomic HRV+GSR regulation                             │          │
+│  │ Autonomic HRV-based regulation                             │          │
 │  │ Variability HRV RMSSD SDNN pNN50                         │          │
 │  │ Activity motion day/night                                │          │
 │  │ Temp skin temp slope circadian                           │          │
-│  │ Metabolic multimodal HR HRV activity temp GSR hypothesized│         │
+│  │ Metabolic multimodal HR HRV activity temp hypothesized│         │
 │  │ Provenance MEASURED CLINICALLY ENTERED IMAGE MODEL UNKNOWN│         │
 │  └──────────────────────┬───────────────────────────────────┘          │
 │                         │                                               │
@@ -93,7 +93,7 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 │  LOCAL DATABASE - 18 Tables Local-First No Cloud                       │
 │  ┌──────────────────────────────────────────────────────────┐          │
 │  │ users patients profiles symptoms cycles sensor_sessions  │          │
-│  │ ppg_data hrv_data gsr_data motion_data temp_data quality│          │
+│  │ ppg_data hrv_data gsr_data (legacy, unused) motion_data temp_data quality│          │
 │  │ ultrasound_records model_results analysis_results reports│          │
 │  │ doctor_notes providers 4 demo supplies 5 audit access    │          │
 │  │ Methods create_user authenticate create_patient list etc │          │
@@ -147,16 +147,16 @@ Must NOT claim diagnosis; distinguish risk-screening/research vs clinical diagno
 ## Data Flow
 
 ```
-SENSOR (MAX30102/MPU6050/DS18B20/GSR/ECG/BME280)
-  → TRANSPORT (Serial $CP2 CRC XOR 20Hz packet parsing reconnection demo mode)
+SENSOR (MAX30102/MPU6050/DS18B20/ECG/BME280)
+  → TRANSPORT (Serial $CP3 CRC XOR 20Hz packet parsing reconnection demo mode)
     → PARSING (timestamped storage)
       → QUALITY CONTROL (0-1 per channel ppg motion temp reason codes source labeling)
-        → FILTERING (bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median GSR lowpass tonic highpass phasic)
-          → BASELINE REMOVAL (PPG drift GSR tonic/phasic temp baseline)
-            → ARTIFACT DETECTION (motion MPU6050 correlation PPG amplitude HR outlier GSR jumps)
+        → FILTERING (bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median )
+          → BASELINE REMOVAL (PPG drift  temp baseline)
+            → ARTIFACT DETECTION (motion MPU6050 correlation PPG amplitude HR outlier temp jumps)
               → MISSING HANDLING (short gaps interpolation quality penalty long gaps mark missing not fabricate)
-                → FEATURE EXTRACTION (established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050 GSR raw derived HRV RMSSD SDNN pNN50 resting HR GSR tonic lowpass phasic highpass activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV+GSR metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation)
-                  → TIMESTAMPED STORAGE (sensor_sessions ppg_data hrv_data gsr_data motion_data temperature_data sensor_quality)
+                → FEATURE EXTRACTION (established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050  derived HRV RMSSD SDNN pNN50 resting HR  activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV-based metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation)
+                  → TIMESTAMPED STORAGE (sensor_sessions ppg_data hrv_data gsr_data (legacy, unused) motion_data temperature_data sensor_quality)
                     → PERSONAL BASELINE (mean median std MAD rolling confidence min obs circadian context learns what is normal for individual first)
                       → LONGITUDINAL CHANGE (6 scenarios stable baseline LOW CHANGE SIGNAL gradual deviation EARLY CHANGE SIGNAL persistent deviation PERSISTENT MULTIMODAL SIGNAL temporary disturbance TEMPORARY EVENT sensor failure LOW SENSOR CONFIDENCE recovery RECOVERY TREND)
                         → RISK LOGIC (PCOSModule SleepModule CardiometabolicModule AutonomicModule risk signals only NOT diagnosis confidence limitations NOT ESTABLISHED)
@@ -174,7 +174,7 @@ SENSOR (MAX30102/MPU6050/DS18B20/GSR/ECG/BME280)
 
 - Dashboard: patient overview today's status physiological measurements HR 72 bpm MEASURED quality 0.91 HRV RMSSD 48 ms DERIVED quality 0.85 Skin Temp 32.5°C MEASURED quality 0.88 Activity 35% MEASURED Sleep Regularity 75% MODEL-INFERRED trends longitudinal changes personal baseline mean median std MAD rolling confidence min obs circadian context alerts/flags education reports professional with disclaimer Research / risk-screening output — not a medical diagnosis privacy local-first no cloud upload default synchronization/export controlled export/import/backup/restore/encrypted package deliberate sharing not automatic
 - Profile: minimal basic/questionnaire/cycle/symptoms
-- Measurements: guided PPG/HR/HRV/GSR/motion/temp/quality graceful failure
+- Measurements: guided PPG/HR/HRV/motion/temp/quality graceful failure
 - Symptoms: structured logging
 - Cycle: tracking dates/length/irregularity/symptoms/notes not diagnosis
 - Results: understandable language Data quality Good not raw unless advanced
@@ -188,7 +188,7 @@ SENSOR (MAX30102/MPU6050/DS18B20/GSR/ECG/BME280)
 
 - Dashboard: overview recent quality pending longitudinal
 - Patient Management: create/search/open/archive/history
-- Physiological: raw/filtered PPG/HR/HRV/GSR/motion/temp/quality/artifacts visualization time-series
+- Physiological: raw/filtered PPG/HR/HRV/motion/temp/quality/artifacts visualization time-series
 - Advanced Analysis: circadian/autonomic/metabolic/fingerprint/multimodal/AI distinguishing categories explainability
 - Ultrasound: all V8.3 caps 11 steps
 - Longitudinal: comparison trends baseline deviation
@@ -250,9 +250,9 @@ FIND CARE map/list distance/specialty/address/hours/services/contact/directions 
 
 ### Public Website
 
-Home tagline What is Problem How it Works flow Sensors→Signal→Feature→Baseline→Longitudinal→Multimodal→Fingerprint→Screening→Doctor Review Technology Arduino/PPG/HR/HRV/GSR/motion/temp/ultrasound/AI/signal Patient App Doctor App Care Discovery Research hypothesis/methodology Benefits without unsupported claims Safety limitations Privacy local-first role offline Docs links 25 docs Footer Design serious modern scientific clean typography diagrams accessible colors responsive mobile strong identity avoid excessive animations/fake claims/stock AI doctor/100% accurate/fake hospital branding
+Home tagline What is Problem How it Works flow Sensors→Signal→Feature→Baseline→Longitudinal→Multimodal→Fingerprint→Screening→Doctor Review Technology Arduino/PPG/HR/HRV/motion/temp/ultrasound/AI/signal Patient App Doctor App Care Discovery Research hypothesis/methodology Benefits without unsupported claims Safety limitations Privacy local-first role offline Docs links 25 docs Footer Design serious modern scientific clean typography diagrams accessible colors responsive mobile strong identity avoid excessive animations/fake claims/stock AI doctor/100% accurate/fake hospital branding
 
-Structure: HOME hero Sense•Model•Predict•Personalize with architecture preview PROBLEM PCOS challenges longitudinal importance HOW IT WORKS interactive flow Sensors→Signal→Quality→Features→Baseline→Longitudinal→AI→Ultrasound→Fusion→Explanation→Patient/Doctor with MEASURED/CLINICALLY-ENTERED/IMAGE-DERIVED/MODEL-INFERRED/UNKNOWN labels HARDWARE actual sensors MAX30102/MPU6050/DS18B20/GSR/ECG/BME280 with what/why/signal/limitations/implemented PHYSIOLOGY HR/HRV/motion/temp/GSR/sleep/autonomic/metabolic CHRONO-METABOLIC major section circadian/autonomic/metabolic/temporal/baseline/multisystem with provenance DIGITAL TWIN computational representation not simulation AI/ML Data/Features/Training/Validation/Registry/Explainability distinction Data vs Model vs Inference vs Clinical ULTRASOUND pipeline 11 steps quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS Patient/Doctor detailed sections ANDROID APK build workflow DATABASE 18 tables local-first REPORTING professional with disclaimer CARE DISCOVERY FIND CARE demo providers TIMELINE V0-V8.3+ interactive with IMPLEMENTED/PROPOSED/CONCEPT SAFETY research prototype disclaimer ROADMAP CHRONO-PCOS→ENDO-TWIN NEXUS DEMO 16 steps DOCS 25+2
+Structure: HOME hero Sense•Model•Predict•Personalize with architecture preview PROBLEM PCOS challenges longitudinal importance HOW IT WORKS interactive flow Sensors→Signal→Quality→Features→Baseline→Longitudinal→AI→Ultrasound→Fusion→Explanation→Patient/Doctor with MEASURED/CLINICALLY-ENTERED/IMAGE-DERIVED/MODEL-INFERRED/UNKNOWN labels HARDWARE actual sensors MAX30102/MPU6050/DS18B20/ECG/BME280 with what/why/signal/limitations/implemented PHYSIOLOGY HR/HRV/motion/temp/sleep/autonomic/metabolic CHRONO-METABOLIC major section circadian/autonomic/metabolic/temporal/baseline/multisystem with provenance DIGITAL TWIN computational representation not simulation AI/ML Data/Features/Training/Validation/Registry/Explainability distinction Data vs Model vs Inference vs Clinical ULTRASOUND pipeline 11 steps quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS Patient/Doctor detailed sections ANDROID APK build workflow DATABASE 18 tables local-first REPORTING professional with disclaimer CARE DISCOVERY FIND CARE demo providers TIMELINE V0-V8.3+ interactive with IMPLEMENTED/PROPOSED/CONCEPT SAFETY research prototype disclaimer ROADMAP CHRONO-PCOS→ENDO-TWIN NEXUS DEMO 16 steps DOCS 25+2
 
 Design: serious modern scientific clean typography diagrams accessible colors responsive mobile strong identity avoid excessive animations/fake claims/stock AI doctor/100% accurate/fake hospital branding
 

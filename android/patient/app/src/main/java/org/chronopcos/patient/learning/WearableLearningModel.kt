@@ -41,7 +41,7 @@ object LearningContract {
 }
 
 val LEARNING_METRICS = listOf(
-    "hr_bpm", "resting_hr_bpm", "rmssd_ms", "skin_temp_c", "gsr_tonic", "activity_level"
+    "hr_bpm", "resting_hr_bpm", "rmssd_ms", "skin_temp_c", "activity_level"
 )
 
 val METRIC_BOUNDS: Map<String, ClosedFloatingPointRange<Double>> = mapOf(
@@ -49,7 +49,6 @@ val METRIC_BOUNDS: Map<String, ClosedFloatingPointRange<Double>> = mapOf(
     "resting_hr_bpm" to 25.0..200.0,
     "rmssd_ms" to 1.0..400.0,
     "skin_temp_c" to 15.0..43.0,
-    "gsr_tonic" to 0.0..4095.0,
     "activity_level" to 0.0..1.0
 )
 
@@ -58,7 +57,6 @@ val POPULATION_PRIOR: Map<String, Pair<Double, Double>> = mapOf(
     "resting_hr_bpm" to (62.0 to 9.0),
     "rmssd_ms" to (42.0 to 15.0),
     "skin_temp_c" to (32.5 to 0.7),
-    "gsr_tonic" to (450.0 to 180.0),
     "activity_level" to (0.10 to 0.08)
 )
 
@@ -435,9 +433,15 @@ class MetricLearning(private val metric: String, private val cfg: LearningConfig
     }
 }
 
-private const val HEAD_FEATURES = 7
+private const val HEAD_FEATURES = 6
 
-/** Online logistic regression with prospective (leak-free) validation. */
+/**
+ * Online logistic regression with prospective (leak-free) validation.
+ *
+ * Feature set: hr_z, rmssd_z, temp_z, activity_z, hour_sin, hour_cos. The GSR
+ * feature left with the GSR hardware, so the head no longer has a channel that
+ * never produces a value.
+ */
 class SupervisedHead(private val cfg: LearningConfig) {
     var w = DoubleArray(HEAD_FEATURES)
     var b = 0.0
@@ -698,7 +702,7 @@ class WearableLearningModel(
         val hour = (ts / 3600.0) % 24.0
         val angle = 2.0 * Math.PI * hour / 24.0
         return doubleArrayOf(
-            zOf("hr_bpm"), zOf("rmssd_ms"), zOf("skin_temp_c"), zOf("gsr_tonic"),
+            zOf("hr_bpm"), zOf("rmssd_ms"), zOf("skin_temp_c"),
             zOf("activity_level"), kotlin.math.sin(angle), kotlin.math.cos(angle)
         )
     }

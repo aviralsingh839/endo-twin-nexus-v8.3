@@ -58,7 +58,7 @@ Double-click any in `LAUNCH/`:
 - `CHRONO_METABOLIC.sh` - Chrono-metabolic fingerprinting circadian autonomic variability activity temp metabolic longitudinal provenance
 - `SIGNAL_PROCESSING.sh` - Filtering baseline removal artifact detection missing handling quality control feature extraction
 - `CARE_FINDER.sh` - FIND CARE map/list distance/specialty/address/hours/services/contact/directions/verification OSM no API key demo clearly marked
-- `DATABASE.sh` - 18 tables local-first SQLite users patients profiles symptoms cycles sensor sessions PPG/HRV/GSR/motion/temp/quality ultrasound model_results reports providers supplies audit access
+- `DATABASE.sh` - 18 tables local-first SQLite users patients profiles symptoms cycles sensor sessions PPG/HRV/motion/temp/quality ultrasound model_results reports providers supplies audit access
 - `REPORTS.sh` - Professional reports Research / risk-screening output — not a medical diagnosis model transparency
 - `WEBSITE.sh` - Public scientific website Home Problem How it Works Technology Patient App Doctor App Care Discovery Research Benefits Safety Privacy Documentation
 - `DIAGNOSTICS.sh` - System check actual checks PASS/WARN/FAIL never fake

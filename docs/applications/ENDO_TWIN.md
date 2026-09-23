@@ -20,8 +20,8 @@ Not PCOS-specific. Disease models are plugins.
 ## Navigation
 
 - Overview: What is happening, what changed, data quality, measured vs derived vs model-inferred vs needs attention
-- Measurements: HR, HRV, GSR, Temp, SpO2, Activity
-- Signals: PPG raw filtered quality, ECG, GSR, IMU, Temp
+- Measurements: HR, HRV, Temp, SpO2, Activity
+- Signals: PPG raw filtered quality, ECG, IMU, Temp
 - Personal Baseline: Rolling mean median MAD confidence drift missingness time-of-day
 - Longitudinal Trends: Hourly daily weekly monthly cycle, 6 scenarios stable low change gradual early change persistent multimodal temporary event sensor failure low confidence recovery trend
 - Sleep & Circadian: Sleep timing activity timing temperature rhythm regularity

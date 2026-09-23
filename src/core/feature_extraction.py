@@ -20,7 +20,6 @@ from src.core.adaptive_learning import AdaptiveWearableModel
 from src.core.shared_features import SharedFeatureExtractor
 from src.signal_processing.ppg import PPGProcessor
 from src.signal_processing.imu import IMUProcessor
-from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.temperature import TemperatureProcessor
 from src.signal_processing.ecg import ECGProcessor
 from src.utils.quality import completeness_score
@@ -43,7 +42,6 @@ class RealtimeFeatureExtractor:
         # Signal processors
         self.ppg = PPGProcessor()
         self.imu = IMUProcessor()
-        self.gsr = GSRProcessor()
         self.temp = TemperatureProcessor(history_s=24 * 3600)
         self.ecg = ECGProcessor()
 
@@ -90,7 +88,6 @@ class RealtimeFeatureExtractor:
             "ay_g": sample.ay_g,
             "az_g": sample.az_g,
             "temp_c": sample.temp_c,
-            "gsr_raw": sample.gsr_raw,
             "ecg_raw": sample.ecg_raw,
         }, source=sample.source)
         self._quality_history.append({k: v.quality for k, v in qualities.items()})
@@ -98,7 +95,6 @@ class RealtimeFeatureExtractor:
         self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red)
         self.imu.add_sample(sample.timestamp_s, sample.ax_g, sample.ay_g, sample.az_g,
                             sample.gx_dps, sample.gy_dps, sample.gz_dps)
-        self.gsr.add_sample(sample.timestamp_s, sample.gsr_raw)
         self.temp.add_sample(sample.timestamp_s, sample.temp_c)
         self.ecg.add_sample(sample.timestamp_s, sample.ecg_raw)
         self.last_lux = sample.lux if sample.lux is not None and sample.lux >= 0 else self.last_lux
@@ -107,7 +103,6 @@ class RealtimeFeatureExtractor:
         now = time.time()
         imu_f = self.imu.features()
         ppg_f = self.ppg.features(motion_index=imu_f["motion_index"])
-        gsr_f = self.gsr.features()
         temp_f = self.temp.features()
         ecg_f = self.ecg.features()
 
@@ -144,8 +139,6 @@ class RealtimeFeatureExtractor:
             low_activity_risk=imu_f["low_activity_risk"],
             skin_temp_c=temp_f.get("skin_temp_c"),
             temp_slope_c_per_min=temp_f.get("temp_slope_c_per_min") or 0.0,
-            gsr_tonic=gsr_f.get("gsr_tonic"),
-            gsr_phasic_per_min=gsr_f.get("gsr_phasic_per_min") or 0.0,
         )
 
         # Quality: mean over present sensors only
@@ -153,8 +146,6 @@ class RealtimeFeatureExtractor:
         if fv.ecg_quality > 0:
             quality_parts.append(float(fv.ecg_quality))
         if fv.skin_temp_c is not None:
-            quality_parts.append(1.0)
-        if fv.gsr_tonic is not None:
             quality_parts.append(1.0)
         fv.signal_quality = float(np.mean(quality_parts)) if quality_parts else 0.0
         fv.baseline_completeness = min(1.0, (now - self.start_time) / BASELINE_CAPTURE_S)
@@ -199,7 +190,7 @@ class RealtimeFeatureExtractor:
             fv.autonomic_imbalance = 30.0
 
         # Completeness adjustment
-        c = completeness_score(fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic, fv.spo2_pct)
+        c = completeness_score(fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.spo2_pct)
         fv.signal_quality = 0.7 * fv.signal_quality + 0.3 * c
 
         # Personal baseline
@@ -211,7 +202,6 @@ class RealtimeFeatureExtractor:
             fv.hr_zscore = self._z("hr_bpm", fv.hr_bpm, now)
             fv.rmssd_zscore = self._z("rmssd_ms", fv.rmssd_ms, now)
             fv.skin_temp_zscore = self._z("skin_temp_c", fv.skin_temp_c, now)
-            fv.gsr_zscore = self._z("gsr_tonic", fv.gsr_tonic, now)
             fv.resting_hr_zscore = self._z("resting_hr_bpm", fv.resting_hr_bpm, now)
             fv.activity_zscore = self._z("activity_level", fv.activity_level, now)
         else:

@@ -23,7 +23,7 @@ Build:
 ./START.sh patient-pc
 ```
 
-Choose LIVE SENSOR MODE and select the discovered serial port. The same CP2 packet format is used by ESP32 and Mega; the desktop parser remains the single canonical parser.
+Choose LIVE SENSOR MODE and select the discovered serial port. The same CP3 packet format is used by ESP32 and Mega (legacy $CP2 frames also parse); the desktop parser remains the single canonical parser.
 
 ## Android
 ```bash

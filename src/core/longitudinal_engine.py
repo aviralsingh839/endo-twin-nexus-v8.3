@@ -30,7 +30,7 @@ from src.core.personal_baseline import PersonalBaselineEngine
 
 DEFAULT_METRICS = [
     "hr_bpm", "resting_hr_bpm", "rmssd_ms", "skin_temp_c",
-    "gsr_tonic", "activity_level", "sleep_duration_h",
+    "activity_level", "sleep_duration_h",
     "circadian_stability_index", "stress_index"
 ]
 

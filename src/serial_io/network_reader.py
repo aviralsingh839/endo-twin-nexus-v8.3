@@ -25,6 +25,7 @@ class NetworkReader(QObject):
     sample_received = Signal(object)  # SensorSample
     error_received = Signal(str)
     state_changed = Signal(str)
+    ack_received = Signal(str)        # informational "$ACK,..." lines
 
     def __init__(self, host: str, port: int = WIFI_BRIDGE_DEFAULT_PORT, require_crc: bool = True, parent=None):
         super().__init__(parent)
@@ -98,6 +99,10 @@ class NetworkReader(QObject):
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
                     if not line:
+                        continue
+                    if line.startswith("$ACK"):
+                        # e.g. "$ACK,CONNECTED,ENDO-TWIN-ESP32S3" on TCP attach
+                        self.ack_received.emit(line)
                         continue
                     try:
                         sample = self.parser.parse(line)

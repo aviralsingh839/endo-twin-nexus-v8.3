@@ -88,9 +88,9 @@ python -c "from core.sensors import SensorManager; print('sensor OK')"
 - PASS: MAX30102 PPG IR+RED HR HRV what/why/signal/limitations/implemented MEASURED
 - PASS: MPU6050 accelerometer+gyroscope motion activity MEASURED
 - PASS: DS18B20 temperature skin temp MEASURED skin not core affected environment
-- PASS: GSR tonic/phasic MEASURED+DERIVED
+- PASS:  MEASURED+DERIVED
 - PASS: ECG/BME280 PROPOSED future research not implemented mark as Future research never add unsupported modules cancer Alzheimer infectious kidney liver thyroid without dataset
-- PASS: Serial $CP2 CRC XOR 20Hz packet parsing reconnection demo mode simulated sensor without physical sensors
+- PASS: Serial $CP3 CRC XOR 20Hz packet parsing reconnection demo mode simulated sensor without physical sensors
 - PASS: Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
 
 ### Failure Conditions
@@ -117,11 +117,11 @@ python -c "from src.core.feature_extraction import RealtimeFeatureExtractor; e=R
 ### Results
 
 - PASS: Quality Control 0-1 per channel ppg motion temp reason codes source labeling
-- PASS: Filtering bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median GSR lowpass tonic highpass phasic
-- PASS: Baseline Removal PPG drift GSR tonic/phasic temp baseline
-- PASS: Artifact Detection motion MPU6050 correlation PPG amplitude HR outlier GSR jumps quality 0-1 per channel source labeling
+- PASS: Filtering bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median 
+- PASS: Baseline Removal PPG drift  temp baseline
+- PASS: Artifact Detection motion MPU6050 correlation PPG amplitude HR outlier temp jumps quality 0-1 per channel source labeling
 - PASS: Missing Handling short gaps interpolation quality penalty long gaps mark missing not fabricate
-- PASS: Feature Extraction established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050 GSR raw derived HRV RMSSD SDNN pNN50 resting HR GSR tonic lowpass phasic highpass activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV+GSR metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation
+- PASS: Feature Extraction established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050  derived HRV RMSSD SDNN pNN50 resting HR  activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV-based metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation
 - PASS: Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
 - PASS: Pipeline SENSOR → TRANSPORT → PARSING → QUALITY CONTROL → FILTERING → ARTIFACT DETECTION → FEATURE EXTRACTION → TIMESTAMPED STORAGE → PERSONAL BASELINE → LONGITUDINAL CHANGE → RISK LOGIC → MULTIMODAL FUSION → EXPLANATION → REPORT/UI
 
@@ -140,11 +140,11 @@ python -c "from core.chrono_metabolic import ChronoMetabolicFingerprint; f=Chron
 - PASS: Personal Baseline mean median std MAD rolling confidence min obs circadian context learns what is normal for individual first
 - PASS: Longitudinal 6 scenarios stable baseline LOW CHANGE SIGNAL gradual deviation EARLY CHANGE SIGNAL persistent deviation PERSISTENT MULTIMODAL SIGNAL temporary disturbance TEMPORARY EVENT sensor failure LOW SENSOR CONFIDENCE recovery RECOVERY TREND
 - PASS: Circadian HR/HRV 24h pattern disruption
-- PASS: Autonomic HRV+GSR regulation
+- PASS: Autonomic HRV-based regulation
 - PASS: Variability HRV RMSSD SDNN pNN50
 - PASS: Activity motion day/night
 - PASS: Temp skin temp slope circadian
-- PASS: Metabolic multimodal HR HRV activity temp GSR hypothesized experimental not clinical
+- PASS: Metabolic multimodal HR HRV activity temp hypothesized experimental not clinical
 - PASS: Multisystem chrono-metabolic fingerprint combination experimental research not diagnosis
 - PASS: Provenance MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN
 - PASS: Implementation ChronoMetabolicFingerprint engine
@@ -265,7 +265,7 @@ python desktop/doctor_app/main_enhanced.py
 - PASS: Preserves src/ui/main_window.py adds new architecture
 - PASS: Dashboard overview/recent/quality/pending/longitudinal
 - PASS: Patient Management create/search/open/archive/history
-- PASS: Physiological raw/filtered PPG/HR/HRV/GSR/motion/temp/quality/artifacts visualization time-series
+- PASS: Physiological raw/filtered PPG/HR/HRV/motion/temp/quality/artifacts visualization time-series
 - PASS: Advanced Analysis circadian/autonomic/metabolic/fingerprint/multimodal/AI distinguishing categories explainability
 - PASS: Ultrasound all V8.3 caps 11 steps
 - PASS: Longitudinal comparison trends baseline deviation
@@ -297,7 +297,7 @@ ls -lh website/index.html website/style.css website/script.js
 
 ### Results
 
-- PASS: Website static site ready index.html 40K+ (was 26K) extensive scientific site covering all required sections HOME with hero CHRONO-PCOS V8.3+ Sense•Model•Predict•Personalize subtitle research prototype disclaimer CTA 5 buttons architecture preview pre Sensors 20Hz $CP2 CRC XOR → Signal Processing → Feature Extraction HR/HRV → Baseline → Longitudinal → Disease Modules → Fusion → Fingerprinting → Screening → Reporting → DB → Platforms key-points 3 cards Research/Local-First/Garuda PROBLEM 2 cards PCOS challenges longitudinal affordability privacy HOW IT WORKS flow-diagram 12 steps icons MEASURED/DERIVED/MODEL-INFERRED/IMAGE-DERIVED/UNKNOWN HARDWARE 3-col 6 tech-cards MAX30102/MPU6050/DS18B20/GSR/ECG/BME280 with what/why/signal/limitations/implemented MEASURED PHYSIOLOGY 2-col 8 cards HR MEASURED HRV DERIVED motion MEASURED temp MEASURED GSR MEASURED+DERIVED sleep MODEL-INFERRED autonomic EXPERIMENTAL metabolic EXPERIMENTAL with category CHRONO-METABOLIC 2-col 6 cards circadian/autonomic/metabolic/temporal/baseline/multisystem impl ChronoMetabolicFingerprint DIGITAL TWIN flow 7 steps computational representation not perfect simulation AI/ML 2-col 4 cards Data public synthetic clinical labeling REAL/SYNTHETIC/USER-ENTERED Features training ModelTrainer subject-level split Registry explainability Distinction Data vs Model vs Inference vs Clinical ULTRASOUND 2-col 4 cards pipeline 11 steps quality UNKNOWN provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS 2 app-cards detailed patient Kivy sections Dashboard/Profile/Measurements/Symptoms/Cycle/Results/Reports/Sharing/Find Care accessibility security demo doctor PySide6 full workstation sections Dashboard/Patient Management/Physiological/Advanced/Ultrasound/Longitudinal/Notes/Reports role ANDROID 2 cards + build scripts DATABASE 2 cards 18 tables REPORTING example report with MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN disclaimer CARE DISCOVERY provider-card demo TIMELINE V0-V8.3+ 13 items with IMPLEMENTED/PROPOSED/CONCEPT distinguishing actual changes SAFETY warning-box research prototype not diagnosis does NOT list and DOES list ROADMAP flow CHRONO-PCOS→Clinical→Digital Twin→ENDO-TWIN NEXUS future research not implemented DEMO 16 steps GUI behavior DOCS 27 cards 01-25 plus GARUDA/SHOWCASE guides footer project root LAUNCH/COMPLETE_LAUNCHER.sh direct launch examples setup scientific modern design no fake claims
+- PASS: Website static site ready index.html 40K+ (was 26K) extensive scientific site covering all required sections HOME with hero CHRONO-PCOS V8.3+ Sense•Model•Predict•Personalize subtitle research prototype disclaimer CTA 5 buttons architecture preview pre Sensors 20Hz $CP3 CRC XOR → Signal Processing → Feature Extraction HR/HRV → Baseline → Longitudinal → Disease Modules → Fusion → Fingerprinting → Screening → Reporting → DB → Platforms key-points 3 cards Research/Local-First/Garuda PROBLEM 2 cards PCOS challenges longitudinal affordability privacy HOW IT WORKS flow-diagram 12 steps icons MEASURED/DERIVED/MODEL-INFERRED/IMAGE-DERIVED/UNKNOWN HARDWARE 3-col 6 tech-cards MAX30102/MPU6050/DS18B20/ECG/BME280 with what/why/signal/limitations/implemented MEASURED PHYSIOLOGY 2-col 8 cards HR MEASURED HRV DERIVED motion MEASURED temp MEASURED sleep MODEL-INFERRED autonomic EXPERIMENTAL metabolic EXPERIMENTAL with category CHRONO-METABOLIC 2-col 6 cards circadian/autonomic/metabolic/temporal/baseline/multisystem impl ChronoMetabolicFingerprint DIGITAL TWIN flow 7 steps computational representation not perfect simulation AI/ML 2-col 4 cards Data public synthetic clinical labeling REAL/SYNTHETIC/USER-ENTERED Features training ModelTrainer subject-level split Registry explainability Distinction Data vs Model vs Inference vs Clinical ULTRASOUND 2-col 4 cards pipeline 11 steps quality UNKNOWN provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS 2 app-cards detailed patient Kivy sections Dashboard/Profile/Measurements/Symptoms/Cycle/Results/Reports/Sharing/Find Care accessibility security demo doctor PySide6 full workstation sections Dashboard/Patient Management/Physiological/Advanced/Ultrasound/Longitudinal/Notes/Reports role ANDROID 2 cards + build scripts DATABASE 2 cards 18 tables REPORTING example report with MEASURED CLINICALLY ENTERED IMAGE-DERIVED MODEL-INFERRED UNKNOWN disclaimer CARE DISCOVERY provider-card demo TIMELINE V0-V8.3+ 13 items with IMPLEMENTED/PROPOSED/CONCEPT distinguishing actual changes SAFETY warning-box research prototype not diagnosis does NOT list and DOES list ROADMAP flow CHRONO-PCOS→Clinical→Digital Twin→ENDO-TWIN NEXUS future research not implemented DEMO 16 steps GUI behavior DOCS 27 cards 01-25 plus GARUDA/SHOWCASE guides footer project root LAUNCH/COMPLETE_LAUNCHER.sh direct launch examples setup scientific modern design no fake claims
 - PASS: style.css polished modern CSS variables primary #0f172a accent #0ea5e9 shadows sm/md/lg header sticky gradient nav flex wrap hero gradient 135deg radial overlay architecture-preview rgba 0,0,0,0.4 border #334155 blur section 4rem alt #f8fafc grid gap 1.5rem card hover -2px shadow-md flow-step border-left 4px accent timeline ::before gradient dot 44px active dot accent provider-card demo #fffbeb yellow left warning-box gradient #fef2f2 #fee2e2 left red footer gradient responsive 1024 768 no excessive animations
 - PASS: script.js minimal JS smooth scroll pushState highlightNav scrollY active link background rgba(14,165,233,0.2) IntersectionObserver fade-in opacity 0→1 translateY 10→0 0.4s console logs integrity
 - PASS: Public website must NOT expose private records structure Home/What is/Problem/How it Works/Technology/Patient App/Doctor App/Care Discovery/Research/Benefits/Safety/Privacy/Documentation avoid excessive animations/fake claims/stock AI doctor imagery/exaggerated promises/100% accurate/fake hospital branding use clean typography/scientific diagrams/clear sections/accessible colors/responsive/mobile/strong identity

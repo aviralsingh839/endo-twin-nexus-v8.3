@@ -8,7 +8,7 @@ package org.chronopcos.patient.data.model
  */
 
 enum class ProvenanceLabel {
-    MEASURED,              // Directly measured HR, temp, motion, GSR raw
+    MEASURED,              // Directly measured HR, skin temp, motion
     CLINICALLY_ENTERED,    // USER-ENTERED age, BMI, cycle, symptoms
     IMAGE_DERIVED,         // Cyst size, volume, morphology from ultrasound
     MODEL_INFERRED,        // Sleep regularity, circadian disruption, HRV derived, risk signals
@@ -29,7 +29,7 @@ data class PatientIdentity(
 data class PhysiologicalMeasurement(
     val measurementId: String,
     val patientId: String,  // Must contain patient_id - no cross-contamination
-    val type: String, // hr, hrv, ppg, gsr, temperature, motion, sleep, activity
+    val type: String, // hr, hrv, ppg, temperature, motion, sleep, activity
     val value: Double,
     val unit: String,
     val timestamp: Long,

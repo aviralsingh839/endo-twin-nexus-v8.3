@@ -12,7 +12,7 @@ Surface:
 
 DEMO MODE presents named synthetic cases and supports condition/module filtering plus sorting by research priority, research risk or condition. Tier/risk/driver values are synthetic UI examples.
 
-LIVE SENSOR MODE reads CRC-checked Arduino packets and processes PPG/HRV, IMU, GSR and temperature signals with visible quality gates.
+LIVE SENSOR MODE reads CRC-checked Arduino packets and processes PPG/HRV, IMU and temperature signals with visible quality gates.
 
 The Doctor Workstation keeps CHRONO-PCOS as the first disease-specific module inside the general ENDO-TWIN platform. Unsupported ultrasound anatomy stays UNKNOWN.
 

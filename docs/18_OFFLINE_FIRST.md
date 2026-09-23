@@ -6,7 +6,7 @@ Internet optional: provider directory, map tiles, updates, controlled sync
 
 ## Core Offline
 - Patient records: LocalDatabase SQLite, no cloud
-- Sensor collection: SerialManager, PacketParser $CP2, local processing
+- Sensor collection: SerialManager, PacketParser $CP3, local processing
 - Signal processing: Filtering, BaselineRemoval, ArtifactDetection, QualityControl, RealtimeFeatureExtractor local Python
 - AI inference: ModelTrainer, ModelEvaluator, disease modules local sklearn, no API
 - Ultrasound: local loading preprocessing quality checks segmentation inference if model local

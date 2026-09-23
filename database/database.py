@@ -6,7 +6,7 @@ Tables:
 - symptoms
 - cycles
 - sensor_sessions
-- ppg, hr, hrv, gsr, motion, temperature
+- ppg, hr, hrv, motion, temperature
 - sensor_quality
 - ultrasound_records
 - model_results
@@ -172,7 +172,8 @@ class LocalDatabase:
         )
         """)
 
-        # GSR
+        # Retired channel: the table is kept so existing databases still open, but
+        # nothing writes to it any more (GSR hardware is no longer fitted).
         cur.execute("""
         CREATE TABLE IF NOT EXISTS gsr_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

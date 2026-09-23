@@ -4,22 +4,22 @@
 - HR bpm: MAX30102 PPG peak detection, quality 0-1, source MEASURED
 - Skin temp C: DS18B20 direct, quality, source MEASURED
 - Motion: MPU6050 accelerometer magnitude, activity level, source MEASURED
-- GSR raw: direct, source MEASURED
+- : direct, source MEASURED
 
 ## Derived Features (Calculated)
 - HRV RMSSD ms: from HR time series, quality, source DERIVED, limitations PPG-derived less accurate than ECG
 - HRV SDNN, pNN50: derived
 - Resting HR: derived low activity
-- GSR tonic: lowpass filtered, derived
-- GSR phasic per min: highpass, derived
+- 
+- 
 - Activity level %: classified from motion, derived
 - Temp slope C per min: derivative, derived
 - Pulse amplitude, SpO2: IR/RED ratio, derived
 
 ## Experimental Research Signals
 - Circadian rhythm: sleep-wake estimation HR/HRV 24h pattern, model-inferred, experimental, limitations not polysomnography
-- Autonomic regulation: HRV+GSR combination, experimental
-- Metabolic signal: multimodal HR, HRV, activity, temp, GSR hypothesized metabolic regulation, experimental, not clinical
+- Autonomic regulation: HRV-based combination, experimental
+- Metabolic signal: multimodal HR, HRV, activity, temp hypothesized metabolic regulation, experimental, not clinical
 - Chrono-metabolic fingerprint: combination circadian, autonomic, variability, activity, temp, metabolic, longitudinal, experimental, not diagnosis
 - Longitudinal trend: deviation from personal baseline, experimental, requires history
 

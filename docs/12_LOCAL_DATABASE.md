@@ -34,8 +34,9 @@ DATA_DIR/chrono_twin_nexus_v8_3_plus.db, fallback /tmp for testing
 ### HRV Data
 - id PK, session_id FK, timestamp_s, hr_bpm, resting_hr_bpm, rmssd_ms, sdnn_ms, pnn50_pct, quality, label
 
-### GSR Data
+### GSR Data (legacy, unused)
 - id PK, session_id FK, timestamp_s, gsr_raw, gsr_tonic, gsr_phasic_per_min, quality, label
+- retained so existing databases still open; nothing writes to it since the GSR channel was retired
 
 ### Motion Data
 - id PK, session_id FK, timestamp_s, ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps, motion_index, activity_level, quality, label

@@ -6,23 +6,23 @@ Chrono-metabolic fingerprinting combining circadian, autonomic, variability, act
 ## Methodology
 
 ### Physiological Sensing
-- Hardware: Nano pod MAX30102 PPG HR SpO2 pulse amplitude MPU6050 motion ax ay az gx gy gz motion index activity level DS18B20 skin temp room temp temp slope GSR raw tonic phasic
-- Sampling 20Hz $CP2 packet CRC XOR
+- Hardware: Nano pod MAX30102 PPG HR SpO2 pulse amplitude MPU6050 motion ax ay az gx gy gz motion index activity level DS18B20 skin temp room temp temp slope 
+- Sampling 20Hz $CP3 packet CRC XOR
 - Lab hub Mega ECG mic FSR BME280 OLED relay mode expanded validation
-- Quality: PPG quality affected motion pressure skin tone ambient light, HRV from PPG less accurate than ECG, skin temp not core temp affected environment, GSR affected sweat electrode contact
+- Quality: PPG quality affected motion pressure skin tone ambient light, HRV from PPG less accurate than ECG, skin temp not core temp affected environment, skin temperature affected by probe contact
 - Failure handling: sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial graceful handling notify user demo mode
 
 ### Signal Processing
-- Filtering: PPG bandpass 0.5-4Hz HR lowpass baseline, motion lowpass activity, temp median outliers, GSR lowpass tonic highpass phasic
-- Baseline removal: PPG baseline drift, GSR tonic/phasic separation, temp baseline
-- Artifact detection: motion artifact MPU6050 correlation PPG, PPG artifact amplitude HR outlier, GSR sudden jumps, quality scores 0-1 per channel, source labeling
+- Filtering: PPG bandpass 0.5-4Hz HR lowpass baseline, motion lowpass activity, temp median outliers, 
+- Baseline removal: PPG baseline drift,  separation, temp baseline
+- Artifact detection: motion artifact MPU6050 correlation PPG, PPG artifact amplitude HR outlier, temp sudden jumps, quality scores 0-1 per channel, source labeling
 - Missing handling: short gaps interpolation quality penalty, long gaps mark missing not fabricate
 - Quality control: SensorQualityControl channel quality per timestamp overall session quality artifact flags reason codes
 
 ### Feature Engineering
-- Established: HR bpm MAX30102 MEASURED, skin temp C DS18B20 MEASURED, motion MPU6050 MEASURED, GSR raw MEASURED
-- Derived: HRV RMSSD SDNN pNN50 derived limitations PPG less accurate than ECG, resting HR derived low activity, GSR tonic lowpass derived phasic highpass derived, activity level classified derived, temp slope derivative derived, pulse amplitude SpO2 IR/RED ratio derived
-- Experimental: circadian sleep-wake estimation HR/HRV 24h pattern model-inferred experimental limitations not polysomnography, autonomic HRV+GSR experimental, metabolic multimodal HR HRV activity temp GSR hypothesized metabolic regulation experimental not clinical, chrono-metabolic fingerprint combination experimental not diagnosis, longitudinal trend personal baseline deviation experimental requires history
+- Established: HR bpm MAX30102 MEASURED, skin temp C DS18B20 MEASURED, motion MPU6050 MEASURED,  MEASURED
+- Derived: HRV RMSSD SDNN pNN50 derived limitations PPG less accurate than ECG, resting HR derived low activity, , activity level classified derived, temp slope derivative derived, pulse amplitude SpO2 IR/RED ratio derived
+- Experimental: circadian sleep-wake estimation HR/HRV 24h pattern model-inferred experimental limitations not polysomnography, autonomic HRV-based experimental, metabolic multimodal HR HRV activity temp hypothesized metabolic regulation experimental not clinical, chrono-metabolic fingerprint combination experimental not diagnosis, longitudinal trend personal baseline deviation experimental requires history
 - ML predictions: PCOS associated risk PCOSModule v8.3.0 low/moderate/high NOT diagnosis clinical validation NOT ESTABLISHED, sleep circadian disruption SleepModule, cardiometabolic risk CardiometabolicModule, autonomic regulation AutonomicModule, model name/version/input/data quality/confidence/features/limitations never hide uncertainty
 - Clinical interpretation: requires professional evaluation Rotterdam criteria not provided by system research risk-screening only
 - Baseline calibration: BaselineCalibrator personal baseline population not used for diagnosis longitudinal tracking deviation personal baseline
@@ -46,7 +46,7 @@ Chrono-metabolic fingerprinting combining circadian, autonomic, variability, act
 
 ### Chrono-Metabolic Fingerprinting
 - Definition: combines circadian autonomic variability activity temp metabolic longitudinal into fingerprint with clear provenance explainability
-- Components: circadian sleep-wake estimation experimental research quality PPG source PPG-derived limitations not polysomnography explainability HR/HRV circadian variation 24h, autonomic HRV RMSSD GSR derived+experimental quality HRV GSR source PPG-derived RMSSD GSR tonic/phasic limitations PPG less accurate than ECG motion artifacts explainability RMSSD parasympathetic, variability HRV activity derived quality PPG source PPG HR variability limitations requires good quality PPG explainability variability metrics, activity MPU6050 established measurement quality motion 0.8 source MPU6050 activity counts limitations wrist not whole-body calorimetry explainability accelerometer magnitude sedentary/light/moderate, temperature DS18B20 established quality temp 0.8 source DS18B20 limitations skin not core affected environment explainability direct circadian variation, metabolic multimodal HR HRV activity temp GSR experimental quality min quality source multimodal hypothesized metabolic limitations experimental not clinical requires validation explainability research combination autonomic activity temperature, longitudinal personal baseline deviation experimental quality 0.6 requires history source personal baseline comparison limitations requires sufficient history baseline calibration explainability deviation personal baseline not population norm
+- Components: circadian sleep-wake estimation experimental research quality PPG source PPG-derived limitations not polysomnography explainability HR/HRV circadian variation 24h, autonomic HRV RMSSD derived+experimental quality HRV source PPG-derived RMSSD  limitations PPG less accurate than ECG motion artifacts explainability RMSSD parasympathetic, variability HRV activity derived quality PPG source PPG HR variability limitations requires good quality PPG explainability variability metrics, activity MPU6050 established measurement quality motion 0.8 source MPU6050 activity counts limitations wrist not whole-body calorimetry explainability accelerometer magnitude sedentary/light/moderate, temperature DS18B20 established quality temp 0.8 source DS18B20 limitations skin not core affected environment explainability direct circadian variation, metabolic multimodal HR HRV activity temp experimental quality min quality source multimodal hypothesized metabolic limitations experimental not clinical requires validation explainability research combination autonomic activity temperature, longitudinal personal baseline deviation experimental quality 0.6 requires history source personal baseline comparison limitations requires sufficient history baseline calibration explainability deviation personal baseline not population norm
 - Implementation: ChronoMetabolicFingerprint class add_component build_from_features features quality_scores get_summary_text understandable language
 - Output: fingerprint dict version components name value category quality confidence source limitations explainability disclaimer research/experimental not diagnosis provenance V8.3+
 - Why distinguish established/derived/experimental/ML/clinical: scientific integrity honest limitations explainability avoid false claims

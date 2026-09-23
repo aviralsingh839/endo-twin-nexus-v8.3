@@ -19,7 +19,7 @@ Tagline: Sense • Model • Predict • Personalize • Connect
 - Not claiming to diagnose PCOS, only research risk signals
 
 ## Architecture
-Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 temp, GSR) → Signal Processing → Feature Extraction → Baseline Calibration → Disease Modules (risk signals only) → Fusion → Chrono-Metabolic Fingerprint → Screening Results (not diagnosis) → Reporting → Local DB → Patient/Doctor Apps/Care Discovery/Website
+Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 skin temp) → Signal Processing → Feature Extraction → Baseline Calibration → Disease Modules (risk signals only) → Fusion → Chrono-Metabolic Fingerprint → Screening Results (not diagnosis) → Reporting → Local DB → Patient/Doctor Apps/Care Discovery/Website
 
 ## Components
 - Patient Android App (Kivy, offline-first)
@@ -33,7 +33,7 @@ Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 temp, GSR) → Signal Processing 
 
 ## Scientific Foundation
 - PPG-derived HR/HRV (established/derived)
-- GSR/EDA (established)
+- Skin temperature (established)
 - Motion activity (established)
 - Skin temp (established)
 - Chrono-metabolic fingerprint (experimental research)

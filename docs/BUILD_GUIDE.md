@@ -30,7 +30,7 @@ Install:
 ```
 
 ## Live sensor
-For LIVE SENSOR MODE, connect the Arduino by USB and choose its serial port. The workstation requires CRC-checked $CP/$CP2 packets and then runs the existing signal-processing pipeline.
+For LIVE SENSOR MODE, connect the Arduino by USB and choose its serial port. The workstation requires CRC-checked $CP/$CP3 packets and then runs the existing signal-processing pipeline.
 
 ## Mobile bridge
 Doctor Workstation uses port 7777. Patient Workstation uses 7778. The current Android transport path is deliberately DEMO_DATA and is documented separately.

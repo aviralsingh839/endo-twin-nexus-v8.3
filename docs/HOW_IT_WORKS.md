@@ -1,5 +1,7 @@
 # HOW IT WORKS - CHRONO-TWIN NEXUS V8.3
 
+Wire format reference: `docs/WIRE_FORMAT_CP3.md`.
+
 ## Complete Journey
 
 ```
@@ -23,15 +25,15 @@ SENSOR
 - MAX30102 PPG: IR + red, 50 Hz, pulse waveform, HR, HRV, pulse amplitude, SpO2 educational
 - MPU6050 IMU: ax, ay, az, gx, gy, gz, 50 Hz, motion index, activity level
 - DS18B20: skin temperature, 1 Hz
-- Optional GSR: galvanic skin response, 10 Hz
-- Streams 20 Hz `$CP2` packets: `$CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc`
+- DS18B20 skin temperature is sampled once per second
+- Streams 20 Hz `$CP3` packets: `$CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc`
 
 **Mega Hub:**
 - All pod sensors + ECG (periodic checkpoints), microphone, FSR, light, BME280 environment, OLED, LEDs, buzzer, buttons
 - In relay mode forwards pod stream
 
 **Quality at Source:**
-- Status bits: PPG finger absent, PPG saturated, MPU error, DS18B20 error, GSR saturated, I2C error, low quality, ECG leads off, etc.
+- Status bits: PPG finger absent, PPG saturated, MPU error, DS18B20/skin-probe error, I2C error, low quality, ECG leads off, etc.
 
 ---
 
@@ -52,7 +54,7 @@ Every reading gets quality metadata:
 
 **Detects:**
 - Missing data (None, NaN)
-- Impossible values (HR 35-210, temp 20-42°C skin, GSR 0-1023, IR 0-262143)
+- Impossible values (HR 35-210, temp 20-42°C skin, IR 0-262143)
 - Flatline (5+ identical values)
 - Excessive noise (z > 5)
 - Motion artifacts (motion_index > 1.5)
@@ -71,7 +73,6 @@ Every reading gets quality metadata:
 **Signal Processing:**
 - PPG: DC blocker (r=0.97), exponential smoother (alpha=0.35), peak detection with refractory period (60/MAX_HR), HRV time domain (RMSSD, SDNN, pNN50)
 - IMU: motion index, activity level, low_activity_risk
-- GSR: tonic, phasic per minute
 - Temperature: skin_temp, slope per min
 - ECG: HR, RMSSD, quality (when available)
 
@@ -79,7 +80,6 @@ Every reading gets quality metadata:
 - hr_bpm, resting_hr_bpm, rmssd_ms, sdnn_ms, pnn50, pulse amplitude
 - motion_index, activity_level, low_activity_risk
 - skin_temp_c, temp_slope
-- gsr_tonic, gsr_phasic
 - stress_index, acute_stress, chronic_stress, autonomic_imbalance
 - sleep_status, sleep_probability, sleep_duration_h, sleep_regularity, circadian_stability, circadian_disruption
 - signal_quality, baseline_completeness, baseline_available, zscores
@@ -178,7 +178,6 @@ shared_features = {
   skin_temp_c,
   temperature_trend_c_per_day,
   temperature_rhythm_disruption,
-  gsr_tonic,
   stress_index,
   autonomic_imbalance,
   recovery_score,

@@ -20,6 +20,7 @@ class ArduinoReader(QObject):
     sample_received=Signal(object)
     error_received=Signal(str)
     state_changed=Signal(str)
+    ack_received=Signal(str)
     def __init__(self,port:str,baud:int=SERIAL_BAUD,require_crc:bool=True,parent=None):
         super().__init__(parent); self.port=port; self.baud=baud; self.require_crc=require_crc
         self._thread:Optional[threading.Thread]=None; self._stop=threading.Event(); self._serial=None
@@ -69,6 +70,12 @@ class ArduinoReader(QObject):
                 line=self._serial.readline().decode("ascii",errors="replace").strip()
                 if not line:
                     if time.time()-last_data>STALE_DATA_TIMEOUT_S: raise _SerialStaleError()
+                    continue
+                if line.startswith("$ACK"):
+                    # Firmware command acknowledgements ("$ACK,PONG,00") share the
+                    # serial link with measurement frames. They are informational;
+                    # feeding them to the frame parser reported them as errors.
+                    self.ack_received.emit(line)
                     continue
                 sample:SensorSample=self.parser.parse(line); last_data=time.time(); self.sample_received.emit(sample)
             except PacketParseError as exc:self.error_received.emit(f"Packet parse error: {exc}")

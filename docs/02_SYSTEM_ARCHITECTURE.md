@@ -4,10 +4,10 @@
 Preserves ALL V8.3 functionality, adds modular layers.
 
 ## Layers
-1. Hardware: Nano pod (MAX30102, MPU6050, DS18B20, GSR), Mega hub (ECG, mic, FSR, BME280, OLED)
-2. Serial: $CP2 packet CRC XOR 20Hz, PacketParser, SerialManager, reconnection
+1. Hardware: S3 wearable pod (MAX30102, MPU6050, DS18B20 skin temp), Mega hub (ECG, mic, FSR, BME280, OLED)
+2. Serial: $CP3 packet CRC XOR 20Hz, PacketParser, SerialManager, reconnection
 3. Signal Processing: Filtering, BaselineRemoval, ArtifactDetection, QualityControl
-4. Feature Extraction: RealtimeFeatureExtractor HR, HRV RMSSD/SDNN/pNN50, GSR tonic/phasic, motion, temp
+4. Feature Extraction: RealtimeFeatureExtractor HR, HRV RMSSD/SDNN/pNN50, , motion, temp
 5. Baseline Calibration: Personal baseline, longitudinal
 6. Disease Modules: PCOS, Sleep, Cardiometabolic, Autonomic - risk signals only
 7. Fusion: MultimodalFusion

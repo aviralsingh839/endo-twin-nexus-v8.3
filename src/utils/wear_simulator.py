@@ -28,7 +28,6 @@ BASE = {
     "resting_hr_bpm": 62.0,
     "rmssd_ms": 42.0,
     "skin_temp_c": 32.6,
-    "gsr_tonic": 450.0,
     "activity_level": 0.10,
 }
 
@@ -38,7 +37,6 @@ NOISE = {
     "resting_hr_bpm": 1.2,
     "rmssd_ms": 3.0,
     "skin_temp_c": 0.12,
-    "gsr_tonic": 25.0,
     "activity_level": 0.02,
 }
 
@@ -52,7 +50,6 @@ class WearerProfile:
     resting_hr_offset: float = 0.0
     rmssd_offset: float = 0.0
     temp_offset: float = 0.0
-    gsr_offset: float = 0.0
     activity_base: float = 0.10
     noise_scale: float = 1.0
     seed: int = 7
@@ -153,10 +150,6 @@ class SyntheticWearer:
             "skin_temp_c",
             BASE["skin_temp_c"] + p.temp_offset + 0.25 * temp_phase + deltas.get("skin_temp_c", 0.0),
         )
-        gsr = noisy(
-            "gsr_tonic",
-            BASE["gsr_tonic"] + p.gsr_offset + deltas.get("gsr_tonic", 0.0),
-        )
         activity = max(
             0.0,
             min(1.0, p.activity_base + deltas.get("activity_level", 0.0)
@@ -169,7 +162,6 @@ class SyntheticWearer:
             resting_hr_bpm=round(resting, 2),
             rmssd_ms=round(max(5.0, rmssd), 2),
             skin_temp_c=round(temp, 3),
-            gsr_tonic=round(max(0.0, gsr), 2),
             activity_level=round(activity, 4),
             signal_quality=max(0.0, min(1.0, quality)),
         )

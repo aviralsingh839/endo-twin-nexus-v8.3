@@ -1,9 +1,9 @@
 # 22 - Future Research - V8.3+
 
 ## Current Scope (Implemented)
-- PPG-derived HR, HRV, activity, temp, GSR
+- PPG-derived HR, HRV, activity, temp
 - Signal processing filtering baseline artifact quality missing handling
-- Feature extraction HR HRV GSR motion temp quality
+- Feature extraction HR HRV motion temp quality
 - Disease modules PCOS, Sleep, Cardiometabolic, Autonomic risk signals only clinical validation NOT ESTABLISHED
 - Multimodal fusion
 - Chrono-metabolic fingerprinting circadian autonomic variability activity temp metabolic longitudinal experimental research

@@ -54,7 +54,8 @@ class HistoryStore:
                     session_id INTEGER,
                     ts REAL NOT NULL,
                     hr REAL, rmssd REAL, spo2 REAL, skin_temp REAL,
-                    gsr REAL, motion REAL, activity REAL, stress REAL,
+                    gsr REAL,  -- legacy column kept so old databases still open
+                    motion REAL, activity REAL, stress REAL,
                     sleep_prob REAL, circadian REAL, risk REAL,
                     anomaly REAL, signal_quality REAL,
                     extra_json TEXT
@@ -270,7 +271,8 @@ class HistoryStore:
                     session_id,
                     row.get("ts", time.time()),
                     row.get("hr"), row.get("rmssd"), row.get("spo2"), row.get("skin_temp"),
-                    row.get("gsr"), row.get("motion"), row.get("activity"), row.get("stress"),
+                    None,  # gsr: retired channel, column retained for old rows
+                    row.get("motion"), row.get("activity"), row.get("stress"),
                     row.get("sleep_prob"), row.get("circadian"), row.get("risk"),
                     row.get("anomaly"), row.get("signal_quality"),
                     extra_json,
@@ -709,7 +711,7 @@ class HistoryStore:
     # ------------------------------------------------------- manual vitals
     def log_manual_vitals(self, hr: float | None = None, rmssd: float | None = None,
                           skin_temp: float | None = None, activity: float | None = None,
-                          gsr: float | None = None, note: str = "") -> int:
+                          note: str = "") -> int:
         """Record manually entered wearable-style values as a real (non-demo)
         feature row, so the longitudinal engine can run without any hardware.
 
@@ -732,7 +734,7 @@ class HistoryStore:
             conn.execute(
                 "INSERT INTO features(session_id, ts, hr, rmssd, skin_temp, gsr, activity, signal_quality)"
                 " VALUES(?,?,?,?,?,?,?,?)",
-                (sid, now, hr, rmssd, skin_temp, gsr, activity, 0.8),
+                (sid, now, hr, rmssd, skin_temp, None, activity, 0.8),  # gsr column left empty
             )
             conn.commit()
             return sid

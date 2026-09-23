@@ -13,7 +13,7 @@ Doctor surface:
 
 DEMO MODE contains named synthetic review cases. The registry can filter by condition/module and sort by research priority, research risk or condition. Tier, risk and drivers are clearly labelled synthetic UI data.
 
-LIVE SENSOR MODE uses CRC-checked Arduino packets and the existing PPG/HRV/IMU/GSR/temperature processing chain. Live patient records are not given fabricated disease risk.
+LIVE SENSOR MODE uses CRC-checked Arduino packets and the existing PPG/HRV/IMU/temperature processing chain. Live patient records are not given fabricated disease risk.
 
 Doctor mobile bridge: **7777**.
 
@@ -27,7 +27,7 @@ The sidebar also includes **Prototype Lab**. In LIVE SENSOR MODE it observes the
 - PPG/HR quality state;
 - IMU motion/activity;
 - DS18B20 temperature;
-- GSR status;
+- skin-probe status (contact, status bit 3);
 - AD8232 lead-off/raw state;
 - FSR, microphone and environment channel status when present;
 - firmware status flags;

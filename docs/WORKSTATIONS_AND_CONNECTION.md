@@ -4,12 +4,12 @@
 
 **ESP8266 primary wearable**
 → USB Serial or Wi-Fi/TCP
-→ CP2
+→ CP3
 → Patient / Doctor / Research processing
 
 **Arduino Mega bench/lab**
 → USB Serial
-→ CP2
+→ CP3
 → Prototype / Research processing
 
 The workstation accepts dynamically discovered serial ports; it does not assume `/dev/ttyUSB0`.
@@ -17,7 +17,7 @@ The workstation accepts dynamically discovered serial ports; it does not assume 
 ## Modes
 
 - DEMO MODE: deterministic synthetic stream explicitly labelled `DEMO_DATA`
-- LIVE SENSOR MODE: actual CP2 packets from ESP8266 or Mega, CRC checked before processing
+- LIVE SENSOR MODE: actual CP3 packets from ESP8266 or Mega, CRC checked before processing
 
 ## Android
 

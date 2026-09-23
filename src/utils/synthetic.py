@@ -3,7 +3,7 @@
 Generates synthetic subjects with:
 - individual baselines
 - age, BMI, activity patterns, resting HR, HRV, sleep timing/duration,
-  temperature trends, GSR patterns, menstrual-cycle info, clinical variables,
+  temperature trends, menstrual-cycle info, clinical variables,
   gradual changes, temporary disturbances, sensor noise, missing data,
   motion artifacts, recovery periods
 
@@ -46,7 +46,6 @@ class SyntheticSubjectProfile:
     resting_hr_baseline: float = 68.0
     hrv_baseline: float = 45.0
     skin_temp_baseline: float = 32.5
-    gsr_baseline: float = 450.0
     activity_baseline: float = 35.0
     sleep_duration_baseline: float = 7.5
     sleep_timing_baseline: float = 23.0  # hour
@@ -123,7 +122,6 @@ def generate_subject_timeline(
             hrv_adjust = 0.0
             temp_adjust = 0.0
             activity_adjust = 0.0
-            gsr_adjust = 0.0
             sleep_adjust = 0.0
             quality = profile.base_quality + rng.normal(0, 0.05)
             artifact = False
@@ -147,7 +145,6 @@ def generate_subject_timeline(
                     hrv_adjust = -12.0 - days_persistent * 0.1 + rng.normal(0, 1.5)
                     temp_adjust = 0.4 + rng.normal(0, 0.05)
                     activity_adjust = -10.0 + rng.normal(0, 2.0)
-                    gsr_adjust = 80.0 + rng.normal(0, 10)
                     sleep_adjust = -0.8 + rng.normal(0, 0.2)
                 else:
                     hr_adjust = rng.normal(0, 1.0)
@@ -158,7 +155,6 @@ def generate_subject_timeline(
                     # Brief disturbance
                     hr_adjust = 15.0 + rng.normal(0, 2.0)
                     hrv_adjust = -15.0 + rng.normal(0, 2.0)
-                    gsr_adjust = 120.0 + rng.normal(0, 15)
                     quality = max(0.3, quality - 0.1)
                 else:
                     hr_adjust = rng.normal(0, 1.0)
@@ -227,8 +223,6 @@ def generate_subject_timeline(
                 activity_base = profile.activity_baseline + 15 * math.exp(-((hour - 17) ** 2) / 8) + rng.normal(0, 3)
             activity = max(0.0, activity_base + activity_adjust)
 
-            # GSR
-            gsr = profile.gsr_baseline + gsr_adjust + rng.normal(0, 20) + (80 if 12 <= hour <= 14 else 0)
 
             # Sleep
             sleep_duration = profile.sleep_duration_baseline + sleep_adjust + rng.normal(0, 0.3)
@@ -251,11 +245,8 @@ def generate_subject_timeline(
 
             # Sensor noise, missing data, artifacts
             # Random missing
-            if rng.random() < 0.02:  # 2% missing
-                if rng.random() < 0.5:
-                    temp = None
-                else:
-                    gsr = None
+            if rng.random() < 0.02:  # 2% missing skin-temperature samples
+                temp = None
 
             # Motion artifact
             if rng.random() < 0.03:
@@ -271,7 +262,6 @@ def generate_subject_timeline(
                 rmssd_ms=float(hrv) if hrv is not None else None,
                 sdnn_ms=float(hrv * 1.2) if hrv is not None else None,
                 skin_temp_c=float(temp) if temp is not None else None,
-                gsr_tonic=float(gsr) if gsr is not None else None,
                 motion_index=float(motion),
                 activity_level=float(activity),
                 sleep_duration_h=float(max(0, sleep_duration)),
@@ -290,7 +280,6 @@ def generate_subject_timeline(
                     "hr": float(max(0, min(1, quality + rng.normal(0, 0.05)))),
                     "hrv": float(max(0, min(1, quality + rng.normal(0, 0.05)))),
                     "temp": float(max(0, min(1, quality + rng.normal(0, 0.05)))) if temp is not None else 0.0,
-                    "gsr": float(max(0, min(1, quality + rng.normal(0, 0.05)))) if gsr is not None else 0.0,
                 },
                 anomaly_score=float(rng.uniform(0, 10)),
             )
@@ -324,7 +313,6 @@ def generate_synthetic_cohort(
             resting_hr_baseline=float(rng.uniform(60, 80)),
             hrv_baseline=float(rng.uniform(30, 60)),
             skin_temp_baseline=float(rng.uniform(31.5, 33.5)),
-            gsr_baseline=float(rng.uniform(400, 600)),
             activity_baseline=float(rng.uniform(20, 50)),
             sleep_duration_baseline=float(rng.uniform(6.5, 8.5)),
             usual_cycle_length=int(rng.integers(21, 35)),
@@ -354,7 +342,6 @@ def generate_synthetic_cohort(
                     "resting_hr_bpm": fv.resting_hr_bpm,
                     "rmssd_ms": fv.rmssd_ms,
                     "skin_temp_c": fv.skin_temp_c,
-                    "gsr_tonic": fv.gsr_tonic,
                     "activity_level": fv.activity_level,
                     "sleep_duration_h": fv.sleep_duration_h,
                     "sleep_regularity": fv.sleep_regularity,
@@ -382,7 +369,6 @@ def generate_scenario_dataset(output_dir: Path, seed: int = 42) -> Dict[str, Dic
         resting_hr_baseline=68.0,
         hrv_baseline=48.0,
         skin_temp_baseline=32.5,
-        gsr_baseline=450.0,
         activity_baseline=35.0,
         sleep_duration_baseline=7.5,
     )
@@ -434,7 +420,6 @@ def generate_scenario_dataset(output_dir: Path, seed: int = 42) -> Dict[str, Dic
             resting_hr_baseline=base_profile.resting_hr_baseline,
             hrv_baseline=base_profile.hrv_baseline,
             skin_temp_baseline=base_profile.skin_temp_baseline,
-            gsr_baseline=base_profile.gsr_baseline,
             activity_baseline=base_profile.activity_baseline,
             sleep_duration_baseline=base_profile.sleep_duration_baseline,
         )

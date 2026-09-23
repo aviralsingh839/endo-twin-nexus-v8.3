@@ -323,7 +323,6 @@ private fun MeasureScreen(patientId: String) {
                     listOf(
                         "MAX30102" to "IR / red PPG",
                         "MPU6050" to "acceleration / gyro",
-                        "GSR" to "finger-electrode analog channel",
                         "BME280" to "temperature / humidity / pressure",
                         "BH1750" to "ambient light"
                     ).forEach { (name, detail) ->
@@ -530,7 +529,7 @@ private fun ConnectionScreen() {
         client.onError = { error = it }
         client.onSample = { sample ->
             packets += 1
-            latest = "IR ${sample.ir} • Red ${sample.red} • GSR ${sample.gsr} • Temp ${sample.temp0 ?: Double.NaN} • status ${sample.status}"
+            latest = "IR ${sample.ir} • Red ${sample.red} • Skin temp ${sample.temp0 ?: Double.NaN} • status ${sample.status} • ${sample.format}"
         }
         onDispose { client.disconnect() }
     }

@@ -93,7 +93,7 @@ class ModelRegistry:
             display_name="Physiological State",
             description="Computational representation of physiological state - NOT perfect simulation, data → features → baseline → longitudinal state",
             category="physiological",
-            capabilities=["hr", "hrv", "activity", "temperature", "gsr", "sleep_circadian", "autonomic", "metabolic_context"],
+            capabilities=["hr", "hrv", "activity", "temperature", "sleep_circadian", "autonomic", "metabolic_context"],
             limitations="Computational representation, not perfect simulation"
         ))
         
@@ -113,9 +113,9 @@ class ModelRegistry:
             name="feature_extraction",
             version="8.3+",
             display_name="Feature Extraction",
-            description="Established MEASURED HR, temp, motion, GSR, derived HRV RMSSD/SDNN/pNN50, experimental circadian, autonomic, metabolic",
+            description="Established MEASURED HR, temp, motion, derived HRV RMSSD/SDNN/pNN50, experimental circadian, autonomic, metabolic",
             category="features",
-            capabilities=["hr", "hrv_rmssd", "hrv_sdnn", "hrv_pnn50", "activity", "temperature", "gsr_tonic", "gsr_phasic", "sleep_regularity"],
+            capabilities=["hr", "hrv_rmssd", "hrv_sdnn", "hrv_pnn50", "activity", "temperature", "sleep_regularity"],
             limitations="PPG-derived HRV less accurate than ECG"
         ))
         

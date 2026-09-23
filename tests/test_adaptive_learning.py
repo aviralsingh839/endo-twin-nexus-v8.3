@@ -207,7 +207,7 @@ def test_requirement_lines_reflect_progress(tmp_path, ladder_run):
 def test_worn_time_ignores_gaps(tmp_path):
     model = AdaptiveWearableModel("gap", path=tmp_path / "gap.json")
     row = {"timestamp_s": 1_000_000.0, "hr_bpm": 70.0, "rmssd_ms": 40.0,
-           "skin_temp_c": 32.5, "gsr_tonic": 450.0, "activity_level": 0.1,
+           "skin_temp_c": 32.5, "activity_level": 0.1,
            "signal_quality": 0.9}
     model.observe(row)
     model.observe(dict(row, timestamp_s=1_000_000.0 + 10 * 3600))   # device off for 10 h
@@ -371,7 +371,8 @@ def test_labels_without_signal_are_withheld(head_runs):
 
 def test_head_features_are_declared(head_runs):
     model = head_runs["informative"]
-    assert len(HEAD_FEATURES) == 7
+    assert len(HEAD_FEATURES) == 6
+    assert not any("gsr" in f for f in HEAD_FEATURES)
     assert set(model.status()["head_features"]) == set(HEAD_FEATURES)
 
 
@@ -460,7 +461,7 @@ def test_observe_accepts_objects_and_mappings(tmp_path):
     for row in wearer.stream(0.05):
         model.observe({                                     # mapping
             "timestamp_s": row.timestamp_s, "hr_bpm": row.hr_bpm, "rmssd_ms": row.rmssd_ms,
-            "skin_temp_c": row.skin_temp_c, "gsr_tonic": row.gsr_tonic,
+            "skin_temp_c": row.skin_temp_c,
             "activity_level": row.activity_level, "signal_quality": row.signal_quality,
         })
     assert model.observations > 0

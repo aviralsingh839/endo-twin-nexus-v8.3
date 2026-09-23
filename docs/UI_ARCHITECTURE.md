@@ -2,7 +2,7 @@
 
 ## Layers
 
-1. **Domain/data** — existing ENDO-TWIN core, database, CP2 acquisition and research modules.
+1. **Domain/data** — existing ENDO-TWIN core, database, CP3 acquisition and research modules.
 2. **Semantic presentation** — shared terminology for provenance, connection, device and sensor state.
 3. **Platform UI** — Qt widgets, Compose screens and website components adapted to their native interaction model.
 4. **Application navigation** — workstation/mobile/site-specific information architecture.

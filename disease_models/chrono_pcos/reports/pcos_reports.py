@@ -57,7 +57,7 @@ class PCOSReportGenerator:
                 }
             },
             "provenance": {
-                "MEASURED": "HR, temp, motion, GSR - quality, source",
+                "MEASURED": "HR, temp, motion - quality, source",
                 "CLINICALLY_ENTERED": "Age, BMI, cycle info - USER-ENTERED",
                 "IMAGE_DERIVED": "Cyst size, morphology - quality UNKNOWN by design",
                 "MODEL_INFERRED": "PCOS risk signal, sleep regularity, circadian disruption - confidence, limitations",
@@ -72,7 +72,7 @@ class PCOSReportGenerator:
                 "capabilities": ["pcos_risk_signal", "circadian_analysis", "autonomic_analysis", "metabolic_context", "longitudinal_tracking", "chrono_metabolic_fingerprinting", "ultrasound_analysis"],
                 "limitations": "Research-only, not diagnostic, not clinically validated, requires clinical evaluation, Rotterdam criteria requires clinician",
                 "clinical_validation": "NOT ESTABLISHED - Engineering validation only",
-                "input": "PPG HR, HRV, activity, temp, optional GSR, clinical cycle info, optional ultrasound",
+                "input": "PPG HR, HRV, activity, temp, clinical cycle info, optional ultrasound",
                 "data_quality": pcos_analysis.get("data_quality"),  # No default - must be computed
                 "confidence": pcos_analysis.get("confidence"),  # No hard-coded default - real model calibrated probability or None
                 "note": "Model output confidence from calibrated classifier, not clinical certainty - None if not computed, never hard-coded 0.75"

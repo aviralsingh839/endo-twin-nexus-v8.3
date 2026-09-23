@@ -17,8 +17,8 @@ Both Patient and Doctor Android applications use the ESP32-S3 Wi-Fi/TCP path:
 - default host `192.168.4.1`
 - TCP port `7777`
 - connect to the ESP32-S3 TCP stream
-- reassemble newline-delimited CP2 frames
-- validate CP2 CRC
+- reassemble newline-delimited CP3 frames
+- validate CP3 CRC
 - parse measurements
 - show LIVE TCP state
 - send `PING` / `WHOAMI`

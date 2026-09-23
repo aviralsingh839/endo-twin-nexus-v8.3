@@ -16,7 +16,7 @@ CHRONO_PCOS_MANIFEST = DiseaseModelManifest(
     required_features=["heart_rate", "hrv_rmssd", "activity_level", "skin_temp_c"],
     optional_features=[
         "sleep_duration_h", "sleep_regularity", "circadian_stability",
-        "gsr_tonic", "stress_index", "temperature_rhythm_disruption",
+        "stress_index", "temperature_rhythm_disruption",
         "cycle_length", "cycle_irregularity", "bmi", "age"
     ],
     capabilities=[
@@ -44,7 +44,7 @@ CHRONO_PCOS_MANIFEST = DiseaseModelManifest(
         "Chrono-metabolic fingerprint experimental research, not diagnosis."
     ),
     clinical_validation="NOT ESTABLISHED - Engineering validation only",
-    data_requirements="PPG HR, HRV, activity, temperature, optional GSR, clinical cycle info, optional ultrasound",
+    data_requirements="PPG HR, HRV, activity, temperature, clinical cycle info, optional ultrasound",
     version_history=[
         {"version": "V0", "status": "CONCEPT", "description": "Original PCOS concept"},
         {"version": "V1-V3", "status": "IMPLEMENTED", "description": "Basic sensing, signal processing, multi-sensor"},

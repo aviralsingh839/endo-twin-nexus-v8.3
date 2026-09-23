@@ -43,7 +43,7 @@ Personal Baseline [ View ]
 - mean, median, std, MAD, rolling, confidence, circadian context
 
 Today's Measurements [ View ]
-- HR, HRV, activity, temperature, GSR
+- HR, HRV, activity, skin temperature
 - MEASURED with quality, source, timestamp
 
 Longitudinal Trends [ View ]

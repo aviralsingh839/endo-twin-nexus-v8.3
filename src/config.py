@@ -48,7 +48,6 @@ FEATURE_LOG_INTERVAL_S = 10.0
 # Sampling targets
 PPG_FS_HZ = 50.0  # Sensor-core default; desktop live packet processing overrides to 20 Hz
 IMU_FS_HZ = 50.0
-GSR_FS_HZ = 10.0
 TEMP_FS_HZ = 1.0
 
 # HR limits
@@ -80,7 +79,6 @@ RECOVERY_THRESHOLD = 0.3
 DEFAULT_RESTING_HR = 72.0
 DEFAULT_RMSSD_MS = 42.0
 DEFAULT_SKIN_TEMP_C = 32.5
-DEFAULT_GSR_RAW = 450.0
 DEFAULT_ACTIVITY = 0.10
 DEFAULT_SLEEP_DURATION_H = 7.5
 

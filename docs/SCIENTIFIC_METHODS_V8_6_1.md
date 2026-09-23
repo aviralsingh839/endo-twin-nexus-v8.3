@@ -117,7 +117,7 @@ V8.6.1 keeps acquisition and UI work separate:
 - desktop feature updates are throttled to a human-readable cadence;
 - PPG peak candidates are found with vectorized NumPy operations;
 - UI drawing uses bounded histories so charts cannot grow indefinitely;
-- slower channels such as GSR and temperature are not oversampled to transport frequency.
+- slower channels such as the temperature probe are not oversampled to transport frequency.
 
 The goal is to reduce latency without inventing extra information.
 

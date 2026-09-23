@@ -4,7 +4,7 @@ Doctor PC App - Patient Management Enhancement V8.3+
 Sections:
 - Dashboard: patient overview, recent assessments, data quality, pending reviews, longitudinal views
 - Patient Management: create, search, open, archive, patient history
-- Physiological Data: raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts, visualization, time-series
+- Physiological Data: raw/filtered PPG, HR, HRV, motion, temp, quality, artifacts, visualization, time-series
 - Advanced Analysis: circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML outputs
 - Ultrasound: loading, preprocessing, quality checks, segmentation, inference, visualization, confidence, training, evaluation, storage
 - Longitudinal: comparison
@@ -71,7 +71,7 @@ class PatientManager:
 
 class PhysiologicalDataViewer:
     """
-    View raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts
+    View raw/filtered PPG, HR, HRV, motion, temp, quality, artifacts
     Visualization, time-series
     """
     def __init__(self, db: LocalDatabase):
@@ -84,7 +84,6 @@ class PhysiologicalDataViewer:
             'ppg': {'raw': [], 'filtered': [], 'quality': 0.85},
             'hr': {'values': [], 'mean': 72},
             'hrv': {'rmssd': 48, 'sdnn': 55},
-            'gsr': {'values': []},
             'motion': {'activity': 35},
             'temperature': {'values': [], 'mean': 32.5},
             'quality': {'overall': 0.85, 'ppg': 0.91, 'motion': 0.8},

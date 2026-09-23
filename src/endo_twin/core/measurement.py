@@ -48,7 +48,8 @@ class MeasurementType(str, Enum):
     HRV_SDNN = "hrv_sdnn"
     HRV_PNN50 = "hrv_pnn50"
     PPG = "ppg"
-    GSR = "gsr"
+    # Kept so rows written before the GSR hardware was retired still resolve.
+    GSR_LEGACY = "gsr"
     TEMPERATURE = "temperature"
     MOTION = "motion"
     ACTIVITY = "activity"
@@ -79,7 +80,7 @@ class SensorReading:
     """Raw sensor reading - general"""
     reading_id: str = field(default_factory=lambda: f"READ-{uuid.uuid4().hex[:8]}")
     patient_id: str = ""
-    sensor_type: str = ""  # MAX30102, MPU6050, DS18B20, GSR, etc.
+    sensor_type: str = ""  # MAX30102, MPU6050, DS18B20, BH1750, BME280, etc.
     timestamp: float = field(default_factory=time.time)
     values: Dict[str, Any] = field(default_factory=dict)  # raw values
     quality: float = 0.0  # 0-1

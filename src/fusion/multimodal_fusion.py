@@ -222,8 +222,7 @@ class FusionEngine:
                 ("resting_hr", "Resting HR", "bpm", shared.resting_heart_rate),
                 ("rmssd", "HRV RMSSD", "ms", shared.hrv_rmssd),
                 ("skin_temp", "Skin temperature", "°C", shared.skin_temp_c),
-                ("activity", "Activity", "%", shared.activity_level),
-                ("gsr", "GSR", "", shared.gsr_tonic)):
+                ("activity", "Activity", "%", shared.activity_level)):
             q = shared.sensor_quality.get(key, quality) if shared.sensor_quality else quality
             ctx.features.append(FusionFeature(
                 key=key, label=label, value=float(val) if val is not None else None,

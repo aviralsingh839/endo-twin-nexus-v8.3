@@ -7,17 +7,17 @@ Preserves src/signal_processing/*
 - PPG: bandpass 0.5-4 Hz for HR, lowpass for baseline
 - Motion: lowpass for activity
 - Temp: median filter for outliers
-- GSR: lowpass tonic, highpass phasic
+- 
 
 ## Baseline Removal
 - PPG baseline drift removal
-- GSR tonic/phasic separation
+-  separation
 - Temp baseline
 
 ## Artifact Detection
 - Motion artifact: MPU6050 correlation with PPG
 - PPG artifact: amplitude, HR outlier
-- GSR artifact: sudden jumps
+- Temp artifact: sudden jumps
 - Quality scores 0-1 per channel
 - Source labeling
 
@@ -37,7 +37,7 @@ SensorQualityControl:
 RealtimeFeatureExtractor:
 - HR bpm, resting HR
 - HRV RMSSD, SDNN, pNN50 (derived)
-- GSR tonic, phasic per min
+- 
 - Motion index, activity level (established)
 - Skin temp C, room temp C, temp slope (established)
 - Pulse amplitude, SpO2

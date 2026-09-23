@@ -14,10 +14,10 @@ Combines circadian, autonomic, variability, activity, temp, metabolic, longitudi
 - Explainability: estimated from HR/HRV circadian variation, 24h pattern
 
 ### Autonomic
-- HRV RMSSD, GSR
+- HRV RMSSD,
 - Category: derived_feature + experimental_research
-- Quality: HRV quality, GSR quality
-- Source: PPG-derived HRV time-domain RMSSD, GSR tonic/phasic
+- Quality: HRV quality
+- Source: PPG-derived HRV time-domain RMSSD, 
 - Limitations: PPG-derived HRV less accurate than ECG, motion artifacts
 - Explainability: RMSSD reflects parasympathetic activity
 
@@ -46,7 +46,7 @@ Combines circadian, autonomic, variability, activity, temp, metabolic, longitudi
 - Explainability: direct temperature measurement circadian variation
 
 ### Metabolic
-- Multimodal combination HR, HRV, activity, temp, GSR
+- Multimodal combination HR, HRV, activity, temp
 - Category: experimental_research
 - Quality: min quality scores
 - Source: multimodal combination hypothesized relate to metabolic regulation

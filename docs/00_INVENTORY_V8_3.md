@@ -1,5 +1,9 @@
 # V8.3 Inventory - Audit
 
+> **Snapshot of the V8.3 tree.** The GSR channel has since been retired and the
+> wire format moved from `$CP2` to `$CP3`, so the `$CP2` entries below describe
+> V8.3 as it was. Current format: `docs/WIRE_FORMAT_CP3.md`.
+
 ## Python Modules
 
 ### Core (src/core/)
@@ -14,7 +18,7 @@
 - pcos.py: PCOSModule, domain weights, cycle_score, domain_scores, risk_from_scores, provenance breakdown
 - sleep.py: SleepModule, duration, regularity, circadian, recovery assessments
 - cardiometabolic.py: CardiometabolicModule, RHR, HRV, activity, metabolic clinical, baseline deviations
-- autonomic.py: AutonomicModule, HRV, GSR, stress, acute vs persistent separation
+- autonomic.py: AutonomicModule, HRV, stress, acute vs persistent separation
 - registry.py: ModuleInfo, DiseaseModuleRegistry, GLOBAL_REGISTRY, enabled modules, future modules
 
 ### Fusion (src/fusion/)
@@ -26,7 +30,7 @@
 ### Signal Processing (src/signal_processing/)
 - ppg.py: PPGProcessor, DCBlocker, ExponentialSmoother, peak detection, HRV time domain, SpO2, waveform
 - imu.py: IMUProcessor, motion_index, activity_level, low_activity_risk
-- gsr.py: GSRProcessor, tonic, phasic
+
 - temperature.py: TemperatureProcessor, skin_temp, slope
 - ecg.py: ECGProcessor, HR, RMSSD, quality
 - filters.py: DCBlocker, ExponentialSmoother
@@ -68,7 +72,7 @@
 
 - 10 tabs in MainWindow: Overview, Baseline, Trends, Health Signals (4 modules + future), Data Quality, Clinical Inputs, Ultrasound, Explanation, Report, Validation
 - Header: port combo, refresh, connect wearable, demo mode, stop, WiFi bridge, load scenario
-- Vital cards: HR, HRV, temp, activity, GSR, stress, sleep, quality, recovery
+- Vital cards: HR, HRV, temp, activity, stress, sleep, quality, recovery
 - Gauges: overall research signal, data quality
 - Plots: HR trend, HRV trend
 - Text areas: shared features, longitudinal, module results, quality, clinical, ultrasound, explanation, report, validation
@@ -77,8 +81,8 @@
 ## ML/AI Models
 
 - PCOS risk: transparent fallback equation with research priors, sigmoid, bootstrap CI, confidence breakdown
-- Sleep: formula-based wearable sleep estimation (time prior 22-07 high, motion, HR, RMSSD, GSR, temp)
-- Stress: formula-based (HR z, RMSSD z, motion z, temp drop z, phasic GSR, GSR z, motion gate)
+- Sleep: formula-based wearable sleep estimation (time prior 22-07 high, motion, HR, RMSSD, temp)
+- Stress: formula-based (HR z, RMSSD z, motion z, temp drop z, motion gate)
 - PPG quality: heuristic (amplitude, saturation, motion penalty) + trained model (wrist_ppg_during_exercise) blended 60/40, features list 15, target |PPG HR - ECG HR| <=5 bpm
 - Legacy: pcos_risk_model.joblib (17MB) and ppg_quality_model.joblib (5MB) in chrono_pcos_project V8/models/, reference only
 
@@ -95,7 +99,7 @@
 
 ## Signal Processing Modules
 
-- PPG, IMU, GSR, temperature, ECG, filters, HRV, SpO2
+- PPG, IMU, temperature, ECG, filters, HRV, SpO2
 - Quality control per channel
 - Feature extraction streaming
 - Baseline calibration
@@ -103,7 +107,7 @@
 
 ## Sensor Interfaces
 
-- Arduino Nano pod: MAX30102 PPG, MPU6050 IMU, DS18B20 temp, optional GSR, 20 Hz $CP2 packets, 115200 baud, XOR CRC, status bits
+- Arduino Nano pod: MAX30102 PPG, MPU6050 IMU, DS18B20 temp, , 20 Hz $CP2 packets, 115200 baud, XOR CRC, status bits
 - Mega hub: pod sensors + ECG, mic, FSR, light, BME280, OLED, LEDs, buzzer, buttons, relay mode
 - ESP8266 bridge: Wi-Fi relay TCP 7777
 - Packet parser: $CP and $CP2, CRC verification, error handling
@@ -206,7 +210,7 @@
 - All core modules: quality_control, personal_baseline, longitudinal_engine, shared_features, feature_extraction
 - All disease modules: base, pcos, sleep, cardiometabolic, autonomic, registry
 - Fusion and explainability
-- Signal processing: ppg, imu, gsr, temperature, ecg, filters, hrv, spo2
+- Signal processing: ppg, imu, temperature, ecg, filters, hrv, spo2
 - Serial IO: packet_parser, arduino_reader, network_reader, led_controller
 - Utils: synthetic, history_store, demo_stream, quality, math_utils, replay, report, qr_encoder, logger, storage
 - UI: theme, gauges, vital_cards, live_plots, main_window (as base for doctor PC app)

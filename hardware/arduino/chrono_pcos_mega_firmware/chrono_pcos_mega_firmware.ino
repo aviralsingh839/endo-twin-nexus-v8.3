@@ -8,7 +8,7 @@
     MAX30102/MAX3010x PPG       I2C  SDA=20 SCL=21 on Mega
     MPU6050 IMU                 I2C
     DS18B20 x1/x2 temperature   D2 OneWire, 4.7k pull-up
-    GSR analog                  A0
+    A0                          free (GSR channel retired)
     MAX4466 microphone          A1
     AD8232 ECG                  A2 + LO+ D11 + LO- D12
     FSR pressure sensor         A3 voltage divider
@@ -20,7 +20,7 @@
     Buzzer                      D6
 
   Packet:
-  $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+  $CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
 
   Medical safety:
   Educational physiological monitoring only. Not a diagnostic medical device.
@@ -62,7 +62,6 @@
 #define ECG_LO_PLUS 11
 #define ECG_LO_MINUS 12
 
-#define GSR_PIN A0
 #define MIC_PIN A1
 #define ECG_PIN A2
 #define FSR_PIN A3
@@ -89,7 +88,7 @@
 #define ST_PPG_SAT      1
 #define ST_MPU_ERR      2
 #define ST_TEMP_ERR     3
-#define ST_GSR_SAT      4
+/* bit 4 (GSR saturated) is retired with the GSR channel */
 #define ST_I2C_ERR      5
 #define ST_LOW_QUALITY  6
 #define ST_ECG_LEADS    7
@@ -110,7 +109,7 @@ uint32_t irValue=0, redValue=0;
 float ax_g=0, ay_g=0, az_g=1, gx_dps=0, gy_dps=0, gz_dps=0;
 float ax_bias=0, ay_bias=0, az_bias=0, gx_bias=0, gy_bias=0, gz_bias=0;
 float temp0=NAN, temp1=NAN;
-int gsrRaw=0, ecgRaw=0, fsrRaw=0, micRaw=0;
+int ecgRaw=0, fsrRaw=0, micRaw=0;
 float micRms=0, micPitchHz=0;
 float luxValue=-1, roomT=NAN, humidity=NAN, pressure=NAN;
 uint8_t buttonMask=0;
@@ -224,7 +223,6 @@ void readIMU(){
 }
 
 void readAnalogSensors(){
-  gsrRaw=analogRead(GSR_PIN);
   ecgRaw=analogRead(ECG_PIN);
   fsrRaw=analogRead(FSR_PIN);
   buttonMask=0;
@@ -283,7 +281,6 @@ uint16_t makeStatus(){
   uint16_t st=statusBase;
   if(ppgOK){ if(irValue<5000) st|=(1<<ST_PPG_ABSENT); if(irValue>250000UL || redValue>250000UL) st|=(1<<ST_PPG_SAT); }
   if(tempOK && !(temp0>-20 && temp0<80)) st|=(1<<ST_TEMP_ERR);
-  if(gsrRaw<5 || gsrRaw>1018) st|=(1<<ST_GSR_SAT);
   if(digitalRead(ECG_LO_PLUS)==HIGH || digitalRead(ECG_LO_MINUS)==HIGH) st|=(1<<ST_ECG_LEADS);
   if(micRms<2) st|=(1<<ST_MIC_LOW);
   if(fsrRaw<20 || fsrRaw>1000) st|=(1<<ST_FSR_ARTIFACT);
@@ -299,9 +296,9 @@ void sendPacket(){
   dtostrf(micRms,1,2,fmr); dtostrf(micPitchHz,1,1,fmp);
   char payload[260];
   uint16_t st=makeStatus();
-  snprintf(payload,sizeof(payload),"$CP2,%lu,%lu,%lu,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
+  snprintf(payload,sizeof(payload),"$CP3,%lu,%lu,%lu,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
     millis(),(unsigned long)irValue,(unsigned long)redValue,
-    fax,fay,faz,fgx,fgy,fgz,ft0,ft1,gsrRaw,micRaw,fmr,fmp,ecgRaw,fsrRaw,flux,frt,fhum,fpress,buttonMask,st);
+    fax,fay,faz,fgx,fgy,fgz,ft0,ft1,micRaw,fmr,fmp,ecgRaw,fsrRaw,flux,frt,fhum,fpress,buttonMask,st);
   uint8_t crc=xorCRC(payload);
   Serial.print(payload); Serial.print(','); if(crc<16) Serial.print('0'); Serial.println(crc,HEX);
 }
@@ -314,7 +311,7 @@ void updateOLED(){
   display.println("CHRONO-PCOS MEGA");
   display.print("IR:"); display.print(irValue); display.print(" ECG:"); display.println(ecgRaw);
   display.print("T0:"); display.print(temp0,1); display.print(" T1:"); display.println(temp1,1);
-  display.print("GSR:"); display.print(gsrRaw); display.print(" FSR:"); display.println(fsrRaw);
+  display.print("FSR:"); display.println(fsrRaw);
   display.print("Lux:"); display.print(luxValue,0); display.print(" MicHz:"); display.println(micPitchHz,0);
   display.print("BTN:"); display.print(buttonMask); display.print(" LED:"); display.println(ledState);
   display.println("Not medical diagnosis");

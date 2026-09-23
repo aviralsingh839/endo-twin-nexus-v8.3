@@ -30,12 +30,11 @@ Feature extraction
 
 ## Current Implementation
 
-- src/signal_processing/ ppg.py ecg.py gsr.py hrv.py imu.py spo2.py temperature.py filters.py
-- Filtering: bandpass 0.5-4Hz PPG, lowpass baseline, motion lowpass temp, median GSR, lowpass tonic, highpass phasic
-- Baseline removal, artifact detection motion MPU6050 correlation PPG amplitude HR outlier GSR jumps, missing handling short gaps interpolation quality penalty long gaps mark missing not fabricate, quality control 0-1 per channel
+- src/signal_processing/ ppg.py ecg.py hrv.py imu.py spo2.py temperature.py filters.py
+- Filtering: bandpass 0.5-4Hz PPG, lowpass baseline, motion lowpass, temp median
+- Baseline removal, artifact detection motion MPU6050 correlation PPG amplitude HR outlier temp jumps, missing handling short gaps interpolation quality penalty long gaps mark missing not fabricate, quality control 0-1 per channel
 - PPG: filtering, peak detection, HR, HRV, quality
 - ECG: ecg.py
-- GSR: gsr.py
 - HRV: hrv.py RMSSD SDNN pNN50, PPG-derived HRV less accurate than ECG limitations documented
 - IMU: imu.py MPU6050 motion
 - SpO2: spo2.py MAX30102

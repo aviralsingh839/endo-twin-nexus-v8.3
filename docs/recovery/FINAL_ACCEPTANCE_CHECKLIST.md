@@ -1,5 +1,10 @@
 # FINAL ACCEPTANCE TEST - ENDO-TWIN V8.3+ SUPERBUILD
 
+> **Historical record.** This document describes the project as it stood at the time
+> of writing. The GSR channel and its hardware were retired afterwards; current
+> hardware is the ESP32-S3 wearable with a DS18B20 skin-contact temperature probe and
+> it emits the `$CP3` frame. See `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`.
+
 Date: 2026-09-19
 Branch: arena/01a0ab67-chrono-pcos-v8-1
 Commit: 72d9a36 + superbuild
@@ -147,7 +152,7 @@ Purpose: Final acceptance test checklist from prompt section 59 - must be attemp
 
 ## SCIENCE
 
-- [x] Original signal processing preserved - src/signal_processing/ ppg.py ecg.py gsr.py hrv.py imu.py spo2.py temperature.py filters.py preserved, filtering baseline removal artifact detection quality control missing handling 20Hz $CP2 CRC XOR, end-to-end pipeline filtering→SQA→reconstruction→peak→IBI→HR/HRV benchmarked against E2E-PPG and research-project not replaced without evidence
+- [x] Original signal processing preserved - src/signal_processing/ ppg.py ecg.py hrv.py imu.py spo2.py temperature.py filters.py preserved, filtering baseline removal artifact detection quality control missing handling 20Hz $CP2 CRC XOR, end-to-end pipeline filtering→SQA→reconstruction→peak→IBI→HR/HRV benchmarked against E2E-PPG and research-project not replaced without evidence
   - Evidence: ls src/signal_processing/ shows 8 files, import core modules 267.9 ms works, `scripts/diagnostics/project_health.sh` Signal processing PASS
 
 - [x] Original models preserved - pcos_risk_model.joblib 17M REAL and ppg_quality_model.joblib 5.1M REAL preserved, not replaced with placeholder, adapter created for real inference

@@ -370,7 +370,6 @@ class PatientWindow(QMainWindow):
             ("HRV RMSSD", self._fmt(vals["hrv"], " ms", 1), "Cleaned beat-to-beat intervals", "DERIVED"),
             ("SpO₂", "—", "Quality-gated research estimate", "DERIVED"),
             ("Skin temperature", self._fmt(vals["temp"], " °C", 1), "Validity-gated", "MEASURED"),
-            ("GSR / EDA", "—", "Conductance proxy", "MEASURED"),
             ("Activity", self._fmt(vals["activity"], " %", 1), "IMU-derived index", "DERIVED"),
         ]
         for i, (a, b, c, p) in enumerate(specs):

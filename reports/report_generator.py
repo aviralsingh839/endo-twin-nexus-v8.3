@@ -51,7 +51,6 @@ class ReportGenerator:
             report_lines.append("HRV RMSSD: 48 ms (DERIVED, quality 0.85, source PPG-derived, limitations PPG less accurate than ECG, motion artifacts affect)")
             report_lines.append("Skin Temp: 32.5°C (MEASURED, quality 0.88, source DS18B20, limitations skin temp not core temp)")
             report_lines.append("Activity: 35% (MEASURED, source MPU6050, limitations wrist activity not whole-body)")
-            report_lines.append("GSR Tonic: 2.1 uS (MEASURED)")
             report_lines.append("Data Quality: Good (understandable language, not raw technical unless advanced)")
             report_lines.append("")
 
@@ -98,7 +97,7 @@ class ReportGenerator:
         report_lines.append("--- Model Transparency - EXAMPLE ---")
         report_lines.append("NOTE: EXAMPLE - real transparency from real_pcos_model_adapter.get_model_info()")
         report_lines.append("Models used: PCOSModule v8.3.0, SleepModule v8.3.0, CardiometabolicModule v8.3.0, AutonomicModule v8.3.0")
-        report_lines.append("Input data: PPG, HRV, activity, temp, GSR, quality scores")
+        report_lines.append("Input data: PPG, HRV, activity, temp, quality scores")
         report_lines.append("Data quality: 0.85 overall (Good) - EXAMPLE, real path computes from coverage")
         report_lines.append("Confidence: 0.75 (model output, not clinical certainty) - EXAMPLE, real path uses calibrated probability from real_pcos_model_adapter")
         report_lines.append("Features: HRV RMSSD, activity level, skin temp - EXAMPLE")

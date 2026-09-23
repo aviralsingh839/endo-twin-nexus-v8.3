@@ -15,8 +15,7 @@ Preserve and recover strongest implementation of:
 - HR
 - HRV
 - Motion/activity
-- Temperature
-- GSR where available
+- Temperature (DS18B20 skin-contact probe)
 - Sensor communication
 - Streaming
 - Feature extraction
@@ -47,8 +46,8 @@ Do NOT replace scientifically meaningful working component with simplified place
 
 ### Signal Processing
 
-- src/signal_processing/ ppg.py ecg.py gsr.py hrv.py imu.py spo2.py temperature.py filters.py
-- Filtering, baseline removal, artifact detection, quality control, missing handling, 20Hz $CP2 CRC XOR
+- src/signal_processing/ ppg.py ecg.py hrv.py imu.py spo2.py temperature.py filters.py
+- Filtering, baseline removal, artifact detection, quality control, missing handling, 20Hz $CP3 CRC XOR
 - End-to-end pipeline: filtering → SQA → reconstruction → peak detection → IBI → HR/HRV - benchmarked against E2E-PPG and research-project, not replaced without evidence
 - HR: 72 bpm MEASURED quality 0.91 source MAX30102 PPG
 - HRV: RMSSD SDNN pNN50 48 ms DERIVED quality 0.85 source PPG-derived limitations PPG less accurate than ECG motion artifacts affect
@@ -56,7 +55,7 @@ Do NOT replace scientifically meaningful working component with simplified place
 ### Feature Extraction
 
 - src/core/feature_extraction.py, shared_features.py, quality_control.py
-- Established MEASURED HR temp motion GSR, derived HRV RMSSD/SDNN/pNN50, experimental circadian autonomic metabolic
+- Established MEASURED HR temp motion, derived HRV RMSSD/SDNN/pNN50, experimental circadian autonomic metabolic
 - Distinguishes established/derived/experimental/ML/clinical, explainability
 
 ### Personal Baseline
@@ -117,7 +116,7 @@ Do NOT replace scientifically meaningful working component with simplified place
 
 ### Hardware
 
-- arduino/ Nano pod + Mega hub, MAX30102/PPG, HR, HRV, GSR, MPU6050, DS18B20, wiring docs
+- hardware/ ESP32-S3 wearable + Mega hub, MAX30102/PPG, HR, HRV, MPU6050, DS18B20 skin probe, wiring docs
 - Preserve working V8.1 functionality, Nano pod, Mega hub
 
 ## Performance

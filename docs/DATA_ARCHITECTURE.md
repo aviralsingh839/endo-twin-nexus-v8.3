@@ -53,7 +53,7 @@ Optional datasets (links via `scripts/dataset_links.py`):
 Old synthetic was random numbers. New synthetic is realistic longitudinal:
 
 **Per Subject:**
-- Individual baselines: age, BMI, resting HR, HRV, skin temp, GSR, activity, sleep duration/timing, cycle length, cycle irregular, BP, glucose
+- Individual baselines: age, BMI, resting HR, HRV, skin temp, activity, sleep duration/timing, cycle length, cycle irregular, BP, glucose
 - Variability: hr_variability, hrv_variability, temp_variability, base_quality
 - Timeline: DAY 1 → DAY 30 → DAY 60 → DAY 90, not independent random
 
@@ -67,8 +67,8 @@ Old synthetic was random numbers. New synthetic is realistic longitudinal:
 **Scenarios (6 required):**
 1. Stable: small random variation around baseline → LOW CHANGE SIGNAL
 2. Gradual: hr_slope_per_day 0.12-0.15 bpm/day, hrv_slope -0.25, temp +0.01/day, activity -0.2/day → EARLY CHANGE SIGNAL
-3. Persistent: after day 20, HR +8 plus 0.1/day, HRV -12, temp +0.4, activity -10, GSR +80, sleep -0.8h → PERSISTENT MULTIMODAL SIGNAL
-4. Temporary: days 30-33 brief disturbance HR +15, HRV -15, GSR +120, quality -0.1 → TEMPORARY EVENT
+3. Persistent: after day 20, HR +8 plus 0.1/day, HRV -12, temp +0.4, activity -10, sleep -0.8h → PERSISTENT MULTIMODAL SIGNAL
+4. Temporary: days 30-33 brief disturbance HR +15, HRV -15, temp +0.6, quality -0.1 → TEMPORARY EVENT
 5. Sensor failure: after day 25, HR missing 70% or flatline, quality 0.2 → LOW SENSOR CONFIDENCE (must not be interpreted as physiological)
 6. Recovery: days 0-10 normal, 10-35 abnormal then gradually returns (initial offset * (1-progress)) → RECOVERY TREND
 
@@ -79,7 +79,7 @@ generate_scenario_dataset(Path("data/synthetic/scenarios"), seed=42)  # 6 scenar
 generate_synthetic_cohort(n_subjects=10, days=30, samples_per_day=12, output_dir=Path("data/synthetic/cohort"))
 ```
 
-**Cohort:** 10 subjects diverse baselines (age 16-45, BMI 18.5-32, RHR 60-80, HRV 30-60, temp 31.5-33.5, GSR 400-600, activity 20-50, sleep 6.5-8.5, cycle 21-35 days, 20% irregular), mix scenarios stable 40%, gradual 20%, persistent 15%, temporary 15%, recovery 10%
+**Cohort:** 10 subjects diverse baselines (age 16-45, BMI 18.5-32, RHR 60-80, HRV 30-60, temp 31.5-33.5, activity 20-50, sleep 6.5-8.5, cycle 21-35 days, 20% irregular), mix scenarios stable 40%, gradual 20%, persistent 15%, temporary 15%, recovery 10%
 
 ## Clinical Data
 
@@ -92,7 +92,7 @@ generate_synthetic_cohort(n_subjects=10, days=30, samples_per_day=12, output_dir
 
 - Location: `data/physiological/` or SQLite
 - Label: REAL or SYNTHETIC
-- From FeatureVector: hr_bpm, resting_hr, rmssd, skin_temp, gsr, activity, sleep_duration, etc.
+- From FeatureVector: hr_bpm, resting_hr, rmssd, skin_temp, activity, sleep_duration, etc.
 - Quality per feature
 
 ## Longitudinal Data

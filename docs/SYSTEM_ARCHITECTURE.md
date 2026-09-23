@@ -9,7 +9,7 @@
             QUALITY CONTROL (value, quality, source, timestamp, artifact)
                      │ Detects missing, impossible, flatline, noise, motion, corruption, stale
                      ▼
-           SIGNAL PROCESSING (PPG, IMU, GSR, Temp, ECG)
+           SIGNAL PROCESSING (PPG, IMU, Temp, ECG)
                      │ Filtering, peak detection, HRV, motion index, etc.
                      ▼
          FEATURE EXTRACTION (FeatureVector, 0-100 normalized where appropriate)
@@ -52,7 +52,7 @@
 ### 1. Quality Control (`src/core/quality_control.py`)
 - `SensorQualityControl` class
 - Methods: `check_missing, check_impossible, check_flatline, check_noise, check_stale, evaluate, evaluate_sample, overall_quality, has_critical_failure`
-- Thresholds: HR 35-210, skin temp 20-42°C, GSR 0-1023, IR 0-262143, motion 8g, stale 6s
+- Thresholds: HR 35-210, skin temp 20-42°C, IR 0-262143, motion 8g, stale 6s
 
 ### 2. Personal Baseline (`src/core/personal_baseline.py`)
 - `MetricStats`: median, mean, std, mad, p05, p95, p25, p75, count, min_obs_days, rolling_median, rolling_std, confidence, hour_of_day_mean, day_of_week_mean
@@ -67,11 +67,11 @@
 - Alias: `ChangeDetector`
 
 ### 4. Shared Features (`src/core/shared_features.py`)
-- `SharedPhysiologicalFeatures`: heart_rate, resting_heart_rate, hrv_rmssd/sdnn, activity_level, motion_index, low_activity_risk, sleep_duration_h, sleep_regularity, sleep_timing_h, sleep_probability, circadian_stability/disruption, day_night_ratio, skin_temp_c, temperature_trend, temperature_rhythm_disruption, gsr_tonic, stress_index, autonomic_imbalance, recovery_score, baseline_deviations, trend_features, sensor_quality, overall_quality, provenance
+- `SharedPhysiologicalFeatures`: heart_rate, resting_heart_rate, hrv_rmssd/sdnn, activity_level, motion_index, low_activity_risk, sleep_duration_h, sleep_regularity, sleep_timing_h, sleep_probability, circadian_stability/disruption, day_night_ratio, skin_temp_c, temperature_trend, temperature_rhythm_disruption, stress_index, autonomic_imbalance, recovery_score, baseline_deviations, trend_features, sensor_quality, overall_quality, provenance
 - `SharedFeatureExtractor`: extract, _compute_trends (24h vs prev 24h), _day_night_ratio, _recovery_score
 
 ### 5. Feature Extraction (`src/core/feature_extraction.py`)
-- `RealtimeFeatureExtractor`: profile, baseline_engine, quality_control, shared_extractor, signal processors (PPG, IMU, GSR, Temp, ECG), last_feature, feature_history, sleep_onset/wake, circadian_metrics, set_profile, set_sleep_window, capture_baseline, add_sample, compute, ppg_waveform, history_arrays
+- `RealtimeFeatureExtractor`: profile, baseline_engine, quality_control, shared_extractor, signal processors (PPG, IMU, Temp, ECG), last_feature, feature_history, sleep_onset/wake, circadian_metrics, set_profile, set_sleep_window, capture_baseline, add_sample, compute, ppg_waveform, history_arrays
 
 ---
 
@@ -94,7 +94,7 @@
 - Signals: reduced_activity_trend, elevated_resting_hr_trend, metabolic_data_flag, cardiometabolic_risk_signal
 
 ### Autonomic (`autonomic.py`)
-- Assesses HRV, GSR, stress_index, acute vs persistent separation
+- Assesses HRV, stress_index, acute vs persistent separation
 - Signals: acute_autonomic_signal, persistent_autonomic_deviation, intermittent_stress_pattern, autonomic_regulation_signal
 
 ### Registry (`registry.py`)
@@ -133,7 +133,6 @@ Reused from V8.1, improved:
 
 - `ppg.py`: PPGProcessor with DC blocker, smoother, peak detection, HRV
 - `imu.py`: IMUProcessor motion_index, activity_level
-- `gsr.py`: GSRProcessor tonic, phasic
 - `temperature.py`: TemperatureProcessor skin_temp, slope
 - `ecg.py`: ECGProcessor HR, RMSSD, quality
 - `filters.py`: DCBlocker, ExponentialSmoother
@@ -144,7 +143,7 @@ Reused from V8.1, improved:
 
 ## Serial IO (`src/serial_io/`)
 
-- `packet_parser.py`: PacketParser with XOR CRC, supports $CP and $CP2, decode_status_flags
+- `packet_parser.py`: PacketParser with XOR CRC, parses $CP3 plus legacy $CP/$CP2, decode_status_flags
 - `arduino_reader.py`: ArduinoReader thread for USB serial
 - `network_reader.py`: NetworkReader for ESP8266 TCP bridge
 - `led_controller.py`: LED feedback
@@ -199,7 +198,7 @@ Organized with clear labels: REAL, SYNTHETIC, PUBLIC DATASET, USER-ENTERED
 - `hardware/arduino/` contains Mega hub and retained legacy firmware
 
 - `chrono_pcos_nano_pod`: wearable pod firmware
-- `chrono_pcos_mega_firmware`: bench hub firmware
+- `chrono_pcos_mega_firmware`: bench hub firmware (bring-up/relay variant of `endo_twin_mega_lab`)
 - `chrono_pcos_esp8266_bridge`: Wi-Fi bridge
 
 ---
@@ -228,7 +227,7 @@ Future modules must have:
 - PROJECT_ROOT, DATA_DIR, MODEL_DIR, LOG_DIR
 - SERIAL_BAUD 115200, timeouts, Wi-Fi port 7777
 - Baseline: capture 300s, min 60 samples, min days 3, rolling 14 days, confidence min obs 30
-- Sampling: PPG 50Hz, IMU 50Hz, GSR 10Hz, Temp 1Hz
+- Sampling: PPG 25Hz (sensor FIFO rate), IMU 50Hz, Temp 1Hz, environment 2Hz
 - HR limits 35-210 bpm
 - Quality thresholds
 - Risk thresholds low 25, medium 50, high 75

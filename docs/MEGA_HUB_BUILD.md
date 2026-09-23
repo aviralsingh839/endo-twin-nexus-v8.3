@@ -7,7 +7,7 @@ Preserved from V8.1 as expanded experimental sensors hub in V8.3.
 ### Components
 
 - Arduino Mega 2560
-- Pod sensors: MAX30102, MPU6050, DS18B20, GSR
+- Pod sensors: MAX30102, MPU6050, DS18B20 skin probe
 - Plus:
   - ECG AD8232 (A1, LO- D30, LO+ D31)
   - Microphone MAX4466 (A2, RMS + pitch)
@@ -26,7 +26,7 @@ See legacy `chrono_pcos_project V8/docs/ARDUINO_WIRING_GUIDE.md` for full detail
 
 `hardware/arduino/chrono_pcos_mega_firmware/chrono_pcos_mega_firmware.ino`
 
-- Same packet format $CP2 but with extra channels filled
+- Same packet format $CP3 ($CP2 layout with the retired gsr field removed); extra channels filled
 - Periodic ECG checkpoints
 - OLED shows live vitals
 - Relay mode: if RELAY_POD_SERIAL1=1, forwards every pod line from Serial1 to USB, so dashboard connects to Mega only

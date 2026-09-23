@@ -120,7 +120,7 @@ For every model, document:
 
 - dataset: e.g. PCOS_data.csv (PUBLIC DATASET), wrist_ppg (PUBLIC), synthetic (SYNTHETIC)
 - target: e.g. PCOS risk, sleep status, HRV
-- features: e.g. HR, HRV, activity, temp, GSR, clinical
+- features: e.g. HR, HRV, activity, temp, clinical
 - preprocessing: filtering, peak detection, etc.
 - train/test split: subject-level where appropriate
 - cross-validation: e.g. LOSOCV

@@ -463,7 +463,7 @@ if PYSIDE_AVAILABLE:
             ])
 
             add_category("DATA & REPORTS", "Data Management - Local-First", [
-                (" Database\n18 Tables Local-First", "SQLite 18 tables, users, patients, profiles, symptoms, cycles, sensor sessions, PPG/HRV/GSR/motion/temp/quality, ultrasound, model_results, reports, providers, supplies, audit, access", "DATABASE"),
+                (" Database\n18 Tables Local-First", "SQLite 18 tables, users, patients, profiles, symptoms, cycles, sensor sessions, PPG/HRV/motion/temp/quality, ultrasound, model_results, reports, providers, supplies, audit, access", "DATABASE"),
                 (" Reports\nProfessional", "Professional reports with Research / risk-screening output — not a medical diagnosis, model transparency", "REPORTS"),
                 (" Backup / Restore", "Export patient data, import, backup SQLite, encrypted package, deliberate sharing not automatic", "DATABASE"),
             ])

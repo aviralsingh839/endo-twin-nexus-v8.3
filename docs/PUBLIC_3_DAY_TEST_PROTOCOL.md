@@ -8,7 +8,7 @@ The volunteer wears the ESP32-S3 pod for three days so the team can evaluate:
 
 - sensor stability;
 - packet continuity;
-- GSR electrode usability;
+- skin-probe contact stability;
 - motion/PPG artifact behaviour;
 - BME280/BH1750 environmental context;
 - data-quality scoring;
@@ -34,7 +34,7 @@ Do not store:
 - diagnosis;
 - unrelated personal notes.
 
-The public-test Android recorder validates the incoming 20 Hz CP2 stream but archives every fourth valid frame (~5 Hz) locally in Room to keep three-day phone storage practical. The participant sees a persistent recording notification.
+The public-test Android recorder validates the incoming 20 Hz CP3 stream but archives every fourth valid frame (~5 Hz) locally in Room to keep three-day phone storage practical. The participant sees a persistent recording notification.
 
 The project should not upload the volunteer's raw physiological data to a public website by default.
 
@@ -79,12 +79,12 @@ Do not turn those notes into physiological conclusions.
 
 ## What the app records
 
-The CP2 stream contains:
+The CP3 stream contains:
 
 - PPG IR/red;
 - acceleration;
 - gyroscope;
-- GSR;
+- skin temperature (temp0, DS18B20 probe in skin contact);
 - ambient light;
 - BME280 temperature;
 - BME280 humidity;
@@ -103,10 +103,10 @@ The BME280 provides temperature, humidity and pressure and is intended for low-p
 Check:
 
 - connection remains stable;
-- CP2 packets are arriving;
+- CP3 packets are arriving;
 - CRC-valid percentage is high;
 - PPG is not continuously saturated/missing;
-- GSR electrodes remain usable;
+- the skin probe stays in contact (temp0 does not collapse toward ambient);
 - BME280 has plausible environmental values;
 - BH1750 responds to environmental light changes.
 
@@ -166,7 +166,7 @@ Each day should show:
 - quality;
 - HR median;
 - HRV RMSSD median where available;
-- GSR median;
+- skin temperature median;
 - activity;
 - temperature/environment context;
 - missing-data indicators.
@@ -221,7 +221,7 @@ Room supports explicit migration paths for schema changes; the current app adds 
 
 ## Android → Desktop handoff
 
-After Day 3, use the Android app's **Export CSV** button. The export contains only the selected participant's locally recorded CP2 packets.
+After Day 3, use the Android app's **Export CSV** button. The export contains only the selected participant's locally recorded CP3 packets.
 
 On the desktop:
 
@@ -237,9 +237,9 @@ Then open the desktop application and use:
 4. **Data Quality → inspect sensor quality**
 5. **Report → generate the research report**
 
-The importer is offline-only. It verifies CP2 CRC before processing packets and labels imported feature rows as REAL / PUBLIC_3_DAY.
+The importer is offline-only. It verifies CP3 CRC before processing packets and labels imported feature rows as REAL / PUBLIC_3_DAY.
 
 
 ### Sampling limitation
 
-The wearable firmware emits CP2 at approximately 20 Hz. The public Android archive intentionally keeps approximately 5 Hz by retaining every fourth valid frame. This is a storage trade-off for a three-day volunteer test. Treat fine-grained PPG/HRV analysis from this public archive as engineering/research output requiring validation; do not present it as clinical-grade HRV.
+The wearable firmware emits CP3 at approximately 20 Hz. The public Android archive intentionally keeps approximately 5 Hz by retaining every fourth valid frame. This is a storage trade-off for a three-day volunteer test. Treat fine-grained PPG/HRV analysis from this public archive as engineering/research output requiring validation; do not present it as clinical-grade HRV.

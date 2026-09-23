@@ -56,7 +56,7 @@ class PCOSModule(DiseaseModule):
     def optional_features(self) -> List[str]:
         return [
             "sleep_duration_h", "sleep_regularity", "circadian_stability",
-            "gsr_tonic", "stress_index", "temperature_rhythm_disruption"
+            "stress_index", "temperature_rhythm_disruption"
         ]
 
     def __init__(self, profile: Optional[UserProfile] = None):

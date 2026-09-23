@@ -1,7 +1,7 @@
 """Autonomic / Stress Regulation Module - V8.3.
 
 Uses:
-- HRV, resting HR, GSR, activity, sleep, temperature
+- HRV, resting HR, activity, sleep, temperature
 
 Creates explainable stress/autonomic deviation estimator.
 Separates ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE.
@@ -28,7 +28,7 @@ class AutonomicModule(DiseaseModule):
 
     @property
     def required_features(self) -> List[str]:
-        return ["hrv_rmssd", "heart_rate", "gsr_tonic"]
+        return ["hrv_rmssd", "heart_rate"]
 
     @property
     def optional_features(self) -> List[str]:
@@ -46,26 +46,6 @@ class AutonomicModule(DiseaseModule):
         if hrv >= 20:
             return 65.0, f"reduced HRV {hrv:.0f}ms - possible autonomic strain"
         return 85.0, f"low HRV {hrv:.0f}ms - significant autonomic deviation"
-
-    def _assess_gsr(self, shared: SharedPhysiologicalFeatures, history: Optional[List]) -> tuple[float, str, bool]:
-        if shared.gsr_tonic is None:
-            return 50.0, "no GSR data", False
-        gsr = shared.gsr_tonic
-        # GSR baseline varies per person, so we rely on deviation if available
-        baseline_dev = shared.baseline_deviations.get("gsr_tonic") if shared.baseline_deviations else None
-        if baseline_dev is not None:
-            if baseline_dev > 2.0:
-                return 70.0, f"elevated GSR {baseline_dev:+.1f} SD above baseline", baseline_dev > 1.5
-            if baseline_dev < -2.0:
-                return 30.0, f"low GSR {baseline_dev:+.1f} SD below baseline", False
-            return 20.0, f"GSR within baseline {baseline_dev:+.1f} SD", False
-
-        # Without baseline, use absolute thresholds (less reliable)
-        if gsr > 700:
-            return 70.0, f"high GSR {gsr:.0f} - elevated arousal", False
-        if gsr > 550:
-            return 45.0, f"moderate GSR {gsr:.0f}", False
-        return 20.0, f"normal GSR {gsr:.0f}", False
 
     def _assess_stress_index(self, shared: SharedPhysiologicalFeatures) -> tuple[float, str]:
         si = shared.stress_index
@@ -115,15 +95,15 @@ class AutonomicModule(DiseaseModule):
     def predict(self, shared: SharedPhysiologicalFeatures, clinical: Optional[Dict] = None,
                 ultrasound: Optional[Dict] = None, history: Optional[List] = None) -> DiseaseModuleResult:
         hrv_score, hrv_desc = self._assess_hrv(shared)
-        gsr_score, gsr_desc, gsr_persistent = self._assess_gsr(shared, history)
         stress_score, stress_desc = self._assess_stress_index(shared)
         acute_persistent_type, ap_score, ap_desc = self._separate_acute_persistent(shared, history)
 
-        # Overall autonomic deviation
+        # Overall autonomic deviation. The GSR component (formerly 0.25) was
+        # removed with the GSR hardware, so the two remaining signals keep their
+        # original ratio: 0.35/0.75 and 0.40/0.75.
         overall = (
-            0.35 * hrv_score +
-            0.25 * gsr_score +
-            0.40 * stress_score
+            0.467 * hrv_score +
+            0.533 * stress_score
         )
         overall = clamp(overall, 0, 100)
 
@@ -162,7 +142,6 @@ class AutonomicModule(DiseaseModule):
 
         drivers = [
             {"domain": "hrv", "score": round(hrv_score, 1), "description": hrv_desc, "type": "autonomic"},
-            {"domain": "gsr", "score": round(gsr_score, 1), "description": gsr_desc, "type": "arousal", "persistent": gsr_persistent},
             {"domain": "stress_index", "score": round(stress_score, 1), "description": stress_desc, "type": "stress"},
             {"domain": "temporal_pattern", "score": round(ap_score, 1), "description": ap_desc, "type": acute_persistent_type},
         ]
@@ -196,7 +175,6 @@ class AutonomicModule(DiseaseModule):
             extra={
                 "acute_vs_persistent": acute_persistent_type,
                 "hrv_rmssd": shared.hrv_rmssd,
-                "gsr_tonic": shared.gsr_tonic,
                 "stress_index": shared.stress_index,
                 "recovery_score": shared.recovery_score,
                 "autonomic_imbalance": shared.autonomic_imbalance,
@@ -206,7 +184,7 @@ class AutonomicModule(DiseaseModule):
     def limitations(self) -> str:
         return (
             "Research-only autonomic/stress regulation signal. Not a mental-health diagnosis. "
-            "HRV and GSR are influenced by many factors (activity, caffeine, temperature, illness). "
+            "HRV is influenced by many factors (activity, caffeine, temperature, illness). "
             "Acute stress signals are normal physiological responses. "
             "Persistent change requires multiple days of good-quality data. "
             "Does not diagnose anxiety, depression, or any psychiatric condition. "

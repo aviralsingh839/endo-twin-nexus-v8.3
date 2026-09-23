@@ -9,7 +9,7 @@ WEARABLE START
     ↓
 sensor/contact + packet quality gates
     ↓
-feature extraction: HR / HRV / GSR / temperature / motion / optional ECG
+feature extraction: HR / HRV / skin temperature / motion / optional ECG
     ↓
 ~1 hour quality-gated personal baseline
     ↓

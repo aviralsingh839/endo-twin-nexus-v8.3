@@ -8,11 +8,11 @@
 
 ## ESP8266 setup workflow
 
-Discover/enter endpoint → Connect → WHOAMI → PING → CP2 validation → sensor inventory → signal quality → Ready.
+Discover/enter endpoint → Connect → WHOAMI → PING → CP3 validation → sensor inventory → signal quality → Ready.
 
 ## Sensor matrix
 
-MAX30102, MPU6050, BME280/BME680, DS18B20, GSR, ECG, FSR, microphone and light should expose Present, Connected, Streaming, Signal Quality, Last Value and Error.
+MAX30102, MPU6050, BME280/BME680, DS18B20 skin probe, ECG, FSR, microphone and light should expose Present, Connected, Streaming, Signal Quality, Last Value and Error.
 
 Unsupported/unwired channels must render UNAVAILABLE, not zero and not synthetic physiology.
 
@@ -22,4 +22,4 @@ Connection loss must show endpoint, last successful packet/timestamp, actual err
 
 ## Protocol
 
-The existing CP2 parser remains canonical. Hardware UI does not duplicate packet decoding.
+The existing CP3 parser remains canonical. Hardware UI does not duplicate packet decoding.

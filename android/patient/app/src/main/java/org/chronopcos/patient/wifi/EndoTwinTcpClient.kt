@@ -12,29 +12,45 @@ import java.io.PrintWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 
+/**
+ * One decoded frame from the ESP32-S3 pod.
+ *
+ * CP3 is the current format; CP2 is still accepted so recordings made before the
+ * GSR hardware was retired keep parsing. The only difference is that CP2 carries a
+ * `gsr` field this pod no longer measures.
+ */
 data class Cp2AndroidSample(
     val raw: String, val ms: Long, val ir: Long, val red: Long,
     val ax: Double, val ay: Double, val az: Double, val gx: Double, val gy: Double, val gz: Double,
-    val temp0: Double?, val temp1: Double?, val gsr: Int, val status: Int, val crcValid: Boolean = true
+    val temp0: Double?, val temp1: Double?, val status: Int, val crcValid: Boolean = true,
+    val format: String = "CP3", val gsr: Int? = null
 )
 
 class Cp2AndroidParser {
+    /** Returns a decoded frame, or null when the line is not a valid CP3/CP2 frame. */
     fun parse(line: String): Cp2AndroidSample? {
         val raw=line.trim()
-        if (!raw.startsWith("\$CP2,")) return null
+        val cp3 = raw.startsWith("\$CP3,")
+        val cp2 = raw.startsWith("\$CP2,")
+        if (!cp3 && !cp2) return null
         val parts=raw.split(",")
-        if (parts.size!=25) return null
+        // CP3: tag + 22 data fields + crc. CP2 adds the retired gsr field.
+        if (parts.size != if (cp3) 24 else 25) return null
         val received=parts.last().toIntOrNull(16) ?: return null
         val payload=parts.dropLast(1).joinToString(",")
         var crc=0
         for (c in payload) crc=crc xor c.code
         if ((crc and 0xFF)!=received) return null
         fun nullableDouble(s:String)=s.toDoubleOrNull()?.takeIf { it.isFinite() }
+        // CP2 places the mic/ECG/FSR/status fields one position later than CP3.
+        val shift = if (cp3) 0 else 1
         return try {
             Cp2AndroidSample(raw,parts[1].toLong(),parts[2].toLong(),parts[3].toLong(),
                 parts[4].toDouble(),parts[5].toDouble(),parts[6].toDouble(),
                 parts[7].toDouble(),parts[8].toDouble(),parts[9].toDouble(),
-                nullableDouble(parts[10]),nullableDouble(parts[11]),parts[12].toInt(),parts[23].toInt())
+                nullableDouble(parts[10]),nullableDouble(parts[11]),
+                parts[22+shift].toInt(), format = if (cp3) "CP3" else "CP2",
+                gsr = if (cp2) parts[12].toIntOrNull() else null)
         } catch(_:Exception) { null }
     }
 }

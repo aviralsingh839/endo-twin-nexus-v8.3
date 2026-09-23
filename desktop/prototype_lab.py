@@ -112,7 +112,6 @@ class PrototypeLabWidget(QWidget):
             ("PPG / MAX30102", "PPG", "IR + RED waveform, pulse quality"),
             ("IMU / MPU6050", "IMU", "Acceleration + gyroscope"),
             ("DS18B20", "TEMP", "Temperature validity"),
-            ("GSR / EDA", "GSR", "Conductance proxy"),
             ("ECG / AD8232", "ECG", "Raw ECG + lead-off state"),
             ("FSR", "FSR", "Pressure/contact context"),
             ("MAX4466", "MIC", "RMS + experimental pitch"),
@@ -240,10 +239,6 @@ class PrototypeLabWidget(QWidget):
             "good" if temp is not None else "warn"
         )
         self._set_module(
-            "GSR",
-            "CHECK" if "GSR saturated" in flags else "PASS",
-            f"Raw {row.get('gsr_raw')} • tonic {row.get('gsr_tonic') if row.get('gsr_tonic') is not None else 'UNKNOWN'}",
-            "warn" if "GSR saturated" in flags else "good"
         )
         self._set_module(
             "ECG",
@@ -324,7 +319,6 @@ class PrototypeLabWidget(QWidget):
             "hrv": any(r.get("rmssd_ms") is not None for r in rows),
             "temp": any(r.get("skin_temp_c") is not None for r in rows),
             "imu": any(r.get("motion_index") is not None for r in rows),
-            "gsr": any(r.get("gsr_raw") is not None for r in rows),
         }
         qvals = [float(r["signal_quality"]) for r in rows if r.get("signal_quality") is not None]
         avg_q = sum(qvals) / len(qvals) if qvals else None
@@ -343,7 +337,6 @@ class PrototypeLabWidget(QWidget):
             f"HRV feature: {'PASS' if have['hrv'] else 'UNKNOWN / insufficient evidence'}",
             f"Temperature: {'PASS' if have['temp'] else 'UNKNOWN'}",
             f"IMU: {'PASS' if have['imu'] else 'UNKNOWN'}",
-            f"GSR: {'PASS' if have['gsr'] else 'UNKNOWN'}",
             f"Firmware flags: {'; '.join(flags) if flags else 'none observed'}",
             "",
             "INTERPRETATION",

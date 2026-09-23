@@ -48,8 +48,11 @@ class SensorSample:
     gy_dps: float
     gz_dps: float
     temp_c: float
-    gsr_raw: int
     lux: float
+    # Retired channel. Legacy $CP2 frames still carry a value and it is preserved
+    # verbatim, but current firmware never measures it, so it is not required to
+    # build a sample and defaults to "not measured".
+    gsr_raw: int = -1
     ecg_raw: int = -1
     mic_raw: int = -1
     mic_rms: float = 0.0
@@ -100,7 +103,8 @@ class FeatureVector:
     # Temperature
     skin_temp_c: Optional[float] = None
     temp_slope_c_per_min: float = 0.0
-    # GSR / stress
+    # Legacy GSR slots: the hardware was retired, so these stay declared (old
+    # databases and exports still load) but nothing fills them any more.
     gsr_tonic: Optional[float] = None
     gsr_phasic_per_min: float = 0.0
     stress_index: float = 0.0

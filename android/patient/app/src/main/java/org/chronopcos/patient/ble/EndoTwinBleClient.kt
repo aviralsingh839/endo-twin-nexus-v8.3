@@ -12,7 +12,6 @@ import android.content.Context
 data class EndoTwinBleSample(
     val ir: Long = 0L,
     val red: Long = 0L,
-    val gsr: Int = 0,
     val ax: Double = 0.0,
     val ay: Double = 0.0,
     val az: Double = 0.0,

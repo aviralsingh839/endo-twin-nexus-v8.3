@@ -64,7 +64,6 @@ def build_shared_from_feature(feature, source: str | None = None) -> SharedPhysi
         skin_temp_c=feature.skin_temp_c,
         temperature_trend_c_per_day=feature.temp_slope_c_per_min * 1440.0,
         temperature_rhythm_disruption=feature.temperature_rhythm_disruption,
-        gsr_tonic=feature.gsr_tonic,
         stress_index=feature.stress_index,
         autonomic_imbalance=feature.autonomic_imbalance,
         recovery_score=50.0,

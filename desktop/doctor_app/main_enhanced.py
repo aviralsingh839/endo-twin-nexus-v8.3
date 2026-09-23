@@ -50,7 +50,7 @@ class DoctorWindow(QMainWindow):
         self.image_path = ""
         self.metric_cards = {}
         self.trend_charts = {}
-        self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
+        self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
         self.tab_pages = {}
         self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
 
@@ -496,7 +496,6 @@ class DoctorWindow(QMainWindow):
         self.dashboard_signal_charts = {}
         signal_defs = [
             ("PPG (IR)", "hr_bpm", "bpm", "#2ed9b0"),
-            ("EDA (GSR)", "gsr_tonic", "µS", "#37b8ff"),
             ("Skin Temp", "skin_temp_c", "°C", "#ffb74d"),
             ("Accelerometer", "activity_level", "g", "#9a7cff"),
         ]
@@ -649,7 +648,6 @@ class DoctorWindow(QMainWindow):
         if self.latest_row:
             vals = {
                 "hr_bpm": (self.latest_row.get("hr_bpm"), " bpm"),
-                "gsr_tonic": (self.latest_row.get("gsr_tonic"), " µS"),
                 "skin_temp_c": (self.latest_row.get("skin_temp_c"), " °C"),
                 "activity_level": (self.latest_row.get("activity_level"), " g"),
             }
@@ -1142,7 +1140,6 @@ class DoctorWindow(QMainWindow):
         specs = [
             ("Heart rate", "hr_bpm", "bpm", "MEASURED"),
             ("Heart rate variability", "rmssd_ms", "ms (RMSSD)", "DERIVED"),
-            ("GSR / EDA", "gsr_tonic", "µS proxy", "MEASURED"),
             ("Skin temperature", "skin_temp_c", "°C", "MEASURED"),
         ]
         for title, key, unit, prov in specs:
@@ -1159,7 +1156,6 @@ class DoctorWindow(QMainWindow):
                 base = {
                     "hr_bpm": self.current_case.hr,
                     "rmssd_ms": self.current_case.hrv,
-                    "gsr_tonic": 18.0 + self.current_case.activity/3,
                     "skin_temp_c": self.current_case.temp,
                 }[key]
                 offsets = [((i * 7) % 9) - 4 for i in range(28)]
@@ -1446,7 +1442,6 @@ class DoctorWindow(QMainWindow):
             ("PPG waveform", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "MAX30102 / demo stream", "Raw signal"),
             ("Heart rate", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "PPG processing", "Observed / source-derived"),
             ("HRV RMSSD", "DERIVED", "PPG beat intervals", "Computed feature"),
-            ("GSR / EDA", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "GSR channel / demo", "Conductance proxy"),
             ("Skin temperature", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "DS18B20 / demo", "Validity-gated"),
             ("Disease-model output", "MODEL-INFERRED / DEMO_DATA", "CHRONO-PCOS", "Only when an actual model run exists"),
             ("Ultrasound", "IMAGE-DERIVED", self.image_path or "No image attached", "Anatomical inference remains UNKNOWN"),
@@ -1573,7 +1568,7 @@ class DoctorWindow(QMainWindow):
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
         # Update metric charts when they exist.
-        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
+        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c"), "spo2_pct": row.get("spo2_pct")}
         for key, value in history_map.items():
             if value is not None:
                 try:

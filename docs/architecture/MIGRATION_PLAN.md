@@ -33,7 +33,7 @@ General Core (src/endo_twin/):
 PCOS-Specific (disease_models/chrono_pcos/):
 - PCOS features, risk logic, model, ultrasound, chrono-metabolic, reports
 
-Preserved: Original scientific work PPG filtering artifact handling HR HRV motion temp GSR sensor communication streaming feature extraction personal baseline longitudinal sleep/circadian chrono-metabolic multimodal fusion ultrasound PCOS modelling reports model artifacts datasets database hardware
+Preserved: Original scientific work PPG filtering artifact handling HR HRV motion temp sensor communication streaming feature extraction personal baseline longitudinal sleep/circadian chrono-metabolic multimodal fusion ultrasound PCOS modelling reports model artifacts datasets database hardware
 
 Fixed: Real Gradle wrappers 61K jar + 8.4K script, hard-coded inference labeled EXAMPLE_DATA, core no direct PCOS import dynamic importlib plugin loading
 

@@ -1,7 +1,7 @@
 # ENDO-TWIN NEXUS — Wearable + Mega Hub Construction Manual
-## ESP32-S3 DevKitC-1 wearable / BME280 / BH1750 / GSR finger electrodes / MAX30102 / MPU6050
+## ESP32-S3 DevKitC-1 wearable / BME280 / BH1750 / DS18B20 skin-contact probe / MAX30102 / MPU6050
 
-**Document purpose:** This is the single physical-build reference for the current prototype. It covers the wearable enclosure, sensor placement, wiring, cable routing, GSR finger electrodes, assembly measurements, ESP32-S3 firmware, the Arduino Mega hub, testing, and final acceptance.
+**Document purpose:** This is the single physical-build reference for the current prototype. It covers the wearable enclosure, sensor placement, wiring, cable routing, skin-contact temperature probe, assembly measurements, ESP32-S3 firmware, the Arduino Mega hub, testing, and final acceptance.
 
 **Prototype status:** educational/research hardware. It is not a medical device and the measurements are not diagnostic.
 
@@ -17,8 +17,7 @@ The active hardware is split into two units:
    - MPU6050 IMU
    - BME280 environmental sensor
    - BH1750 ambient-light sensor
-   - GSR/EDA module
-   - two finger electrodes
+   - DS18B20 skin-temperature probe (skin contact, GPIO4)
    - external status LED
    - battery/power system
 
@@ -48,7 +47,7 @@ Use these as **prototype enclosure targets**, not as the exact dimensions of eve
 | Internal usable height | ~24 mm |
 | Wrist strap width | 20–25 mm |
 | Recommended cable exit | 8–12 mm opening |
-| Finger-electrode lead length | 300–450 mm each |
+| Skin-temperature probe lead | 150–350 mm |
 
 A 110 × 70 × 30 mm enclosure leaves room for the development board, sensor breakouts, wiring, strain relief and a small protected battery/power section.
 
@@ -157,44 +156,59 @@ Create a clear optical window:
 
 The BH1750 uses I2C; its common address is 0x23, with 0x5C available using the address pin. 
 
-## 3.6 GSR module
+## 3.6 DS18B20 skin-temperature probe
 
-Do **not** place the finger electrodes directly on the ESP32 enclosure.
+The temperature channel is now the DS18B20 in **direct skin contact**. It replaced the
+GSR module; the GSR hardware is no longer fitted and no firmware reads it.
 
-Instead:
+Recommended placement:
 
-- GSR module stays inside the pod;
-- its electrode connector exits through a strain-relieved side opening;
-- two flexible wires run to the finger electrodes;
-- electrodes are held on two adjacent fingers.
+- probe taped or stitched against skin that stays in contact while the pod is worn —
+  the inner forearm beside the pod, or the wrist strap surface next to the pod;
+- at least 15 mm away from the MAX30102 optical window so it does not press on the PPG
+  site or block the finger/wrist surface the PPG needs;
+- at least 20 mm away from the ESP32-S3, the regulator and the battery — those parts run
+  warm and will bias the reading toward pod temperature instead of skin temperature;
+- flat against skin over the full probe body, held by a thin adhesive patch or a
+  purpose-made low-profile tape. Do not bury it under thick foam or hot glue;
+- cable exits through a strain-relieved opening, with a service loop so pulling the lead
+  never pulls on the probe joint;
+- use the waterproof/stainless-sheathed probe variant if the pod is worn during
+  activity or near moisture.
 
-Recommended prototype placement:
+**Contact is what makes the number meaningful.** A probe hanging in air beside the wrist
+reads somewhere between skin and ambient and will drift with room temperature; a probe
+pressed flat against skin tracks skin temperature within its own accuracy limits.
 
-- electrode A: palmar side of index finger;
-- electrode B: palmar side of middle finger;
-- electrode centers approximately 20–30 mm apart when the fingers are relaxed;
-- use soft adjustable straps or conductive finger pads;
-- do not use bare sharp metal;
-- avoid excessive pressure.
+Limits to record with every session:
 
-The exact GSR response depends strongly on the module, electrode material, contact pressure, skin condition and circuit design. Record the raw ADC value and calibrate per user/session rather than treating a raw ADC number as a universal conductance value.
+- skin temperature is **not** core temperature and lags it;
+- it is affected by ambient temperature, airflow, clothing, perfusion and probe pressure;
+- the DS18B20 datasheet accuracy applies to the sensor, not to the skin-contact site;
+- one probe is fitted, so `temp1` is always `nan`, and the firmware raises status bit 3
+  when the probe is missing or falls off.
 
 ---
 
-# 4. GSR FINGER-ELECTRODE SAFETY
+# 4. SKIN-CONTACT PROBE: SAFETY AND HANDLING
 
-**This is a body-contact circuit.**
+The DS18B20 is a passive sensing element: it is read by the ESP32-S3 and drives no
+current into the body. Body-contact rules are simpler than they were for the retired
+electrode circuit, but they still apply:
 
-For body-contact testing:
+- the probe, its cable and its adhesive patch must not press hard enough to mark or
+  irritate skin, and should be removed periodically during long sessions;
+- keep the probe and its cable away from the mains and from any mains-powered bench
+  equipment; run body-contact sessions from battery power;
+- do not use damaged probes or probes with cracked sheaths on skin;
+- do not place the probe over broken skin, a rash or a mole for repeated sessions;
+- confirm the probe is electrically isolated from the pod's charging path (charge with
+  the probe removed, or use an isolated charger);
+- the DQ pull-up resistor (4.7 kΩ) sits on the 3V3 rail, so keep the probe wiring away
+  from any point that can be energised at a higher voltage.
 
-- use a battery-powered, isolated prototype;
-- do not attach finger electrodes while the wearable is simultaneously connected to a laptop/PC by USB unless the entire setup has been designed and verified for safe isolation;
-- never connect body electrodes to mains-powered circuitry;
-- never connect the ESP32 GPIO directly to the electrodes;
-- the electrodes connect to the GSR module's electrode inputs;
-- only the GSR module's analog output goes to ESP32 GPIO4.
-
-If the GSR module exposes its own excitation/electrode circuitry, follow that module's electrical limits and documentation.
+The purpose is to log a skin-temperature trend on a research prototype, not to measure
+body temperature for any clinical decision.
 
 ---
 
@@ -212,7 +226,7 @@ If the GSR module exposes its own excitation/electrode circuitry, follow that mo
 | BME280 | SCL | GPIO9 |
 | BH1750 | SDA | GPIO8 |
 | BH1750 | SCL | GPIO9 |
-| GSR module | AO | GPIO4 / ADC |
+| DS18B20 probe | DQ (data) | GPIO4 (OneWire, 4.7 kΩ pull-up to 3V3) |
 | Status LED | control | GPIO2 |
 | All sensors | GND | ESP32 GND |
 | I2C sensors | VCC | 3.3 V-compatible supply |
@@ -247,17 +261,24 @@ Expected addresses:
 
 There is no address collision between these defaults.
 
-## 5.3 GSR
+## 5.3 DS18B20 skin-temperature probe
+
+Use **three-wire (normal) power**, not parasite power: it is more tolerant of long
+probe leads and does not need a strong pull-up during conversion.
 
 ```
-GSR module AO ───────── ESP32-S3 GPIO4
-GSR module GND ──────── ESP32-S3 GND
-GSR module VCC ──────── compatible supply
-GSR electrode 1 ─────── finger electrode A
-GSR electrode 2 ─────── finger electrode B
+DS18B20 VDD (red)   ───────── ESP32-S3 3V3
+DS18B20 GND (black) ───────── ESP32-S3 GND
+DS18B20 DQ  (data)  ───────── ESP32-S3 GPIO4
+4.7 kΩ resistor     ───────── between DQ and 3V3   (required)
 ```
 
-Verify the GSR module's analog-output voltage range before connecting AO to GPIO4.
+Note the pull-up: without it the probe usually returns `DEVICE_DISCONNECTED_C` and the
+firmware sets status bit 3. GPIO4 is the pin the GSR module used to occupy; no other
+peripheral uses it.
+
+Probe lead lengths up to a few metres work with normal power and a 4.7 kΩ pull-up; keep
+the lead short (150–350 mm) so it can be strain-relieved inside or beside the pod.
 
 ---
 
@@ -270,12 +291,11 @@ For the first prototype:
 | I2C sensor branch | 80–150 mm |
 | BME280 branch | 80–120 mm |
 | BH1750 branch | 80–150 mm |
-| GSR electrode lead A | 300–450 mm |
-| GSR electrode lead B | 300–450 mm |
+| DS18B20 skin-probe lead | 150–350 mm |
 | Status LED | 80–150 mm |
 | Battery lead | 100–200 mm |
 
-Keep I2C wires short and grouped. Keep GSR electrode wires physically separated from noisy digital/power wiring as much as practical.
+Keep I2C wires short and grouped. Keep the probe lead separated from noisy digital/power wiring where practical.
 
 Use a common ground.
 
@@ -288,7 +308,7 @@ For the wearable prototype, avoid long loose Dupont jumpers. After bench validat
 For development:
 
 - USB power is acceptable for bench testing without body electrodes.
-- For body-contact GSR testing, use a suitable battery-powered isolated supply.
+- For any body-contact session, use a suitable battery-powered isolated supply.
 - The ESP32-S3 DevKitC-1 supports USB power as well as 5V/GND or 3V3/GND supply options; do not simultaneously feed conflicting power sources. 
 
 Do not place an unprotected Li-ion cell directly on the wearable's 3.3V rail.
@@ -306,8 +326,8 @@ Recommended top-to-bottom arrangement:
 │  [BH1750 optical window]      [BME280 vent]            │
 │                                                         │
 │  ┌───────────────┐      ┌─────────────────────────┐    │
-│  │ ESP32-S3      │      │ GSR module              │    │
-│  │               │      │ electrode connector ────┼───┼──►
+│  │ ESP32-S3      │      │ 4.7 kΩ pull-up + JST    │    │
+│  │               │      │ probe connector ────────┼───┼──► skin probe
 │  └───────────────┘      └─────────────────────────┘    │
 │                                                         │
 │  ┌───────────┐             ┌──────────────────────┐    │
@@ -338,7 +358,7 @@ Drill/cut:
 - power switch opening if used;
 - BH1750 optical window;
 - BME280 ventilation opening;
-- GSR cable exit;
+- DS18B20 probe lead exit (strain-relieved);
 - optional status LED opening;
 - four small mounting holes or standoffs if using a mounting plate.
 
@@ -382,11 +402,16 @@ Place it under the top optical window.
 
 The sensor must see ambient light.
 
-### Step 8 — Install GSR
+### Step 8 — Install the skin-temperature probe
 
-Secure the GSR board inside.
+Fit the 4.7 kΩ pull-up between DQ and 3V3 on a small piece of perfboard or inline in the
+connector housing, then run three wires to the probe.
 
-Add a strain-relieved connector for the two electrode leads.
+Use a JST or similar connector at the pod wall so the probe can be replaced without
+opening the enclosure.
+
+Add a service loop and a strain relief so a pulled probe lead cannot load the solder
+joint. Keep the probe at least 20 mm from the ESP32, regulator and battery.
 
 ### Step 9 — Add status LED
 
@@ -407,37 +432,42 @@ No wire should be able to pull directly on a sensor solder joint.
 
 ---
 
-# 10. FINGER ELECTRODE STRAP
+# 10. SKIN-TEMPERATURE PROBE MOUNTING
 
 Recommended prototype:
 
 ```
-INDEX FINGER             MIDDLE FINGER
-     │                         │
- [electrode A]             [electrode B]
-     │                         │
-     └──── 300–450 mm ────────┘
+        WEARABLE POD (wrist / forearm strap)
               │
-          GSR MODULE
+        strain-relieved exit
               │
-          WEARABLE POD
+      ┌───────┴────────┐
+      │  probe body    │  flat against skin, thin tape
+      │  150–350 mm    │  ≥ 15 mm from PPG window
+      └───────┬────────┘  ≥ 20 mm from ESP32 / battery
+              │
+        skin contact site
+        (inner forearm, or wrist beside the pod)
 ```
 
-Use two soft conductive-contact surfaces.
+Contact checklist:
 
-The electrode should make repeatable contact but should not cut into the finger or cause discomfort.
+- the full probe body lies flat on skin, not on top of the strap seam or a bone ridge;
+- the adhesive patch is thin; thick foam insulates the probe from skin and adds lag;
+- the probe cannot slide or lift when the wrist moves — test by moving the arm and
+  watching the reported temperature for a step back toward ambient;
+- the cable cannot tug the probe when the arm moves.
 
-Record:
+Record with every session:
 
-- finger locations;
-- electrode material;
-- electrode spacing;
-- contact pressure/strap tightness;
-- session duration;
-- skin preparation;
-- raw GSR values.
+- probe site and side (left/right forearm, wrist);
+- how it was fixed (patch, tape, strap pocket) and for how long;
+- ambient/room temperature at the start (BME280 `roomT`);
+- whether the probe was replaced or repositioned mid-session;
+- the `status` bit 3 state, so a probe that fell off is visible in the recording.
 
-This makes later comparisons reproducible.
+This makes later comparisons reproducible, and makes it obvious when a temperature
+change is a contact problem rather than a physiological one.
 
 ---
 
@@ -451,10 +481,10 @@ The firmware:
 
 - reads MAX30102 IR/red;
 - reads MPU6050 acceleration/gyro;
-- reads GSR ADC;
+- reads the DS18B20 skin probe once per second (non-blocking conversion);
 - reads BME280 temperature/humidity/pressure;
 - reads BH1750 lux;
-- emits canonical CP2 at approximately 20 Hz;
+- emits canonical CP3 at approximately 20 Hz;
 - validates data through an XOR CRC;
 - provides USB serial;
 - starts Wi-Fi SoftAP;
@@ -489,6 +519,8 @@ arduino-cli lib install "Adafruit MPU6050"
 arduino-cli lib install "Adafruit Unified Sensor"
 arduino-cli lib install "BH1750"
 arduino-cli lib install "Adafruit BME280 Library"
+arduino-cli lib install "OneWire"
+arduino-cli lib install "DallasTemperature"
 ```
 
 Compile:
@@ -524,13 +556,18 @@ Expected startup information includes the ESP32-S3 AP address and TCP server sta
 
 ---
 
-# 13. CP2 PACKET
+Wire format reference: `docs/WIRE_FORMAT_CP3.md`.
 
-The active packet remains:
+# 13. CP3 PACKET
+
+The active packet is **CP3** — CP2 with the retired `gsr` field removed:
 
 ```
-$CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+$CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
 ```
+
+CP2 is still accepted by the host parser so recordings made before the change keep
+loading, and the Android clients accept both. Current firmware only ever emits CP3.
 
 Wearable meanings:
 
@@ -540,11 +577,9 @@ Wearable meanings:
 | red | MAX30102 |
 | ax/ay/az | MPU6050 |
 | gx/gy/gz | MPU6050 |
-| temp0/temp1 | NAN / unused on wearable |
-| gsr | GSR module ADC |
-| micRaw | - not installed |
-| micRms | 0 |
-| micPitch | 0 |
+| temp0 | DS18B20 skin-contact probe (°C, NAN until the first conversion) |
+| temp1 | `nan` - only one probe is fitted |
+| micRaw / micRms / micPitch | `-1` - not installed |
 | ecg | -1 |
 | fsr | -1 |
 | lux | BH1750 |
@@ -555,7 +590,7 @@ Wearable meanings:
 | status | firmware quality/status bits |
 | crc | XOR CRC |
 
-The Android TCP parser continues to consume the same 25-field CP2 frame.
+The Android TCP parser accepts both formats: 24 fields for CP3, 25 for legacy CP2.
 
 ---
 
@@ -612,22 +647,31 @@ Verify:
 - lux rises under brighter light;
 - sensor is not blocked by enclosure material.
 
-## Test 7 — GSR
+## Test 7 — DS18B20 skin probe
 
-First test with no finger contact.
+Start the pod and watch `temp0` in the stream.
 
-Then connect the electrodes and test with a relaxed finger position.
+Verify:
 
-Record the raw values. Do not assume that a particular raw number means a particular physiological state.
+- `temp0` is a plausible skin-range number (roughly 28–36 °C depending on site and room);
+- it is not `nan` and not `85` (85 °C is the DS18B20 power-on value - it means the
+  firmware read the scratchpad before a conversion finished);
+- pinch the probe between two fingers for ~30 s: the reading should climb toward
+  ~33–35 °C, then fall back toward ambient when released;
+- unplug the probe: `temp0` becomes `nan` and status bit 3 (value 8) sets;
+- `roomT` from the BME280 and `temp0` must not track each other exactly — if they do,
+  the probe is reading pod/ambient air rather than skin.
 
-## Test 8 — CP2
+Do not interpret `temp0` as core body temperature.
+
+## Test 8 — CP3
 
 Verify:
 
 ```
-$CP2,...,<CRC>
-$CP2,...,<CRC>
-$CP2,...,<CRC>
+$CP3,...,<CRC>
+$CP3,...,<CRC>
+$CP3,...,<CRC>
 ```
 
 at approximately 20 packets/second.
@@ -698,7 +742,7 @@ Recommended layout:
 │ └─────────────────┘    └─────────────────────────────┘ │
 │                                                         │
 │ ┌─────────────────────────────────────────────────────┐ │
-│ │ optional ECG / GSR / FSR / microphone connectors   │ │
+│ │ optional ECG / FSR / microphone connectors         │ │
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
 │ cable strain relief + external sensor ports            │
@@ -718,7 +762,7 @@ Current Mega firmware uses:
 | I2C SDA | D20 |
 | I2C SCL | D21 |
 | DS18B20 | D2 |
-| GSR | A0 |
+| (GSR, A0) | retired - pin free, no firmware reads it |
 | MAX4466 | A1 |
 | AD8232 ECG OUT | A2 |
 | FSR | A3 |
@@ -753,7 +797,7 @@ Recommended connector labels:
 
 - PPG
 - IMU
-- GSR
+- TEMP
 - ECG
 - FSR
 - MIC
@@ -771,8 +815,8 @@ The normal topology is:
 ```
                 ┌─────────────────────┐
                 │ ESP32-S3 WEARABLE  │
-                │ PPG / IMU / GSR    │
-                │ BME280 / BH1750     │
+                │ PPG / IMU / TEMP   │
+                │ BME280 / BH1750    │
                 └──────────┬──────────┘
                            │ Wi-Fi/TCP
                            ▼
@@ -803,8 +847,8 @@ The two controllers can be tested independently.
 - [ ] MPU6050 rigidly mounted
 - [ ] BME280 has ambient-air vent
 - [ ] BH1750 has clear optical window
-- [ ] GSR connector strain relieved
-- [ ] finger electrodes labelled A/B
+- [ ] skin-temperature probe connector strain relieved
+- [ ] probe sites labelled in the session log
 - [ ] all grounds common
 - [ ] no exposed sharp conductive parts
 - [ ] battery protected and secured
@@ -815,13 +859,13 @@ The two controllers can be tested independently.
 - [ ] ESP32-S3 firmware compiles
 - [ ] board uploads successfully
 - [ ] I2C sensors detected
-- [ ] GSR ADC changes
-- [ ] CP2 CRC validates
+- [ ] skin temperature responds to contact and drops when released
+- [ ] CP3 CRC validates
 - [ ] ~20 Hz packet stream
 - [ ] Wi-Fi AP starts
 - [ ] TCP 7777 accepts a client
 - [ ] PING works
-- [ ] WHOAMI reports ENDO-TWIN-ESP32S3
+- [ ] WHOAMI reports ENDO-TWIN-ESP32S3-CP3
 
 ### Mega
 
@@ -843,11 +887,12 @@ The two controllers can be tested independently.
 3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. 
 4. Keep BME280 thermally isolated from the ESP32 and battery.
 5. Keep BH1750 optically exposed.
-6. Keep GSR electrode wires strain relieved.
-7. Treat GSR as a raw research channel requiring calibration.
+6. Keep the probe lead strain relieved and the pull-up resistor fitted.
+7. Treat skin temperature as a contact-dependent research channel: it is not core
+   temperature, and a loose probe reads the room, not the wearer.
 8. Never treat wearable data alone as a medical diagnosis.
 9. Test every sensor separately before sealing the enclosure.
-10. Record the exact board revision, sensor breakout version, wiring, electrode placement and firmware commit for every experimental session.
+10. Record the exact board revision, sensor breakout version, wiring, probe site and firmware commit for every experimental session.
 
 ---
 

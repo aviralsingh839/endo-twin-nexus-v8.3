@@ -14,7 +14,7 @@ Transforms V8.3 into integrated ecosystem:
 - **Patient Android App** (Kivy, offline-first, dashboard/profile/measurements/symptoms/cycle/results/reports/sharing/find care)
 - **Doctor Android App** (mobile review, patient list/search/profiles/recent measurements/trends/screening results/ultrasound/reports/notes/follow-up, not duplicate full PC)
 - **Doctor PC App** (PySide6, preserves src/ui/main_window.py, enhanced with dashboard/patient management/physiological data/advanced analysis/ultrasound/longitudinal/notes/reports)
-- **Local Database** (SQLite 18 tables, local-first, no cloud upload, auth, patient CRUD, symptom/cycle logging, sensor sessions, PPG/HRV/GSR/motion/temp/quality, ultrasound, model_results, analysis_results, reports, doctor_notes, providers, supplies, audit, access control, export/import/backup)
+- **Local Database** (SQLite 18 tables, local-first, no cloud upload, auth, patient CRUD, symptom/cycle logging, sensor sessions, PPG/HRV/motion/temp/quality, ultrasound, model_results, analysis_results, reports, doctor_notes, providers, supplies, audit, access control, export/import/backup)
 - **Analysis Engine** (signal processing, AI/ML, ultrasound, chrono-metabolic fingerprinting with provenance)
 - **Care Discovery** (FIND CARE map/list distance/specialty/address/hours/services/contact/directions/verification status, OSM directions no API key, provider directory separate from private records, supply discovery sensor accessories/monitoring equipment/menstrual-care/general supplies no prescription sales)
 - **Public Website** (serious modern scientific, Home/What is/Problem/How it Works/Technology/Patient App/Doctor App/Care Discovery/Research/Benefits/Safety/Privacy/Documentation, clean typography/scientific diagrams/clear sections/accessible colors/responsive/mobile/strong identity, no private records, no excessive animations/fake claims/stock AI doctor/exaggerated promises/100% accurate/fake hospital branding)
@@ -23,9 +23,9 @@ Transforms V8.3 into integrated ecosystem:
 ## Architecture
 
 ```
-Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 temp, GSR) 20Hz $CP2 CRC XOR
+Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 skin temp) 20Hz $CP2 CRC XOR
   → Signal Processing (filtering, baseline removal, artifact detection, quality control, missing handling)
-  → Feature Extraction (HR, HRV RMSSD/SDNN/pNN50, GSR tonic/phasic, motion activity, temp, quality)
+  → Feature Extraction (HR, HRV RMSSD/SDNN/pNN50, motion activity, temp, quality)
   → Personal Baseline Calibration
   → Disease Modules (PCOS, Sleep, Cardiometabolic, Autonomic) - risk signals only, versioned, confidence, limitations, clinical validation NOT ESTABLISHED
   → Multimodal Fusion
@@ -106,7 +106,7 @@ Every working V8.3 feature remains unless compelling technical reason, do not si
 - symptoms: structured symptom logging
 - cycles: cycle tracking dates/length/irregularity/symptoms/notes not diagnosis
 - sensor_sessions: session_id, patient_id, source, start_at, data_quality, label REAL/SIMULATED/DEMO
-- ppg_data, hrv_data, gsr_data, motion_data, temperature_data, sensor_quality
+- ppg_data, hrv_data, gsr_data (legacy table), motion_data, temperature_data, sensor_quality
 - ultrasound_records: image_path, cyst_size, volume, morphology, quality, source, confidence, label REAL/SYNTHETIC/DEMO, provenance CLINICALLY-ENTERED vs IMAGE-DERIVED
 - model_results: module_name, version, signal, level, confidence, data_quality, clinical_validation NOT ESTABLISHED, drivers, explanation, provenance, limitations
 - analysis_results: fingerprint_json, circadian, autonomic, metabolic, longitudinal
@@ -132,7 +132,7 @@ Methods: create_user, authenticate, create_patient, get_patient, list_patients d
 
 Kivy, offline-first, local SQLite, accessibility-friendly, simplicity low complexity clear explanations large readable accessibility-friendly multilingual-ready offline-first.
 
-Sections: Dashboard (collection status, sensor status, recent measurements, quality, cycle, previous sessions, notifications), Profile (basic, questionnaire, cycle, symptoms minimal USER-ENTERED), Measurements (sensor connection, guided PPG/HR/HRV/GSR/motion/temp/quality, gracefully handle unavailable/disconnected/noisy/missing/invalid/serial failure/partial), Symptoms (structured), Cycle Tracking (dates/length/irregularity/symptoms/notes not diagnosis), Results (understandable language Data quality Good not raw technical unless advanced, research risk-screening not diagnosis), Reports, Doctor Sharing (controlled export, local-first default without cloud, deliberate sharing not automatic, encrypted package, audit logged), Find Care (nearby doctors/clinics/labs/supplies map/list distance specialty address hours contact directions verification), Supply Discovery.
+Sections: Dashboard (collection status, sensor status, recent measurements, quality, cycle, previous sessions, notifications), Profile (basic, questionnaire, cycle, symptoms minimal USER-ENTERED), Measurements (sensor connection, guided PPG/HR/HRV/motion/temp/quality, gracefully handle unavailable/disconnected/noisy/missing/invalid/serial failure/partial), Symptoms (structured), Cycle Tracking (dates/length/irregularity/symptoms/notes not diagnosis), Results (understandable language Data quality Good not raw technical unless advanced, research risk-screening not diagnosis), Reports, Doctor Sharing (controlled export, local-first default without cloud, deliberate sharing not automatic, encrypted package, audit logged), Find Care (nearby doctors/clinics/labs/supplies map/list distance specialty address hours contact directions verification), Supply Discovery.
 
 Accessibility: large readable fonts, clear buttons, simple navigation tabs, multilingual-ready, offline-first.
 Security: local auth role PATIENT own data only cannot access other patient controlled export audit logging.
@@ -144,7 +144,7 @@ Technology: Kivy -> APK via Buildozer, offline SQLite, local-first.
 
 Full workstation, preserves src/ui/main_window.py, enhanced modular architecture, PySide6 PyQtGraph.
 
-Sections: Dashboard (patient overview, recent assessments, data quality, pending reviews, longitudinal views), Patient Management (create, search, open, archive, patient history only authorized patients for doctor role), Physiological Data (raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts visualization time-series), Advanced Analysis (circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML outputs distinguish established/derived/experimental/ML/clinical explainability), Ultrasound (all V8.3 capabilities loading/preprocessing/quality checks/segmentation/inference/visualization/confidence/training/evaluation/storage no invented accuracy state if insufficient never fabricate percentages quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20), Longitudinal (comparison trends baseline deviation), Doctor Notes (input/view follow-up), Reports (professional with Research / risk-screening output — not a medical diagnosis model transparency name/version/input/data quality/confidence/features/limitations never hide uncertainty).
+Sections: Dashboard (patient overview, recent assessments, data quality, pending reviews, longitudinal views), Patient Management (create, search, open, archive, patient history only authorized patients for doctor role), Physiological Data (raw/filtered PPG, HR, HRV, motion, temp, quality, artifacts visualization time-series), Advanced Analysis (circadian, autonomic, metabolic, fingerprint, multimodal, AI/ML outputs distinguish established/derived/experimental/ML/clinical explainability), Ultrasound (all V8.3 capabilities loading/preprocessing/quality checks/segmentation/inference/visualization/confidence/training/evaluation/storage no invented accuracy state if insufficient never fabricate percentages quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED fusion weight 0.20), Longitudinal (comparison trends baseline deviation), Doctor Notes (input/view follow-up), Reports (professional with Research / risk-screening output — not a medical diagnosis model transparency name/version/input/data quality/confidence/features/limitations never hide uncertainty).
 
 Role System: DOCTOR authorized patients only review analysis notes reports, ADMIN prototype manage provider directory system config demo data verification.
 Security: local auth role separation encrypted storage prototype Fernet controlled export audit logging minimal collection no cloud upload doctor only authorized patients.
@@ -218,21 +218,21 @@ Test files:
 
 1. Introduction: What is CHRONO-PCOS V8.3+ Sense•Model•Predict•Personalize•Connect research prototype not medical diagnosis
 2. Problem: PCOS/PCOD challenges need accessible research tools not diagnosis
-3. Hardware: Show Nano pod MAX30102 MPU6050 DS18B20 GSR 20Hz $CP2 wiring firmware
+3. Hardware: Show ESP32-S3 wearable pod MAX30102 MPU6050 DS18B20 skin temp 20Hz $CP3 wiring firmware
 4. Patient Android App: Dashboard data collection status sensor status recent measurements quality cycle previous sessions notifications
 5. Patient Profile: Basic profile questionnaire cycle symptoms minimal USER-ENTERED
-6. Measurements: Sensor connection guided measurement PPG HR HRV GSR motion temp quality graceful handling unavailable/disconnected/noisy demo mode simulated
+6. Measurements: Sensor connection guided measurement PPG HR HRV motion temp quality graceful handling unavailable/disconnected/noisy demo mode simulated
 7. Symptoms: Structured symptom logging type severity notes USER-ENTERED not diagnosis
 8. Cycle Tracking: Dates length irregularity symptoms notes not diagnosis
-9. Signal Processing: Filtering baseline removal artifact detection missing handling quality control feature extraction HR HRV GSR motion temp quality distinguish established/derived/experimental/ML/clinical explainability
+9. Signal Processing: Filtering baseline removal artifact detection missing handling quality control feature extraction HR HRV motion temp quality distinguish established/derived/experimental/ML/clinical explainability
 10. AI/ML: Disease modules PCOS Sleep Cardiometabolic Autonomic risk signals only confidence quality limitations clinical validation NOT ESTABLISHED fusion multimodal
 11. Chrono-Metabolic Fingerprinting: Circadian autonomic variability activity temp metabolic longitudinal experimental research not diagnosis provenance
 12. Ultrasound: Loading preprocessing quality checks segmentation inference visualization confidence training evaluation storage no invented accuracy state if insufficient never fabricate percentages provenance CLINICALLY-ENTERED vs IMAGE-DERIVED
 13. Results: Patient view understandable language Data quality Good not raw technical unless advanced research risk-screening not diagnosis
-14. Doctor Review: Doctor PC app dashboard patient overview recent assessments quality pending reviews longitudinal patient management create/search/open/archive/history physiological data raw/filtered PPG HR HRV GSR motion temp quality artifacts visualization time-series advanced analysis circadian autonomic metabolic fingerprint multimodal AI ultrasound longitudinal comparison doctor notes reports professional disclaimer, Doctor Android mobile companion patient list/search/profiles/recent measurements/trends/screening results/ultrasound/reports/notes/follow-up not duplicate full PC
+14. Doctor Review: Doctor PC app dashboard patient overview recent assessments quality pending reviews longitudinal patient management create/search/open/archive/history physiological data raw/filtered PPG HR HRV motion temp quality artifacts visualization time-series advanced analysis circadian autonomic metabolic fingerprint multimodal AI ultrasound longitudinal comparison doctor notes reports professional disclaimer, Doctor Android mobile companion patient list/search/profiles/recent measurements/trends/screening results/ultrasound/reports/notes/follow-up not duplicate full PC
 15. Reports: Professional reports with Research / risk-screening output — not a medical diagnosis model transparency
 16. Care Discovery: FIND CARE map/list distance/specialty/address/opening hours/services/contact/directions/verification status example Nearby ABC Women's Clinic 1.2km Gynecology Verified View Directions, provider directory separate from private records, supply discovery sensor accessories/monitoring equipment/menstrual-care/general supplies no prescription sales no auto medication no treatment decisions
-17. Public Website: Home tagline What is Problem What It Is NOT/IS How it Works flow Sensors→Signal Processing→Feature Extraction→Multimodal AI→Chrono-Metabolic Fingerprinting→Risk Screening→Doctor Review Technology Arduino/PPG/HR/HRV/GSR/motion/temp/ultrasound/AI/signal processing Patient App Doctor App Care Discovery Research hypothesis/methodology Benefits without unsupported claims Safety limitations Privacy local-first Documentation links to 25 docs, serious modern scientific avoid excessive animations/fake claims/stock AI doctor/exaggerated promises/100% accurate/fake hospital branding clean typography/scientific diagrams/clear sections/accessible colors/responsive/mobile/strong identity, one coherent ecosystem common terminology/data model/scientific foundation/identity/UI/safety language polished Class 11 research/innovation scientifically honest
+17. Public Website: Home tagline What is Problem What It Is NOT/IS How it Works flow Sensors→Signal Processing→Feature Extraction→Multimodal AI→Chrono-Metabolic Fingerprinting→Risk Screening→Doctor Review Technology Arduino/PPG/HR/HRV/motion/temp/ultrasound/AI/signal processing Patient App Doctor App Care Discovery Research hypothesis/methodology Benefits without unsupported claims Safety limitations Privacy local-first Documentation links to 25 docs, serious modern scientific avoid excessive animations/fake claims/stock AI doctor/exaggerated promises/100% accurate/fake hospital branding clean typography/scientific diagrams/clear sections/accessible colors/responsive/mobile/strong identity, one coherent ecosystem common terminology/data model/scientific foundation/identity/UI/safety language polished Class 11 research/innovation scientifically honest
 
 Integrated ecosystem not unrelated apps.
 

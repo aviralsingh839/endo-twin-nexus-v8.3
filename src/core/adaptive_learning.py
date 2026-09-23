@@ -79,7 +79,6 @@ LEARNING_METRICS: Tuple[str, ...] = (
     "resting_hr_bpm",
     "rmssd_ms",
     "skin_temp_c",
-    "gsr_tonic",
     "activity_level",
 )
 
@@ -90,7 +89,6 @@ METRIC_BOUNDS: Dict[str, Tuple[float, float]] = {
     "resting_hr_bpm": (25.0, 200.0),
     "rmssd_ms": (1.0, 400.0),
     "skin_temp_c": (15.0, 43.0),
-    "gsr_tonic": (0.0, 4095.0),
     "activity_level": (0.0, 1.0),
 }
 
@@ -101,7 +99,6 @@ POPULATION_PRIOR: Dict[str, Tuple[float, float]] = {
     "resting_hr_bpm": (62.0, 9.0),
     "rmssd_ms": (42.0, 15.0),
     "skin_temp_c": (32.5, 0.7),
-    "gsr_tonic": (450.0, 180.0),
     "activity_level": (0.10, 0.08),
 }
 
@@ -110,7 +107,6 @@ METRIC_UNITS: Dict[str, str] = {
     "resting_hr_bpm": "bpm",
     "rmssd_ms": "ms",
     "skin_temp_c": "C",
-    "gsr_tonic": "a.u.",
     "activity_level": "index",
 }
 
@@ -750,7 +746,7 @@ class MetricLearning:
 # Supervised head (online logistic regression, prospective validation)
 # ---------------------------------------------------------------------------
 HEAD_FEATURES: Tuple[str, ...] = (
-    "hr_z", "rmssd_z", "temp_z", "gsr_z", "activity_z", "hour_sin", "hour_cos",
+    "hr_z", "rmssd_z", "temp_z", "activity_z", "hour_sin", "hour_cos",
 )
 
 
@@ -1427,7 +1423,6 @@ class AdaptiveWearableModel:
             z_of("hr_bpm"),
             z_of("rmssd_ms"),
             z_of("skin_temp_c"),
-            z_of("gsr_tonic"),
             z_of("activity_level"),
             math.sin(angle),
             math.cos(angle),

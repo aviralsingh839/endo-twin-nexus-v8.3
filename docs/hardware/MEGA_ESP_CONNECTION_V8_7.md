@@ -7,7 +7,7 @@ ESP32-S3 wearable ── Wi-Fi/TCP 7777 ── Android/Desktop
 Mega 2560 lab hub ── USB Serial ─────── Desktop
 ```
 
-The two controllers are independent CP2 producers.
+The two controllers are independent CP3 producers.
 
 ## Wearable
 
@@ -16,7 +16,7 @@ The two controllers are independent CP2 producers.
 - MPU6050
 - BME280
 - BH1750
-- GSR module + finger electrodes
+- DS18B20 skin-temperature probe
 - TCP port 7777
 
 ## Mega

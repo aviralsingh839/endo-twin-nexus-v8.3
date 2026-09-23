@@ -26,7 +26,7 @@ PERSISTENT CHANGE + GOOD DATA QUALITY → higher-confidence research signal
 
 ## Metrics Tracked
 
-Default: hr_bpm, resting_hr_bpm, rmssd_ms, skin_temp_c, gsr_tonic, activity_level, sleep_duration_h, circadian_stability_index, stress_index
+Default: hr_bpm, resting_hr_bpm, rmssd_ms, skin_temp_c, activity_level, sleep_duration_h, circadian_stability_index, stress_index
 
 ## Baseline Reference
 

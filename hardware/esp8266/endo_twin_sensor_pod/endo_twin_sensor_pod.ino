@@ -7,8 +7,8 @@
  *   MAX30102 / MAX30105-compatible PPG  -> I2C
  *   MPU6050                             -> I2C
  *   BME280 (optional)                   -> I2C
- *   DS18B20                             -> D5
- *   GSR                                 -> A0
+ *   DS18B20 (skin contact)              -> D5
+ *   A0 free — the GSR channel was retired and the firmware no longer reads it
  *
  * Network:
  *   Wi-Fi AP: ENDO-TWIN-POD
@@ -16,7 +16,7 @@
  *   TCP:      7777
  *
  * Data:
- *   newline-delimited $CP2 packet
+ *   newline-delimited $CP3 packet (CP2 without the retired gsr field)
  *   XOR CRC over the payload before the final comma
  *   20 Hz packet cadence
  *
@@ -38,7 +38,6 @@ static const char* AP_PASSWORD = "endotwin123";   // change before any non-lab u
 static const uint16_t TCP_PORT = 7777;
 
 static const uint8_t DS18B20_PIN = D5;
-static const uint8_t GSR_PIN = A0;
 
 WiFiServer server(TCP_PORT);
 WiFiClient tcpClient;
@@ -52,6 +51,7 @@ bool ppgOk = false;
 bool imuOk = false;
 bool bmeOk = false;
 bool tempOk = false;
+bool tempPrimed = false;
 uint32_t seqMs = 0;
 uint32_t packetCount = 0;
 
@@ -80,7 +80,6 @@ String makePacket() {
   float ax = NAN, ay = NAN, az = NAN;
   float gx = NAN, gy = NAN, gz = NAN;
   float skinTemp = NAN;
-  int gsr = 0;
   float roomTemp = NAN, humidity = NAN, pressure = NAN;
 
   uint16_t status = 0;
@@ -110,13 +109,18 @@ String makePacket() {
     status |= (1u << 5);
   }
 
+  // The DS18B20 takes ~750 ms at 12-bit resolution, which must not stall the
+  // 50 ms packet loop: request a conversion now, read the previous one.
   if (tempOk) {
     tempSensor.requestTemperatures();
-    skinTemp = tempSensor.getTempCByIndex(0);
-    if (skinTemp == DEVICE_DISCONNECTED_C) {
-      skinTemp = NAN;
-      status |= (1u << 3);
+    if (tempPrimed) {
+      skinTemp = tempSensor.getTempCByIndex(0);
+      if (skinTemp <= DEVICE_DISCONNECTED_C) {
+        skinTemp = NAN;
+        status |= (1u << 3);
+      }
     }
+    tempPrimed = true;
   } else {
     status |= (1u << 3);
   }
@@ -129,17 +133,14 @@ String makePacket() {
     status |= (1u << 8);
   }
 
-  gsr = analogRead(GSR_PIN);
-
-  // $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,
+  // $CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,
   //      micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
-  String payload = "$CP2," +
+  String payload = "$CP3," +
     String(ms) + "," +
     String(ir) + "," + String(red) + "," +
     String(ax, 4) + "," + String(ay, 4) + "," + String(az, 4) + "," +
     String(gx, 3) + "," + String(gy, 3) + "," + String(gz, 3) + "," +
     String(skinTemp, 2) + "," + String(NAN, 2) + "," +
-    String(gsr) + "," +
     "-1,-1,-1,-1,-1,-1," +
     String(roomTemp, 2) + "," +
     String(humidity, 2) + "," +
@@ -185,8 +186,6 @@ void setup() {
   Wire.begin(D2, D1); // SDA, SCL for NodeMCU ESP8266
   Wire.setClock(400000);
 
-  pinMode(GSR_PIN, INPUT);
-
   setupPPG();
 
   imu.initialize();
@@ -194,6 +193,10 @@ void setup() {
 
   tempSensor.begin();
   tempOk = tempSensor.getDeviceCount() > 0;
+  if (tempOk) {
+    tempSensor.setResolution(12);
+    tempSensor.setWaitForConversion(false);
+  }
 
   bmeOk = bme.begin(0x76, &Wire);
   if (!bmeOk) bmeOk = bme.begin(0x77, &Wire);

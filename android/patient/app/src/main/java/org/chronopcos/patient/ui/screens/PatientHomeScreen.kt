@@ -42,7 +42,7 @@ fun PatientHomeScreen(
                     Text("Today's Overview", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Data collection status: Active - Demo sensor")
-                    Text("Sensor/device status: Connected - MAX30102 PPG, MPU6050 Motion, DS18B20 Temp, GSR")
+                    Text("Sensor/device status: Connected - MAX30102 PPG, MPU6050 Motion, DS18B20 skin temperature")
                     Text("Recent measurements: HR 72 bpm MEASURED quality 0.91, HRV RMSSD 48 ms DERIVED quality 0.85")
                     Text("Signal quality: Good - understandable language, not raw technical")
                     Text("Recent activity: 35% MEASURED source MPU6050")

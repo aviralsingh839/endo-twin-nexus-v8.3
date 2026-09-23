@@ -166,7 +166,7 @@ private fun Dashboard(onOpen: (DemoPatient) -> Unit) {
         }
         item { SectionTitle("Recently synced", "Select a patient to open the full patient-scoped workspace.") }
         items(demoPatients.take(5)) { p -> PatientRow(p, onOpen) }
-        item { SectionCard("Live sensor monitoring", "CRC-checked • quality-gated", "PPG, HRV, IMU, GSR and temperature. Live measurements remain separate from disease-model output.") }
+        item { SectionCard("Live sensor monitoring", "CRC-checked • quality-gated", "PPG, HRV, IMU and skin temperature. Live measurements remain separate from disease-model output.") }
         item { Text("Research / risk-screening output — not a medical diagnosis.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
     }
 }
@@ -265,7 +265,6 @@ private fun PatientWorkspace(patient: DemoPatient) {
             }
             "Signals" -> {
                 item { SectionCard("PPG", "20 Hz packet stream", "CRC-checked input → filtered waveform → peak detection → quality gate.") }
-                item { SectionCard("GSR / EDA", "10 Hz processing", "Tonic and phasic conductance features; source quality remains explicit.") }
                 item { SectionCard("IMU", "6-axis motion", "Acceleration + gyro context for activity and motion-artifact handling.") }
                 item { SectionCard("Quality", "Channel-aware", "Missing, stale, flatline and implausible states remain explicit.") }
             }
@@ -351,7 +350,7 @@ private fun HardwarePage() {
         client.onState = { state = it }
         client.onDevice = { device = it }
         client.onError = { error = it }
-        client.onSample = { sample -> packets += 1; latest = "IR ${sample.ir} • Red ${sample.red} • GSR ${sample.gsr} • status ${sample.status}" }
+        client.onSample = { sample -> packets += 1; latest = "IR ${sample.ir} • Red ${sample.red} • Skin temp ${sample.temp0 ?: Double.NaN} • status ${sample.status} • ${sample.format}" }
         onDispose { client.disconnect() }
     }
 

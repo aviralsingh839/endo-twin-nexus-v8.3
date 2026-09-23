@@ -53,7 +53,7 @@ Original PCOS application contains:
 - AutonomicModule - autonomic regulation signal
 - PersonalBaselineEngine - mean, median, std, MAD, rolling, confidence, min obs, circadian context
 - LongitudinalEngine - rolling windows, persistence, trend, change-point, recovery
-- RealtimeFeatureExtractor - HR, HRV RMSSD/SDNN/pNN50, GSR tonic/phasic, motion, temp
+- RealtimeFeatureExtractor - HR, HRV RMSSD/SDNN/pNN50, , motion, temp
 - SharedFeatureExtractor - shared physiological representation
 - SensorQualityControl - value, quality, source, timestamp, artifact
 - FusionEngine - MultimodalFusion confidence weighted quality
@@ -61,17 +61,17 @@ Original PCOS application contains:
 - ChronoMetabolicFingerprint - circadian, autonomic, variability, activity, temp, metabolic, longitudinal
 
 **Sensors**:
-- MAX30102 PPG IR+RED HR SpO2 pulse amplitude - 20Hz $CP2
+- MAX30102 PPG IR+RED HR SpO2 pulse amplitude - 20Hz $CP3
 - MPU6050 motion ax ay az gx gy gz motion index activity level
 - DS18B20 skin temp room temp temp slope
-- GSR raw tonic phasic per min
+-  per min
 - ECG Mega Hub (expanded lab)
 - BME280 environmental (Mega Hub)
 
 **Signal Processing**:
-- Filtering bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median GSR lowpass tonic highpass phasic
-- Baseline Removal PPG drift GSR tonic/phasic temp baseline
-- Artifact Detection motion MPU6050 correlation PPG amplitude HR outlier GSR jumps
+- Filtering bandpass 0.5-4Hz PPG lowpass baseline motion lowpass temp median 
+- Baseline Removal PPG drift  temp baseline
+- Artifact Detection motion MPU6050 correlation PPG amplitude HR outlier temp jumps
 - Missing Handling short gaps interpolation quality penalty long gaps mark missing not fabricate
 - Quality Control 0-1 per channel
 

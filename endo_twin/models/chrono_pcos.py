@@ -74,12 +74,12 @@ class ChronoPCOSModel:
                 "autonomic_analysis": {
                     "signal": "moderate dysregulation",
                     "provenance": "DERIVED_FEATURE + EXPERIMENTAL_RESEARCH",
-                    "explainability": "HRV+GSR autonomic regulation"
+                    "explainability": "HRV autonomic regulation"
                 },
                 "metabolic_context": {
                     "signal": "experimental",
                     "provenance": "EXPERIMENTAL_RESEARCH",
-                    "limitations": "Not clinical metabolic measurement, hypothesized multimodal HR HRV activity temp GSR"
+                    "limitations": "Not clinical metabolic measurement, hypothesized multimodal HR HRV activity temp"
                 },
                 "longitudinal_tracking": {
                     "baseline": "Personal baseline mean median std MAD rolling confidence min obs circadian context",

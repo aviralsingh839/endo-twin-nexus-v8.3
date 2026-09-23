@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from dataclasses import dataclass
 
 class ProvenanceLabel(Enum):
-    MEASURED = "MEASURED"  # Directly measured HR, temp, motion, GSR raw
+    MEASURED = "MEASURED"  # Directly measured HR, skin temp, motion
     CLINICALLY_ENTERED = "CLINICALLY_ENTERED"  # USER-ENTERED age, BMI, cycle, symptoms, glucose, BP
     IMAGE_DERIVED = "IMAGE_DERIVED"  # Cyst size, volume, morphology from ultrasound image
     MODEL_INFERRED = "MODEL_INFERRED"  # Sleep regularity, circadian disruption, HRV derived, risk signals
@@ -42,9 +42,9 @@ class ProvenanceTracker:
             "patient_id": patient_id,
             "provenance_labels": {
                 "MEASURED": {
-                    "description": "Directly measured HR 72 bpm quality 0.91 source MAX30102, Skin Temp 32.5°C quality 0.88 source DS18B20, Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level quality 0.8 source MPU6050, GSR raw gsr_raw quality source GSR",
+                    "description": "Directly measured HR 72 bpm quality 0.91 source MAX30102, Skin Temp 32.5°C quality 0.88 source DS18B20, Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level quality 0.8 source MPU6050",
                     "category": "ESTABLISHED_MEASUREMENT",
-                    "examples": ["HR bpm MAX30102", "Skin Temp C DS18B20", "Motion MPU6050", "GSR raw"]
+                    "examples": ["HR bpm MAX30102", "Skin Temp C DS18B20", "Motion MPU6050"]
                 },
                 "CLINICALLY_ENTERED": {
                     "description": "Age 22 years, BMI 23.5, cycle length 28 days, irregularity regular, symptoms irregular_cycle mild, notes free text, Glucose BP if entered",
@@ -60,7 +60,7 @@ class ProvenanceTracker:
                     "examples": ["Cyst size mm", "Volume cc", "Morphology"]
                 },
                 "MODEL_INFERRED": {
-                    "description": "Sleep regularity 75%, circadian disruption pattern moderate, HRV RMSSD 48 ms SDNN 55 ms pNN50 % derived from HR time series limitations PPG less accurate than ECG, GSR tonic lowpass derived phasic highpass derived, circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography, autonomic HRV+GSR experimental, metabolic multimodal experimental not clinical, chrono-metabolic fingerprint experimental research not diagnosis, PCOS associated risk low/moderate/high NOT diagnosis",
+                    "description": "Sleep regularity 75%, circadian disruption pattern moderate, HRV RMSSD 48 ms SDNN 55 ms pNN50 % derived from HR time series limitations PPG less accurate than ECG, circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography, autonomic HRV-based experimental, metabolic multimodal experimental not clinical, chrono-metabolic fingerprint experimental research not diagnosis, PCOS associated risk low/moderate/high NOT diagnosis",
                     "category": "DERIVED_FEATURE, EXPERIMENTAL_RESEARCH, MODEL-INFERRED",
                     "confidence": "Model output not clinical certainty",
                     "limitations": "Engineering validation only, clinical validation NOT ESTABLISHED",

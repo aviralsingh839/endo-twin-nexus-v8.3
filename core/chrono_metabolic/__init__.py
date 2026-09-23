@@ -3,7 +3,7 @@ Chrono-Metabolic Fingerprinting V8.3+
 
 Combines:
 - Circadian patterns (sleep-wake, HR, temp)
-- Autonomic regulation (HRV, GSR)
+- Autonomic regulation (HRV)
 - Variability (HRV metrics, activity)
 - Activity (MPU6050 motion)
 - Temperature (DS18B20 skin temp)
@@ -129,7 +129,7 @@ class ChronoMetabolicFingerprint:
                 value=features.get('metabolic_index', 0),
                 category=SignalCategory.EXPERIMENTAL_RESEARCH,
                 quality=min(quality_scores.values()) if quality_scores else 0.5,
-                source='Multimodal combination: HR, HRV, activity, temp, GSR',
+                source='Multimodal combination: HR, HRV, activity, temp',
                 limitations='Experimental research signal, not clinical metabolic measurement, requires validation',
                 explainability='Research combination of autonomic, activity, temperature patterns hypothesized to relate to metabolic regulation'
             ))

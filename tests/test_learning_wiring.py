@@ -37,7 +37,7 @@ def _sample(i: int) -> SensorSample:
     return SensorSample(
         timestamp_s=time.time(), ms=i, ir=1000 + i, red=1200 + i,
         ax_g=0.01, ay_g=0.0, az_g=1.0, gx_dps=0.0, gy_dps=0.0, gz_dps=0.0,
-        temp_c=32.5, gsr_raw=450, lux=120.0,
+        temp_c=32.5, lux=120.0,
     )
 
 
@@ -57,7 +57,6 @@ def _row(ts: float, hr: float = 74.0, quality: float = 0.9) -> dict:
         "resting_hr_bpm": hr - 8.0,
         "rmssd_ms": 42.0,
         "skin_temp_c": 32.5,
-        "gsr_tonic": 450.0,
         "activity_level": 0.12,
         "signal_quality": quality,
     }

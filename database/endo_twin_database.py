@@ -60,6 +60,8 @@ class EndoTwinDatabase(LocalDatabase):
             measurement_id TEXT PRIMARY KEY,
             patient_id TEXT NOT NULL,
             session_id TEXT,
+            -- 'gsr' stays in the allowed set so existing rows keep validating;
+            -- new measurements are only written with the remaining types.
             measurement_type TEXT NOT NULL CHECK(measurement_type IN ('hr','hrv','ppg','gsr','temperature','motion','sleep','activity','circadian','autonomic','metabolic')),
             value REAL,
             value_json TEXT,

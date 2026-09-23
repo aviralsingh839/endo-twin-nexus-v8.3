@@ -222,7 +222,6 @@ class ChronoPCOSDiseaseModel(DiseaseModel):
                 ("sleep_duration_h", "sleep_duration_h"),
                 ("sleep_regularity", "sleep_regularity"),
                 ("circadian_stability", "circadian_stability"),
-                ("gsr_tonic", "gsr_tonic"),
                 ("stress_index", "stress_index"),
                 ("circadian_disruption", "circadian_disruption"),
                 ("temperature_rhythm_disruption", "temperature_rhythm_disruption"),

@@ -15,7 +15,6 @@ class PatientBleRecorder(context: Context, private val patientId: String) {
             val values = listOf(
                 Triple("ppg_ir", sample.ir.toDouble(), "raw"),
                 Triple("ppg_red", sample.red.toDouble(), "raw"),
-                Triple("gsr", sample.gsr.toDouble(), "adc"),
                 Triple("accel_x", sample.ax, "g"),
                 Triple("accel_y", sample.ay, "g"),
                 Triple("accel_z", sample.az, "g"),

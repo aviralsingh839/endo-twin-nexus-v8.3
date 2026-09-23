@@ -2,9 +2,9 @@
 
 ## Proper Testing
 - Database: create_user, authenticate, create_patient, get_patient, list_patients, search_patients, log_symptom, log_cycle, create_session, list_providers, search_providers, get_nearby_providers, list_supplies, create_report, add_doctor_note, get_doctor_notes, grant_access, check_access, export_patient_data, import_patient_data, backup_database
-- Sensor: serial packet parser $CP2 CRC XOR, filtering, baseline removal, artifact detection, missing handling, reconnection, graceful handling unavailable/disconnected/noisy/missing/invalid/serial failure/partial
-- Signal Processing: filtering, baseline, artifact, quality control, feature extraction HR HRV GSR motion temp quality
-- Artifact: motion artifact detection MPU6050 correlation PPG, PPG artifact amplitude HR outlier, GSR sudden jumps
+- Sensor: serial packet parser $CP3 CRC XOR, filtering, baseline removal, artifact detection, missing handling, reconnection, graceful handling unavailable/disconnected/noisy/missing/invalid/serial failure/partial
+- Signal Processing: filtering, baseline, artifact, quality control, feature extraction HR HRV motion temp quality
+- Artifact: motion artifact detection MPU6050 correlation PPG, PPG artifact amplitude HR outlier, temp sudden jumps
 - Missing: short gaps interpolation quality penalty, long gaps mark missing not fabricate
 - Reconnection: SerialManager retry fallback
 - Permissions: PATIENT own data only, DOCTOR authorized only, ADMIN provider directory, patient cannot access other patient, doctor only authorized
@@ -16,7 +16,7 @@
 
 ## Failure Conditions
 - Unplug: sensor unplugged during measurement, graceful handling, notify user, save partial with quality penalty
-- Corrupt: corrupt packet $CP2 CRC fail, discard, log artifact, quality penalty
+- Corrupt: corrupt packet $CP3 CRC fail, discard, log artifact, quality penalty
 - No Internet: offline-first core works without internet patient records/sensor collection/signal processing/AI inference/ultrasound/reports/historical/local DB, internet optional provider directory/map/updates/controlled sync, no crash
 - Empty DB: no patients, no providers, handle empty list, show No authorized patients yet demo data
 - Invalid: invalid input age negative BMI zero, validation discard invalid, error message not crash

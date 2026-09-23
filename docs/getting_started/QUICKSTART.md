@@ -13,7 +13,7 @@ Choose:
 For Doctor or Patient Workstation, the next screen is the **startup-only DEMO MODE / LIVE SENSOR MODE** chooser.
 
 ## Live sensor
-Choose LIVE SENSOR MODE, select the Arduino serial port, and start the session. The workstation validates packet CRCs and processes PPG/HRV, IMU, GSR and temperature data with visible quality gates.
+Choose LIVE SENSOR MODE, select the Arduino serial port, and start the session. The workstation validates packet CRCs and processes PPG/HRV, IMU and temperature data with visible quality gates.
 
 ## Demo
 Choose DEMO MODE for the hardware-free exhibition stream. All synthetic values are visibly marked DEMO_DATA.

@@ -84,7 +84,7 @@ class PublicStudyManager:
                 "rmssd": feature.rmssd_ms,
                 "spo2": getattr(feature, "spo2_pct", None),
                 "skin_temp": feature.skin_temp_c,
-                "gsr": feature.gsr_tonic,
+                "gsr": None,  # retired channel: pre-change sessions may still hold values
                 "motion": feature.motion_index,
                 "activity": feature.activity_level,
                 "stress": feature.stress_index,
@@ -111,6 +111,7 @@ class PublicStudyManager:
                 "quality": float(g["signal_quality"].mean()) if g["signal_quality"].notna().any() else 0.0,
                 "hr": float(g["hr"].median()) if g["hr"].notna().any() else None,
                 "rmssd": float(g["rmssd"].median()) if g["rmssd"].notna().any() else None,
+                # legacy column: only pre-change sessions ever have values here
                 "gsr": float(g["gsr"].median()) if g["gsr"].notna().any() else None,
                 "activity": float(g["activity"].mean()) if g["activity"].notna().any() else None,
                 "temp": float(g["skin_temp"].median()) if g["skin_temp"].notna().any() else None,

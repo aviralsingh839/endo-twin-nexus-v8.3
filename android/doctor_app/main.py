@@ -202,7 +202,7 @@ if __name__ == '__main__':
         print("CHRONO-PCOS Doctor Android App V8.3+ - Console Demo")
         print("Patient list: patient list, search, only authorized patients")
         print("Patient profiles: basic info, questionnaire, cycle, symptoms")
-        print("Recent measurements: HR, HRV, GSR, motion, temp, quality, artifacts")
+        print("Recent measurements: HR, HRV, motion, temp, quality, artifacts")
         print("Trends: longitudinal changes")
         print("Screening results: PCOS, Sleep, Cardiometabolic, Autonomic modules, research-only, not diagnosis, model name/version, quality, confidence, features, limitations")
         print("Ultrasound results: image, quality, features, provenance")

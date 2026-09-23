@@ -36,8 +36,8 @@ def run_demo():
     print("\n[2/17] Problem: PCOS/PCOD challenges need accessible research tools not diagnosis")
 
     # 3. Hardware
-    print("\n[3/17] Hardware: Show Nano pod MAX30102 MPU6050 DS18B20 GSR 20Hz $CP2 wiring firmware")
-    print("Nano pod: Arduino Nano, MAX30102 PPG, MPU6050 motion, DS18B20 temp, GSR, 20Hz $CP2 CRC XOR")
+    print("\n[3/17] Hardware: Show ESP32-S3 wearable pod MAX30102 MPU6050 DS18B20 20Hz $CP3 wiring firmware")
+    print("S3 wearable pod: ESP32-S3, MAX30102 PPG, MPU6050 motion, DS18B20 skin temp, 20Hz $CP3 CRC XOR")
     print("Mega hub: Arduino Mega, ECG, mic, FSR, BME280, OLED, relay mode expanded lab validation")
 
     # 4. Patient Android App Dashboard
@@ -51,7 +51,7 @@ def run_demo():
     print(f"Created demo patient: {patient['anonymous_id']} Age {patient['age_years']} BMI {patient['bmi']} (USER-ENTERED, DEMO)")
 
     # 6. Measurements
-    print("\n[6/17] Measurements: Sensor connection guided measurement PPG HR HRV GSR motion temp quality")
+    print("\n[6/17] Measurements: Sensor connection guided measurement PPG HR HRV motion temp quality")
     print("Sensor connection: USB/BLE Connect button, Demo Mode Simulated button")
     print("Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial")
     session_id = db.create_session(patient_id=patient_id, source="DEMO_SIMULATED", label="DEMO", notes="Simulated sensor data for science-fair demo, labeled DEMO/SIMULATED")
@@ -110,7 +110,7 @@ def run_demo():
     overview = dashboard.get_overview()
     print(f"Doctor Dashboard: {overview['total_patients']} patients, longitudinal {overview['longitudinal_summary']}")
     print("Patient Management: create, search, open, archive, history")
-    print("Physiological Data: raw/filtered PPG HR HRV GSR motion temp quality artifacts visualization time-series")
+    print("Physiological Data: raw/filtered PPG HR HRV motion temp quality artifacts visualization time-series")
     print("Advanced Analysis: circadian autonomic metabolic fingerprint multimodal AI distinguish established/derived/experimental/ML/clinical explainability")
     adv_viewer = AdvancedAnalysisViewer(db)
     analysis = adv_viewer.analyze(patient_id=patient_id)

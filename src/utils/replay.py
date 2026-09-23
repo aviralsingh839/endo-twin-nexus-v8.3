@@ -56,7 +56,7 @@ def features_from_frame(df: pd.DataFrame) -> List[FeatureVector]:
             rmssd_ms=_opt(row.get("rmssd")),
             spo2_pct=_opt(row.get("spo2")),
             skin_temp_c=_opt(row.get("skin_temp")),
-            gsr_tonic=_opt(row.get("gsr")),
+            gsr_tonic=_opt(row.get("gsr")),  # legacy column: blank in current recordings
             motion_index=_opt(row.get("motion")),
             activity_level=_opt(row.get("activity")),
             stress_index=_opt(row.get("stress")),

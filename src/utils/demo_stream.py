@@ -52,15 +52,12 @@ class DemoSensorStream(QObject):
         if phase == 0:
             hr = 72 + 3 * math.sin(2 * math.pi * t / 35)
             motion = 0.02
-            gsr = 420 + 15 * math.sin(2 * math.pi * t / 50)
         elif phase == 1:
             hr = 90 + 5 * math.sin(2 * math.pi * t / 25)
             motion = 0.04
-            gsr = 600 + 70 * abs(math.sin(2 * math.pi * t / 11))
         else:
             hr = 105 + 8 * math.sin(2 * math.pi * t / 20)
             motion = 0.35
-            gsr = 520 + 40 * math.sin(2 * math.pi * t / 16)
 
         pulse_freq = hr / 60.0
         ppg = 48000 + 2500 * math.sin(2 * math.pi * pulse_freq * t) + 400 * math.sin(2 * math.pi * 2 * pulse_freq * t)
@@ -85,7 +82,6 @@ class DemoSensorStream(QObject):
             gy_dps=float(gy),
             gz_dps=float(gz),
             temp_c=float(temp),
-            gsr_raw=int(gsr + self.rng.normal(0, 10)),
             lux=float(150 + 100 * math.sin(2 * math.pi * t / 240)),
             ecg_raw=int(512 + 120 * math.sin(2 * math.pi * pulse_freq * t + 0.2) + self.rng.normal(0, 8)),
             mic_raw=int(512 + self.rng.normal(0, 4)),

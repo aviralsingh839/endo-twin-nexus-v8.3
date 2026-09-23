@@ -1,5 +1,10 @@
 # DEVELOPMENT HISTORY - V8.3
 
+> **Historical record.** This document describes the project as it stood at the time
+> of writing. The GSR channel and its hardware were retired afterwards; current
+> hardware is the ESP32-S3 wearable with a DS18B20 skin-contact temperature probe and
+> it emits the `$CP3` frame. See `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`.
+
 ## V8.1 - CHRONO-PCOS (Legacy Reference)
 
 **Location:** `chrono_pcos_project V8/` folder preserved as legacy/reference implementation.
@@ -9,7 +14,7 @@
 **Question:** Can continuous, personalised physiological information collected between clinical assessments provide useful longitudinal context, and does combining it with periodic clinical information such as ultrasound improve PCOS-related risk phenotyping? Wearable only acquires data. Contribution is longitudinal framework: personal baseline, persistent-change detection, evidence-linked "WHAT CHANGED?" summary, provenance-aware fusion, low-infrastructure digital reporting.
 
 **Hardware:**
-- Arduino Nano wearable pod: MAX30102 PPG, DS18B20 skin temp, MPU6050 motion, optional GSR, streams 20 Hz $CP2
+- Arduino Nano wearable pod: MAX30102 PPG, DS18B20 skin temp, MPU6050 motion, , streams 20 Hz $CP2
 - Arduino Mega 2560 bench hub and base station: pod sensors plus ECG, microphone, FSR, light, environment, OLED, LEDs, buzzer, buttons, in relay mode forwards pod stream
 - Optional ESP8266 Wi-Fi bridge relays same packets over TCP 7777
 - Dashboard runs with no hardware: demo mode, manual entries, replay
@@ -101,7 +106,7 @@ RAW DATA → Quality Control → Signal Processing → Feature Extraction → Pe
 
 **Modules Initially Implemented (reasonably supported by available data):**
 
-- **Module A - PCOS / Reproductive-Metabolic:** Keeps and improves V8.1 PCOS pipeline, inputs age, BMI, cycle info, clinical variables, glucose, HR, HRV, activity, sleep/circadian, temp trends, GSR/stress, ultrasound structured features, distinguishes clinical-variable, wearable physiology, ultrasound-derived, combined/fused, language PCOS-associated risk signals not wearable detects PCOS, provenance breakdown computed not hard-coded fake
+- **Module A - PCOS / Reproductive-Metabolic:** Keeps and improves V8.1 PCOS pipeline, inputs age, BMI, cycle info, clinical variables, glucose, HR, HRV, activity, sleep/circadian, temp trends, stress, ultrasound structured features, distinguishes clinical-variable, wearable physiology, ultrasound-derived, combined/fused, language PCOS-associated risk signals not wearable detects PCOS, provenance breakdown computed not hard-coded fake
 
 - **Module B - Sleep / Circadian:** Uses activity, movement, HR, HRV, resting HR, temp trends, sleep duration/timing/regularity, day/night activity, outputs sleep regularity signal, circadian disruption signal, recovery signal, persistent deviation, language sleep-related risk signal or circadian disruption pattern not diagnosis
 
@@ -115,7 +120,7 @@ RAW DATA → Quality Control → Signal Processing → Feature Extraction → Pe
 
 - Organized into raw, processed, clinical, physiological, longitudinal, ultrasound, synthetic, public, baselines
 - Clearly labelled REAL, SYNTHETIC, SIMULATED, PUBLIC DATASET, USER-ENTERED, never mix silently
-- Synthetic redesigned realistic longitudinal variation not random numbers, individual baselines, age, BMI, activity patterns, resting HR, HRV, sleep timing/duration, temp trends, GSR patterns, cycle info, clinical variables, gradual changes, temporary disturbances, sensor noise, missing data, motion artifacts, recovery periods, timeline DAY1→DAY30→DAY60→DAY90
+- Synthetic redesigned realistic longitudinal variation not random numbers, individual baselines, age, BMI, activity patterns, resting HR, HRV, sleep timing/duration, temp trends, temperature patterns, cycle info, clinical variables, gradual changes, temporary disturbances, sensor noise, missing data, motion artifacts, recovery periods, timeline DAY1→DAY30→DAY60→DAY90
 - 6 scenarios: stable LOW CHANGE SIGNAL, gradual EARLY CHANGE SIGNAL, persistent PERSISTENT MULTIMODAL SIGNAL, temporary TEMPORARY EVENT not disease, sensor failure LOW SENSOR CONFIDENCE must not be interpreted as physiological, recovery RECOVERY TREND
 - Synthetic cohort 10 subjects diverse baselines, mix scenarios
 
@@ -155,7 +160,7 @@ RAW DATA → Quality Control → Signal Processing → Feature Extraction → Pe
 
 **Hardware:**
 
-- Keep V8.1 wearable pod as primary: Nano + MAX30102 + MPU6050 + DS18B20 + optional GSR
+- Keep V8.1 wearable pod as primary: Nano + MAX30102 + MPU6050 + DS18B20 + 
 - Keep Mega hub as expanded lab/base station
 - Architecture: WEARABLE POD → physiological data, MEGA HUB → expanded experimental sensors, PC → CHRONO-TWIN NEXUS ENGINE
 - Do not force every sensor required, software gracefully operates with missing sensors

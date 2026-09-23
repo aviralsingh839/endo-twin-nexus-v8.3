@@ -1,5 +1,10 @@
 # ORIGINAL PROJECT INVENTORY - V8.3
 
+> **Historical record.** This document describes the project as it stood at the time
+> of writing. The GSR channel and its hardware were retired afterwards; current
+> hardware is the ESP32-S3 wearable with a DS18B20 skin-contact temperature probe and
+> it emits the `$CP3` frame. See `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`.
+
 Date: 2026-09-19
 Branch: arena/01a0ab67-chrono-pcos-v8-1
 Commit: afe6315 (architectural correction)
@@ -131,7 +136,7 @@ Core:
 - src/endo_twin/physiology/general_physiology.py
 - src/endo_twin/provenance/general_provenance.py
 - src/endo_twin/uncertainty/general_uncertainty.py - Contains example pcos_risk 0.75 (DEMO, not real path)
-- src/signal_processing/ppg.py, ecg.py, gsr.py, hrv.py, imu.py, spo2.py, temperature.py, filters.py
+- src/signal_processing/ppg.py, ecg.py, , hrv.py, imu.py, spo2.py, temperature.py, filters.py
 - src/serial_io/arduino_reader.py, packet_parser.py, led_controller.py, network_reader.py
 - src/ui/main_window.py, live_plots.py, gauges.py, vital_cards.py, theme.py
 - src/utils/quality.py - Blends heuristic + ppg_quality_model 40% weight
@@ -174,7 +179,7 @@ ADAPTER:
 
 - PPG: ppg.py - filtering, peak detection, HR, HRV, quality
 - ECG: ecg.py
-- GSR: gsr.py
+- GSR: 
 - HRV: hrv.py - RMSSD, etc.
 - IMU: imu.py - MPU6050 motion
 - SpO2: spo2.py - MAX30102
@@ -192,7 +197,7 @@ ADAPTER:
 
 ## 7. Database
 
-- SQLite tables: patients/profiles/symptoms/cycles/sensor_sessions/PPG/HRV/GSR/motion/temp/quality/ultrasound/model_results/analysis_results/reports/doctor_notes/providers/supplies/audit/access
+- SQLite tables: patients/profiles/symptoms/cycles/sensor_sessions/PPG/HRV/motion/temp/quality/ultrasound/model_results/analysis_results/reports/doctor_notes/providers/supplies/audit/access
 - database.py, endo_twin_database.py, security.py
 - Local-first, no upload private health to public website, default no cloud
 - Portability: controlled export/import/backup/restore/encrypted package deliberate not automatic

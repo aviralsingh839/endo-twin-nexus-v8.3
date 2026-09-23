@@ -306,7 +306,6 @@ class MainWindow(QMainWindow):
             ("hrv", "HRV RMSSD", "ms"),
             ("temp", "Skin Temperature", "°C"),
             ("activity", "Activity", "%"),
-            ("gsr", "GSR", "raw"),
             ("stress", "Stress Index", "%"),
         ]):
             card = VitalCard(title, unit)
@@ -370,7 +369,7 @@ class MainWindow(QMainWindow):
         self.shared_text = QTextEdit()
         self.shared_text.setReadOnly(True)
         self.shared_text.setMinimumHeight(145)
-        self.shared_text.setPlaceholderText("PPG • ECG • GSR • temperature • motion • environmental channels will appear here.")
+        self.shared_text.setPlaceholderText("PPG • ECG • temperature • motion • environmental channels will appear here.")
         sv.addWidget(self.shared_text)
         root.addWidget(signal_box)
 
@@ -460,7 +459,6 @@ class MainWindow(QMainWindow):
                 )
                 if day.get("hr") is not None: lines[-1] += f"\n  HR median: {day['hr']:.1f} bpm"
                 if day.get("rmssd") is not None: lines[-1] += f"\n  HRV RMSSD median: {day['rmssd']:.1f} ms"
-                if day.get("gsr") is not None: lines[-1] += f"\n  GSR median: {day['gsr']:.1f}"
                 if day.get("activity") is not None: lines[-1] += f"\n  Activity mean: {day['activity']:.1f}"
                 lines[-1] += "\n  Acquisition quality ≠ clinical validity."
             while len(lines) < 3: lines.append(f"DAY {len(lines)+1}  • waiting for recorded data")
@@ -609,7 +607,7 @@ class MainWindow(QMainWindow):
         # Autonomic
         auto_tab = QWidget()
         auto_layout = QVBoxLayout(auto_tab)
-        auto_info = QLabel("MODULE D - Autonomic / Stress Regulation\nUses HRV, resting HR, GSR, activity, sleep, temp\nExplainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE\nNot a mental-health diagnosis")
+        auto_info = QLabel("MODULE D - Autonomic / Stress Regulation\nUses HRV, resting HR, activity, sleep, temp\nExplainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE\nNot a mental-health diagnosis")
         auto_info.setWordWrap(True)
         auto_layout.addWidget(auto_info)
         self.autonomic_text = QTextEdit()
@@ -803,7 +801,7 @@ class MainWindow(QMainWindow):
             "Engineering Validation:\n"
             "- Personal baseline: mean, median, std, MAD, rolling, confidence, min obs, circadian context - IMPLEMENTED\n"
             "- Longitudinal engine: rolling windows, persistence, trend, change-point, recovery, missing handling, confidence - IMPLEMENTED\n"
-            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
+            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
             "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED\n"
             "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED\n"
             "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
@@ -818,7 +816,7 @@ class MainWindow(QMainWindow):
             "- Requires ethics-approved prospective study\n"
             "- Model confidence vs data quality vs clinical validation separated\n\n"
             "Hardware:\n"
-            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
+            "- Wearable S3 pod: MAX30102 + MPU6050 + DS18B20 skin temp (+ BME280/BH1750) - GSR retired\n"
             "- Mega Hub: expanded experimental sensors - PRESERVED\n"
             "- Software gracefully handles missing sensors - IMPLEMENTED\n"
         )
@@ -941,7 +939,6 @@ class MainWindow(QMainWindow):
                     gy_dps=float(sample.get("gy", 0)),
                     gz_dps=float(sample.get("gz", 0)),
                     temp_c=float(sample.get("temp_c", 32.5)),
-                    gsr_raw=int(sample.get("gsr", 450)),
                     lux=float(sample.get("lux", 100)),
                     source="demo" if self.demo_stream else "serial"
                 )
@@ -988,7 +985,6 @@ class MainWindow(QMainWindow):
         set_card("hrv", fv.rmssd_ms)
         set_card("temp", fv.skin_temp_c, "{:.1f}")
         set_card("activity", fv.activity_level)
-        set_card("gsr", fv.gsr_tonic)
         set_card("stress", fv.stress_index)
         set_card("sleep", fv.sleep_probability)
         set_card("quality", fv.signal_quality * 100 if fv.signal_quality else 0)
@@ -1166,7 +1162,6 @@ class MainWindow(QMainWindow):
                 rmssd_ms=num("rmssd"),
                 spo2_pct=num("spo2"),
                 skin_temp_c=num("skin_temp"),
-                gsr_tonic=num("gsr"),
                 motion_index=num("motion", 0.0),
                 activity_level=num("activity", 0.0),
                 stress_index=num("stress", 0.0),

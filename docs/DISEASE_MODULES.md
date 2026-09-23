@@ -7,7 +7,7 @@
 Keeps and improves V8.1 PCOS pipeline.
 
 **Inputs:**
-- age, BMI, menstrual-cycle info, clinical variables, glucose/metabolic where available, HR, HRV, activity, sleep/circadian, temp trends, GSR/stress, ultrasound structured features
+- age, BMI, menstrual-cycle info, clinical variables, glucose/metabolic where available, HR, HRV, activity, sleep/circadian, temp trends, stress, ultrasound structured features
 
 **Distinguishes:**
 1. Clinical-variable prediction
@@ -57,13 +57,13 @@ Keeps and improves V8.1 PCOS pipeline.
 
 ### Module D - Autonomic / Stress Regulation
 
-**Uses:** HRV, resting HR, GSR, activity, sleep, temp
+**Uses:** HRV, resting HR, activity, sleep, temp
 
 **Explainable estimator separating ACUTE SIGNAL from PERSISTENT LONGITUDINAL CHANGE**
 
 **Not mental-health diagnosis**
 
-**Method:** See MULTI_DISEASE_MODEL.md - HRV, GSR, stress, acute vs persistent separation
+**Method:** See MULTI_DISEASE_MODEL.md - HRV, stress, acute vs persistent separation
 
 **Signals:** acute_autonomic_signal, persistent_autonomic_deviation, intermittent_stress_pattern, autonomic_regulation_signal
 

@@ -6,7 +6,7 @@ Kivy-based, offline-first, local SQLite, accessibility-friendly.
 Sections:
 - Dashboard: data collection status, sensor status, recent measurements, quality, cycle, previous sessions, notifications
 - Patient Profile: basic profile, questionnaire, cycle, symptom (minimal data)
-- Measurements: sensor connection, guided measurement, PPG, HR, HRV, GSR, motion, temp, quality
+- Measurements: sensor connection, guided measurement, PPG, HR, HRV, motion, temp, quality
 - Symptoms: structured symptom logging
 - Cycle Tracking: dates, length, irregularity, symptoms, notes (not diagnosis)
 - Results: understandable language "Data quality: Good" not raw technical unless advanced
@@ -70,7 +70,7 @@ class PatientDashboard(BoxLayout):
         self.add_widget(Label(text='Previous Screening Sessions: None yet', size_hint_y=None, height=dp(30)))
 
     def start_measurement(self, instance):
-        print("Starting guided measurement - PPG, HR, HRV, GSR, motion, temp")
+        print("Starting guided measurement - PPG, HR, HRV, motion, temp")
 
     def view_results(self, instance):
         print("Viewing results in understandable language - Data quality: Good")
@@ -107,7 +107,7 @@ class MeasurementsTab(BoxLayout):
     def __init__(self, db, **kwargs):
         super().__init__(orientation='vertical', **kwargs)
         self.add_widget(Label(text='Measurements - Guided', size_hint_y=None, height=dp(40), font_size='18sp', bold=True))
-        self.add_widget(Label(text='Sensor connection, guided measurement, PPG, HR, HRV, GSR, motion, temp, quality - graceful handling if sensor unavailable/disconnected/noisy', size_hint_y=None, height=dp(60)))
+        self.add_widget(Label(text='Sensor connection, guided measurement, PPG, HR, HRV, motion, temp, quality - graceful handling if sensor unavailable/disconnected/noisy', size_hint_y=None, height=dp(60)))
 
         btn_box = BoxLayout(size_hint_y=None, height=dp(100), spacing=dp(10), padding=dp(10))
         btn_box.add_widget(Button(text='Connect Sensor (USB/BLE)'))
@@ -260,7 +260,7 @@ if __name__ == '__main__':
         print("CHRONO-PCOS Patient App V8.3+ - Console Demo")
         print("Dashboard: data collection status, sensor status, recent measurements, quality, cycle, previous sessions")
         print("Profile: basic info, questionnaire, cycle, symptoms - minimal data")
-        print("Measurements: sensor connection, guided measurement, PPG, HR, HRV, GSR, motion, temp, quality")
+        print("Measurements: sensor connection, guided measurement, PPG, HR, HRV, motion, temp, quality")
         print("Symptoms: structured logging")
         print("Cycle Tracking: dates, length, irregularity, symptoms, notes - not diagnosis")
         print("Results: understandable language, Data quality: Good, not raw technical unless advanced")

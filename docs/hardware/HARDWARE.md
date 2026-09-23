@@ -20,7 +20,7 @@ Sensors:
 - MPU6050 IMU
 - BME280 temperature/humidity/pressure
 - BH1750 ambient light
-- GSR/EDA with external finger electrodes
+- DS18B20 skin-contact temperature probe
 
 Transport:
 - USB serial 115200
@@ -28,7 +28,7 @@ Transport:
 - password `endotwins3`
 - TCP port 7777
 
-The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP2/TCP architecture can be retained. 
+The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP3/TCP architecture can be retained. 
 
 ## Mega hub
 
@@ -39,7 +39,7 @@ The Mega remains the separate bench/lab controller for expanded experiments.
 
 ## Unified build guide
 
-Physical assembly, dimensions, wiring, sensor placement, GSR safety, wearable enclosure and Mega box assembly:
+Physical assembly, dimensions, wiring, sensor placement, probe safety, wearable enclosure and Mega box assembly:
 
 `docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md`
 

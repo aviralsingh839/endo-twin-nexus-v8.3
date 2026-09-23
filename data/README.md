@@ -41,7 +41,7 @@ Additional optional datasets (links in `scripts/dataset_links.py`):
 Located in `synthetic/`:
 
 - Individual baselines per subject
-- Age, BMI, activity patterns, resting HR, HRV, sleep timing/duration, temperature trends, GSR patterns, menstrual-cycle info, clinical variables
+- Age, BMI, activity patterns, resting HR, HRV, sleep timing/duration, temperature trends, temperature patterns, menstrual-cycle info, clinical variables
 - Gradual physiological changes, temporary disturbances, sensor noise, missing data, motion artifacts, recovery periods
 - Timeline: DAY 1 → DAY 30 → DAY 60 → DAY 90 (not independent random)
 

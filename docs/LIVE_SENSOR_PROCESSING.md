@@ -4,7 +4,7 @@
 
 The workstation live path is desktop/workstation_runtime.py.
 
-Arduino $CP / $CP2 packets are accepted only after the existing parser and XOR CRC check succeed.
+Arduino $CP3 packets (and legacy $CP/$CP2 frames) are accepted only after the existing parser and XOR CRC check succeed.
 
 The canonical firmware sends approximately one workstation packet every 50 ms (about 20 packets/s). This is the PC transport rate; it is not automatically the same as an internal sensor sampling rate.
 
@@ -27,8 +27,8 @@ The existing red/IR ratio-of-ratios estimator is educational/research-only. It i
 ### IMU
 Acceleration and gyroscope signals feed the activity/motion processor. Motion is also used as a context signal for PPG quality.
 
-### GSR
-GSR is processed at approximately 10 Hz rather than treating a 20 Hz transport packet as new GSR information.
+### Skin temperature
+The probe channel is slow by design (1 Hz conversion) and is not oversampled per packet.
 
 ### Temperature
 Temperature is processed at approximately 1 Hz and range/validity-gated before a feature is exposed.
@@ -52,7 +52,7 @@ The processing layer can receive approximately 20 packets/s, while the feature l
 
 - NumPy vectorized peak candidates instead of scanning the waveform entirely in Python.
 - Bounded deques for signal history and chart data.
-- Slower GSR/temperature channels are not oversampled.
+- Slower temperature/environment channels are not oversampled.
 - Feature processing remains off the GUI thread through the reader/session architecture.
 - Quality gates short-circuit downstream outputs when source evidence is inadequate.
 

@@ -2,7 +2,7 @@
 
 ## Consistent Visual Identity
 - Patient App: simple friendly, large readable, accessibility-friendly, low complexity, clear explanations, understandable language Data quality Good not raw technical unless advanced, multilingual-ready
-- Doctor PC App: professional dense, technical, complete, physiological data raw/filtered PPG HR HRV GSR motion temp quality artifacts visualization time-series, advanced analysis circadian autonomic metabolic fingerprint multimodal AI, ultrasound all V8.3 capabilities, longitudinal comparison, notes, reports professional with disclaimer
+- Doctor PC App: professional dense, technical, complete, physiological data raw/filtered PPG HR HRV motion temp quality artifacts visualization time-series, advanced analysis circadian autonomic metabolic fingerprint multimodal AI, ultrasound all V8.3 capabilities, longitudinal comparison, notes, reports professional with disclaimer
 - Doctor Android App: mobile review, patient list/search/profiles/recent measurements/trends/screening results/ultrasound/reports/notes/follow-up, not duplicate full PC
 - Website: scientific accessible, serious modern scientific avoid excessive animations/fake claims/stock AI doctor/exaggerated promises/100% accurate/fake hospital branding, clean typography/scientific diagrams/clear sections/accessible colors/responsive/mobile/strong identity
 

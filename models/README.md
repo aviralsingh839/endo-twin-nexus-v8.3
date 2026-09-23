@@ -6,9 +6,9 @@
 
 - **PCOS risk**: Transparent fallback equation with research-prior weights, not trained calibrated model. Formula: `risk = 100 * sigmoid(INTERCEPT + sum(W_i * domain_i))`. Weights: CYCLE 1.20, METABOLIC 0.90, AUTONOMIC 0.60, SLEEP 0.50, CIRCADIAN 0.50, TEMPERATURE 0.35, GLUCOSE 0.35, ACTIVITY 0.30, BP 0.20, INTERCEPT -3.0. Confidence via bootstrap CI 5-95 percentile over 250 samples with noise sigma 5 + (1-quality)*14. Confidence breakdown: 30% data quality, 20% baseline, 20% CI width, 20% feature completeness, 10% cycle completeness.
 
-- **Sleep**: Formula-based wearable sleep estimation (approximate, not polysomnography). Uses HR z-score, RMSSD z-score, motion z-score, GSR z-score, temp stability, time prior 22:00-07:00 high, user sleep window prior.
+- **Sleep**: Formula-based wearable sleep estimation (approximate, not polysomnography). Uses HR z-score, RMSSD z-score, motion z-score, temp stability, time prior 22:00-07:00 high, user sleep window prior.
 
-- **Stress**: Formula-based stress estimation from autonomic and arousal features. HR z, RMSSD z, motion z, temp drop z, phasic GSR z, GSR z. Motion gate activity >45 reduces stress 0.65.
+- **Stress**: Formula-based stress estimation from autonomic and arousal features. HR z, RMSSD z, motion z, temp drop z. Motion gate activity >45 reduces stress 0.65.
 
 - **PPG Quality**: Heuristic + trained model blended 60/40. Heuristic: amplitude, saturation, motion penalty. Model: trained on wrist_ppg_during_exercise (different sensor and sampling rate than MAX30102) - features: ppg_amp, ppg_amp_cv, ppg_regularity, ppg_dominant_hr_bpm, ppg_band_power, ppg_peak_rate, ppg_hr_bpm, ppg_ibi_rmssd_ms, ppg_ibi_cv, ppg_beat_consistency, ppg_zero_cross_rate, ppg_dom_peak_diff, ppg_half_hr_diff, motion_index, ppg_quality_heuristic. Target: |PPG HR - ECG HR| <=5 bpm reliable. Model only soft correction, heuristic dominant.
 

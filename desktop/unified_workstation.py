@@ -178,7 +178,7 @@ class UnifiedWorkstation(QMainWindow):
         self.risk=QLabel("UNKNOWN"); self.risk.setObjectName("risk"); self.reason=QLabel("Select a patient and satisfy the evidence gate."); self.reason.setObjectName("muted"); self.reason.setWordWrap(True)
         hero=QFrame(); hero.setObjectName("hero"); hv=QVBoxLayout(hero); hv.addWidget(QLabel("CHRONO-PCOS RESEARCH INDEX")); hv.addWidget(self.risk); hv.addWidget(self.reason); v.addWidget(hero)
         grid=QGridLayout(); self.metrics={}
-        for i,(k,t,d) in enumerate([("hr_bpm","Heart rate","PPG/ECG derived when valid"),("rmssd_ms","HRV RMSSD","PPG-derived; not ECG-equivalent"),("skin_temp_c","Skin temperature","Measured channel"),("activity_level","Activity","IMU derived"),("gsr_tonic","GSR tonic","Analog channel"),("signal_quality","Signal quality","0–1 engineering quality")]):
+        for i,(k,t,d) in enumerate([("hr_bpm","Heart rate","PPG/ECG derived when valid"),("rmssd_ms","HRV RMSSD","PPG-derived; not ECG-equivalent"),("skin_temp_c","Skin temperature","Measured channel"),("activity_level","Activity","IMU derived"),("signal_quality","Signal quality","0–1 engineering quality")]):
             self.metrics[k]=self._card(t); grid.addWidget(self.metrics[k],i//3,i%3)
         v.addLayout(grid); c=QFrame(); c.setObjectName("card"); cv=QVBoxLayout(c); h=QHBoxLayout(); h.addWidget(QLabel("Patient context")); h.addStretch(); e=QPushButton("Edit / enter clinical context"); e.setObjectName("secondary"); e.clicked.connect(self._edit_current); h.addWidget(e); cv.addLayout(h); self.context=QLabel("—"); self.context.setObjectName("muted"); self.context.setWordWrap(True); cv.addWidget(self.context); v.addWidget(c); self.timeline=QTextEdit(); self.timeline.setReadOnly(True); self.timeline.setMaximumHeight(135); v.addWidget(self.timeline); return p
     def _doctor_page(self):
@@ -191,7 +191,7 @@ class UnifiedWorkstation(QMainWindow):
         for label,cmd in [("PING","PING"),("LED green","LED,G"),("BEEP","BEEP")]:
             b=QPushButton(label); b.setObjectName("secondary"); b.clicked.connect(lambda _,cc=cmd:self.session.command(cc)); c.addWidget(b)
         c.addStretch(); self.test_btn=QPushButton("Run 15 s acceptance test"); self.test_btn.setObjectName("primary"); self.test_btn.clicked.connect(self._start_test); c.addWidget(self.test_btn); ex=QPushButton("Export report"); ex.setObjectName("secondary"); ex.clicked.connect(self._export_test); c.addWidget(ex); v.addLayout(c)
-        self.modules=QTableWidget(8,4); self.modules.setHorizontalHeaderLabels(["Module","Signal","State","Meaning"]); names=[("MAX30102 PPG","—","NOT TESTED","IR/RED waveform"),("MPU6050 IMU","—","NOT TESTED","accel/gyro"),("DS18B20","—","NOT TESTED","temperature"),("GSR/EDA","—","NOT TESTED","analog channel"),("AD8232 ECG","—","OPTIONAL","raw ECG / lead-off"),("FSR","—","OPTIONAL","contact context"),("MAX4466","—","OPTIONAL","RMS/pitch"),("BH1750/BME280","—","OPTIONAL","environment")]
+        self.modules=QTableWidget(8,4); self.modules.setHorizontalHeaderLabels(["Module","Signal","State","Meaning"]); names=[("MAX30102 PPG","—","NOT TESTED","IR/RED waveform"),("MPU6050 IMU","—","NOT TESTED","accel/gyro"),("DS18B20","—","NOT TESTED","temperature"),("AD8232 ECG","—","OPTIONAL","raw ECG / lead-off"),("FSR","—","OPTIONAL","contact context"),("MAX4466","—","OPTIONAL","RMS/pitch"),("BH1750/BME280","—","OPTIONAL","environment")]
         for r0,row in enumerate(names):
             for c0,val in enumerate(row): self.modules.setItem(r0,c0,QTableWidgetItem(val))
         v.addWidget(self.modules,1); self.lab_log=QTextEdit(); self.lab_log.setReadOnly(True); self.lab_log.setMaximumHeight(155); v.addWidget(self.lab_log); return p
@@ -249,7 +249,7 @@ class UnifiedWorkstation(QMainWindow):
         if self.test_active:self.test_rows.append(s)
     def _on_feature(self,f):
         self.latest=f
-        for k,val in [("hr_bpm",f.hr_bpm),("rmssd_ms",f.rmssd_ms),("skin_temp_c",f.skin_temp_c),("activity_level",f.activity_level),("gsr_tonic",f.gsr_tonic),("signal_quality",f.signal_quality)]:
+        for k,val in [("hr_bpm",f.hr_bpm),("rmssd_ms",f.rmssd_ms),("skin_temp_c",f.skin_temp_c),("activity_level",f.activity_level),("signal_quality",f.signal_quality)]:
             if k in self.metrics:self._set_metric(k,val)
         self.quality.setText(f"Quality {float(f.signal_quality)*100:.0f}%"); self.lab_packets.findChildren(QLabel)[1].setText(str(self.session.samples)); self.lab_q.findChildren(QLabel)[1].setText(f"{float(f.signal_quality)*100:.0f}%")
         self.timeline.append(f"{datetime.now().strftime('%H:%M:%S')} • HR {f.hr_bpm if f.hr_bpm is not None else 'UNKNOWN'} • quality {f.signal_quality:.2f}") if hasattr(self,"timeline") else None
@@ -285,7 +285,7 @@ class UnifiedWorkstation(QMainWindow):
     def _finish_test(self):
         rows=self.test_rows; fs=self.test_features; q=[float(f.signal_quality) for f in fs if f.signal_quality is not None]; avg=sum(q)/len(q) if q else None
         def finite_attr(name): return any(getattr(r,name,None) is not None for r in rows)
-        checks=[("PPG raw",finite_attr("ir") or finite_attr("red")),("IMU",finite_attr("az_g")),("TEMP",any(math.isfinite(float(getattr(r,"temp_c",float("nan")))) for r in rows)),("GSR",finite_attr("gsr_raw")),("ECG",finite_attr("ecg_raw")),("FSR",finite_attr("fsr_raw")),("MIC",finite_attr("mic_raw")),("ENV",finite_attr("lux") or finite_attr("room_temp_c"))]
+        checks=[("PPG raw",finite_attr("ir") or finite_attr("red")),("IMU",finite_attr("az_g")),("TEMP",any(math.isfinite(float(getattr(r,"temp_c",float("nan")))) for r in rows)),("ECG",finite_attr("ecg_raw")),("FSR",finite_attr("fsr_raw")),("MIC",finite_attr("mic_raw")),("ENV",finite_attr("lux") or finite_attr("room_temp_c"))]
         self.lab_log.append(f"TEST COMPLETE • {len(rows)} samples • avg quality {avg*100:.0f}%" if avg is not None else f"TEST COMPLETE • {len(rows)} samples")
         for i,(name,seen) in enumerate(checks): self.modules.setItem(i,1,QTableWidgetItem("SIGNAL" if seen else "UNKNOWN")); self.modules.setItem(i,2,QTableWidgetItem("PASS" if seen else "CHECK"))
         self.lab_log.append(" • ".join(f"{n}={'PASS' if s else 'UNKNOWN'}" for n,s in checks)); self.lab_log.append("PASS means software receipt/processing only; it does not prove calibration or clinical validity.")

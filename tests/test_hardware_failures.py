@@ -8,7 +8,7 @@ from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfi
 def test_packet_parser_corrupted():
     parser = PacketParser(require_crc=True)
     # Valid packet example from nano pod
-    # $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+    # $CP3,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
     # We'll test corrupted CRC
     valid_payload = "$CP2,1234,10000,9000,0.1,0.2,0.9,0.1,0.2,0.3,32.5,nan,450,0,0.0,0.0,-1,-1,-1,nan,nan,nan,0,0"
     # Calculate CRC

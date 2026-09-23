@@ -62,13 +62,6 @@ class PhysiologicalState:
                     "quality": "0.8 typical",
                     "limitations": "Wrist activity not whole-body calorimetry"
                 },
-                "gsr": {
-                    "value": "MEASURED + DERIVED - tonic lowpass, phasic highpass",
-                    "provenance": "MEASURED",
-                    "source": "GSR sensor",
-                    "quality": "0.7-0.9",
-                    "limitations": "Affected by environment, motion"
-                }
             },
             "provenance": "MEASURED, DERIVED, MODEL-INFERRED clearly distinguished",
             "disclaimer": "Physiological state - computational representation, not perfect simulation"

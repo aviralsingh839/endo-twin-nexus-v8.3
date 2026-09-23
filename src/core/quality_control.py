@@ -35,8 +35,6 @@ class QualityThresholds:
     temp_max: float = 80.0
     skin_temp_min: float = 20.0
     skin_temp_max: float = 42.0
-    gsr_min: int = 0
-    gsr_max: int = 1023
     ir_min: int = 0
     ir_max: int = 262143
     motion_max_g: float = 8.0
@@ -75,9 +73,6 @@ class SensorQualityControl:
         elif channel in ("temp1_c", "room_temp_c"):
             if not (t.temp_min <= value <= t.temp_max):
                 return True, f"temp {value} out of range"
-        elif channel == "gsr_raw":
-            if not (t.gsr_min <= value <= t.gsr_max):
-                return True, f"GSR {value} out of range"
         elif channel in ("ir", "red"):
             if not (t.ir_min <= value <= t.ir_max):
                 return True, f"PPG {value} out of range"
