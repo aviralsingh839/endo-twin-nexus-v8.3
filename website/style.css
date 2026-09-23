@@ -383,3 +383,49 @@ footer strong { color: white; }
 }
 
 /* No excessive animations, no fake medical claims, clean typography, scientific diagrams, clear sections, accessible colors, responsive, mobile support, strong identity, modern, credible, human, innovative */
+
+
+/* ENDO-TWIN NEXUS V8.8 — command-center visual language */
+:root {
+  --primary:#071321; --primary-light:#0b1c2f; --secondary:#14314b;
+  --accent:#39d9ff; --accent-strong:#18bfe9; --accent-light:#10384d;
+  --text:#eef7ff; --text-muted:#8fa9c4; --text-light:#6f89a5;
+  --bg:#050d18; --bg-alt:#081524; --bg-card:#0c1d30;
+  --border:#1d3c59; --border-strong:#315b7d;
+  --green:#42e5b0; --green-light:#0b3d35; --orange:#ffb34d; --orange-light:#4a3314;
+  --red:#ff737d; --red-light:#4a1d28; --yellow:#ffd166;
+}
+body { background:var(--bg); color:var(--text); }
+header { background:rgba(6,18,31,.92); border-bottom:1px solid #21445f; box-shadow:0 8px 32px rgba(0,0,0,.24); backdrop-filter:blur(18px); }
+.logo h1 { color:#f4fbff; }
+.nav-links a { color:#9eb7d0; border:1px solid transparent; }
+.nav-links a:hover { color:#fff; background:#0d2439; border-color:#214c69; }
+.hero { background:radial-gradient(circle at 68% 35%,rgba(49,153,255,.17),transparent 32%),linear-gradient(135deg,#06111e,#0a1e33 55%,#071321); text-align:left; }
+.hero-content { max-width:1200px; }
+.hero h2 { font-size:clamp(2.7rem,6vw,5.2rem); max-width:850px; }
+.tagline { color:#45d9ff; }
+.subtitle { color:#a8bfd6; max-width:780px; }
+.architecture-preview { background:linear-gradient(180deg,#0d2237,#091827); border-color:#224b69; border-radius:18px; }
+.section.alt { background:#071321; border-color:#17334d; }
+.section h2 { color:#f3f9ff; }
+.section h2 + p { color:#91a9c4; }
+.card,.tech-card,.app-card,.provider-card,.timeline-content,.flow-step {
+  background:linear-gradient(180deg,#10253a,#0b1a2b);
+  border-color:#244862; color:#eef7ff; box-shadow:0 12px 35px rgba(0,0,0,.18);
+  border-radius:16px;
+}
+.card:hover,.tech-card:hover,.app-card:hover,.provider-card:hover { border-color:#3c789d; box-shadow:0 18px 45px rgba(0,0,0,.28); }
+.tech-card h3,.app-card h3,.flow-step h4,.timeline-content h4,.provider-card h4 { color:#eaf7ff; }
+.tech-card p,.app-card p,.card p,.flow-step p,.timeline-content p,.provider-card p { color:#8fa9c4; }
+.card pre { background:#071321; border-color:#1e3c57; color:#a8bfd6; }
+.flow-step { border-left-color:#31d5ff; }
+.flow-step small { background:#0c3045; color:#48d9ff; }
+.timeline::before { background:linear-gradient(to bottom,#35d9ff,#635cff); }
+.timeline-dot { background:#0c2338; border-color:#15334c; }
+.timeline-content small { background:#102238; color:#8fa9c4; }
+.warning-box { background:linear-gradient(135deg,#301a20,#26151b); border-color:#6c2d39; }
+.warning-box p { color:#ffb3ba; }
+footer { background:linear-gradient(135deg,#040b14,#091827); border-top:1px solid #1a3852; }
+.btn.primary { background:linear-gradient(90deg,#24c6ee,#5c7dff); }
+.btn.secondary { background:#0c2033; border-color:#2c5572; }
+@media (max-width:768px){ .hero{text-align:center;} }
