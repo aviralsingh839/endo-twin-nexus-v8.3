@@ -1073,11 +1073,13 @@ class MainWindow(QMainWindow):
                     scores.append(level_map.get(r.level, 30))
                 overall_risk = float(sum(scores) / len(scores)) if scores else 0
 
-            self.risk_gauge.set_value(overall_risk)
+            if hasattr(self, "pcos_science"):
+                self.pcos_science.setText(f"RESEARCH INDEX: {overall_risk:.0f}/100")
             self.confidence_label.setText(f"Model Confidence: {fusion_result.confidence_breakdown.get('model_confidence', 0):.2f}")
             self.quality_label.setText(f"Data Quality: {fusion_result.confidence_breakdown.get('data_quality', 0):.2f}")
             self.coverage_label.setText(f"Coverage: {fusion_result.confidence_breakdown.get('fusion_coverage', 0):.0%}")
-            self.quality_gauge.set_value(fusion_result.confidence_breakdown.get('data_quality', 0) * 100)
+            if hasattr(self, "quality_label"):
+                self.quality_label.setText(f"DATA QUALITY  {fusion_result.confidence_breakdown.get('data_quality', 0):.2f}")
 
             # Baseline status
             if self.baseline_engine.has_baseline:
@@ -1321,3 +1323,18 @@ class MainWindow(QMainWindow):
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             Path(path).write_text(self.report_text.toPlainText(), encoding="utf-8")
             self.status_label.setText(f"Report saved to {path}")
+
+
+
+def run(start_demo: bool = True, port: str | None = None, net: str | None = None, db_path=None):
+    """Launch the unified ENDO-TWIN scientific workstation."""
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication.instance() or QApplication(sys.argv)
+    window = MainWindow(start_demo=start_demo, port=port, net=net, db_path=db_path)
+    window.showMaximized()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(run(start_demo=True))
