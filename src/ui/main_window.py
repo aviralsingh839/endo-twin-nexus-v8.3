@@ -198,6 +198,11 @@ class MainWindow(QMainWindow):
         if net:
             self.connect_network(net)
 
+    def _named_label(self, text: str, object_name: str):
+        label = QLabel(text)
+        label.setObjectName(object_name)
+        return label
+
     def _select_workstation_page(self, index: int):
         if not hasattr(self, "tabs"):
             return
@@ -309,7 +314,7 @@ class MainWindow(QMainWindow):
         baseline_box.setObjectName("ScienceCard")
         bv = QVBoxLayout(baseline_box)
         bv.setContentsMargins(14, 12, 14, 12)
-        bv.addWidget(QLabel("PERSONAL BASELINE", objectName="CardEyebrow"))
+        bv.addWidget(self._named_label("\"PERSONAL BASELINE\"", "CardEyebrow"))
         self.baseline_science = QLabel("CALIBRATING • first-hour quality-gated window")
         self.baseline_science.setObjectName("CardValue")
         self.baseline_science.setWordWrap(True)
@@ -323,7 +328,7 @@ class MainWindow(QMainWindow):
         pcos_box.setObjectName("ScienceCard")
         pv = QVBoxLayout(pcos_box)
         pv.setContentsMargins(14, 12, 14, 12)
-        pv.addWidget(QLabel("CHRONO-PCOS  •  RESEARCH SCREENING", objectName="CardEyebrow"))
+        pv.addWidget(self._named_label("\"CHRONO-PCOS  •  RESEARCH SCREENING\"", "CardEyebrow"))
         self.pcos_science = QLabel("INSUFFICIENT DATA")
         self.pcos_science.setObjectName("CardValue")
         pv.addWidget(self.pcos_science)
@@ -336,14 +341,14 @@ class MainWindow(QMainWindow):
         quality_box.setObjectName("ScienceCard")
         qv = QVBoxLayout(quality_box)
         qv.setContentsMargins(14, 12, 14, 12)
-        qv.addWidget(QLabel("EVIDENCE & PROVENANCE", objectName="CardEyebrow"))
+        qv.addWidget(self._named_label("\"EVIDENCE & PROVENANCE\"", "CardEyebrow"))
         self.quality_label = QLabel("DATA QUALITY  —")
         self.quality_label.setObjectName("CardValue")
         qv.addWidget(self.quality_label)
         self.coverage_label = QLabel("Coverage —")
         self.coverage_label.setObjectName("SmallMuted")
         qv.addWidget(self.coverage_label)
-        qv.addWidget(QLabel("MEASURED → DERIVED → MODEL-INFERRED", objectName="ProvenanceLine"))
+        qv.addWidget(self._named_label("\"MEASURED → DERIVED → MODEL-INFERRED\"", "ProvenanceLine"))
 
         scientific.addWidget(baseline_box, 0, 0)
         scientific.addWidget(pcos_box, 0, 1)
@@ -354,7 +359,7 @@ class MainWindow(QMainWindow):
         signal_box.setObjectName("ScienceCard")
         sv = QVBoxLayout(signal_box)
         sv.setContentsMargins(14, 12, 14, 12)
-        sv.addWidget(QLabel("LIVE MULTIMODAL STREAM", objectName="CardEyebrow"))
+        sv.addWidget(self._named_label("\"LIVE MULTIMODAL STREAM\"", "CardEyebrow"))
         self.shared_text = QTextEdit()
         self.shared_text.setReadOnly(True)
         self.shared_text.setMinimumHeight(145)
@@ -366,7 +371,7 @@ class MainWindow(QMainWindow):
         signals_box.setObjectName("ScienceCard")
         sig_layout = QVBoxLayout(signals_box)
         sig_layout.setContentsMargins(14, 12, 14, 12)
-        sig_layout.addWidget(QLabel("RESEARCH SIGNAL MATRIX", objectName="CardEyebrow"))
+        sig_layout.addWidget(self._named_label("\"RESEARCH SIGNAL MATRIX\"", "CardEyebrow"))
         self.signal_labels = {}
         matrix = QGridLayout()
         matrix.setSpacing(7)
