@@ -14,8 +14,10 @@ from src.utils.quality import ppg_quality
 
 
 class PPGProcessor:
-    def __init__(self, history_s: float = 180.0, fs_hz: float = PPG_FS_HZ):
+    def __init__(self, history_s: float = 180.0, fs_hz: float = PPG_FS_HZ, input_type: str = "OPTICAL_IR_RED"):
         self.fs_hz = fs_hz
+        self.input_type = input_type.upper()
+        self.is_analog_pulse = self.input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}
         self.maxlen = int(history_s * fs_hz)
         self.times: Deque[float] = deque(maxlen=self.maxlen)
         self.ir_raw: Deque[float] = deque(maxlen=self.maxlen)
@@ -26,7 +28,11 @@ class PPGProcessor:
         self.last_peaks: list[float] = []
         self.last_ibi_s: list[float] = []
 
-    def add_sample(self, timestamp_s: float, ir: int, red: int) -> None:
+    def add_sample(self, timestamp_s: float, ir: int, red: int = -1, input_type: str | None = None) -> None:
+        # The generic analog Pulse Sensor has one waveform channel; transport maps it into ir and red=-1.
+        if input_type:
+            self.input_type = input_type.upper()
+            self.is_analog_pulse = self.input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}
         # Prime the DC blocker from the first sample so its initial condition
         # does not create a synthetic step transient (which previously made the
         # peak detector blind for the first ~20 s of every session).
@@ -104,7 +110,10 @@ class PPGProcessor:
         n = int(12 * self.fs_hz)
         recent_ir = np.asarray(list(self.ir_raw)[-n:], dtype=float)
         recent_red = list(self.red_raw)[-n:]
-        spo2, spo2_q = estimate_spo2(recent_red, recent_ir)
+        if self.is_analog_pulse:
+            spo2, spo2_q = None, 0.0
+        else:
+            spo2, spo2_q = estimate_spo2(recent_red, recent_ir)
         if recent_ir.size >= 10:
             ppg_amp = float((np.percentile(recent_ir, 95) - np.percentile(recent_ir, 5)) / max(np.median(recent_ir), 1.0))
         else:
