@@ -54,3 +54,26 @@ def test_quality_control_accepts_midscale_analog_pulse():
     assert result.quality > 0.0
     assert not result.artifact
 
+
+
+def test_end_to_end_extractor_routes_analog_ppg():
+    from src.core.feature_extraction import RealtimeFeatureExtractor
+    extractor = RealtimeFeatureExtractor()
+    t = np.arange(25.0, step=0.02)
+    waveform = 2000 + 180 * np.sin(2 * np.pi * 1.2 * t)
+    for ti, x in zip(t, waveform):
+        sample = SensorSample(
+            timestamp_s=float(ti),
+            ms=int(ti * 1000),
+            ir=int(x),
+            red=-1,
+            ax_g=0.0, ay_g=0.0, az_g=1.0,
+            gx_dps=0.0, gy_dps=0.0, gz_dps=0.0,
+            temp_c=32.0, gsr_raw=500, lux=-1,
+            ppg_input_type="ANALOG_PULSE",
+            source="serial-mega-analog-pulse",
+        )
+        extractor.add_sample(sample)
+    fv = extractor.compute()
+    assert fv.spo2_pct is None
+    assert fv.signal_quality >= 0.0
