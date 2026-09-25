@@ -40,7 +40,7 @@ class GeneralPhysiologyEngine:
                 "patient_id": patient_id,
                 "state": state.to_dict(),
                 "recent_measurements": [
-                    {"type": "heart_rate", "value": 72, "unit": "bpm", "quality": 0.91, "provenance": "MEASURED", "source": "MAX30102"},
+                    {"type": "heart_rate", "value": 72, "unit": "bpm", "quality": 0.91, "provenance": "MEASURED", "source": "generic analog Pulse Sensor"},
                     {"type": "hrv_rmssd", "value": 48, "unit": "ms", "quality": 0.85, "provenance": "MODEL-INFERRED", "source": "PPG-derived"},
                     {"type": "activity", "value": 35, "unit": "%", "quality": 0.8, "provenance": "MEASURED", "source": "MPU6050"},
                     {"type": "temperature", "value": 32.5, "unit": "C", "quality": 0.88, "provenance": "MEASURED", "source": "DS18B20"},
