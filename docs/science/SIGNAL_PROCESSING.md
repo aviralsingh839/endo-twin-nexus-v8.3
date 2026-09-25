@@ -38,7 +38,7 @@ Feature extraction
 - GSR: gsr.py
 - HRV: hrv.py RMSSD SDNN pNN50, PPG-derived HRV less accurate than ECG limitations documented
 - IMU: imu.py MPU6050 motion
-- SpO2: spo2.py MAX30102
+- SpO2: spo2.py generic analog Pulse Sensor
 - Temperature: temperature.py DS18B20
 - Filters: filters.py baseline calibration filtering
 - Quality: quality.py ppg_quality heuristic + ppg_quality_model 5.1M 15 features blended 40%, artifact handling missing handling reconnection
