@@ -43,11 +43,20 @@ def test_packet_parser_corrupted():
 
 def test_disconnected_sensors():
     qc = SensorQualityControl()
-    # Simulate disconnected MAX30102: ir=0, red=0
-    q_ir = qc.evaluate("ir", 0, source="MAX30102")
+    # Legacy optical disconnect remains supported.
+    q_ir = qc.evaluate("ir", 0, source="legacy-optical-ppg")
     assert q_ir.quality == 0.0
     assert q_ir.artifact == True
-    print("Disconnected MAX30102 detected")
+    print("Disconnected legacy optical PPG detected")
+
+    # V8.8 analog Pulse Sensor uses the 0..1023 Arduino ADC range.
+    q_pulse = qc.evaluate("analog_pulse", 0, source="serial-nano-analog-pulse")
+    assert q_pulse.quality == 0.0
+    assert q_pulse.artifact == True
+    q_pulse_live = qc.evaluate("analog_pulse", 512, source="serial-nano-analog-pulse")
+    assert q_pulse_live.quality > 0.0
+    assert not q_pulse_live.artifact
+    print("Analog Pulse Sensor disconnect/live handling detected")
 
     # Disconnected temp: nan
     q_temp = qc.evaluate("temp_c", None, source="DS18B20")
@@ -66,7 +75,7 @@ def test_noisy_ppg():
     qc = SensorQualityControl()
     # Stable HR then noisy
     for i in range(20):
-        qc.evaluate("hr", 70 + (i % 2), source="MAX30102")
+        qc.evaluate("hr", 70 + (i % 2), source="legacy-optical-ppg")
     q_noisy = qc.evaluate("hr", 150, source="MAX30102")
     print(f"Noisy PPG: quality {q_noisy.quality}, artifact {q_noisy.artifact}")
     assert q_noisy.quality < 1.0
