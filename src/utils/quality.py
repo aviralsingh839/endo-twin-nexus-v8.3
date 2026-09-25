@@ -8,9 +8,9 @@ presence or SpO2 assumptions are applied. If a trained model exists at `models/p
 (see scripts/train_ppg_quality_model.py), the score is blended with the model's
 probability that the window's PPG HR estimate is reliable (|PPG HR - ECG HR| <= 5 bpm).
 
-The model is trained on wrist-PPG-during-exercise data (different sensor and
-sampling rate than the MAX30102), so it is only used as a soft correction term
-(40% weight) and the heuristic always remains the dominant component.
+The legacy quality model is trained on wrist-PPG-during-exercise data and is
+not used for analog Pulse Sensor input. It remains available only for the
+legacy optical PPG path.
 """
 from __future__ import annotations
 
