@@ -297,8 +297,8 @@ void sendPacket(){
   dtostrf(micRms,1,2,fmr); dtostrf(micPitchHz,1,1,fmp);
   char payload[260];
   uint16_t st=makeStatus();
-  snprintf(payload,sizeof(payload),"$CP2,%lu,%lu,%lu,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
-    millis(),(unsigned long)irValue,(unsigned long)redValue,
+  snprintf(payload,sizeof(payload),"$CP2,%lu,%d,-1,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
+    millis(),pulseRaw,
     fax,fay,faz,fgx,fgy,fgz,ft0,ft1,gsrRaw,micRaw,fmr,fmp,ecgRaw,fsrRaw,flux,frt,fhum,fpress,buttonMask,st);
   uint8_t crc=xorCRC(payload);
   Serial.print(payload); Serial.print(','); if(crc<16) Serial.print('0'); Serial.println(crc,HEX);
@@ -310,7 +310,7 @@ void updateOLED(){
   display.clearDisplay();
   display.setTextSize(1); display.setCursor(0,0);
   display.println("CHRONO-PCOS MEGA");
-  display.print("IR:"); display.print(irValue); display.print(" ECG:"); display.println(ecgRaw);
+  display.print("PULSE:"); display.print(pulseRaw); display.print(" ECG:"); display.println(ecgRaw);
   display.print("T0:"); display.print(temp0,1); display.print(" T1:"); display.println(temp1,1);
   display.print("GSR:"); display.print(gsrRaw); display.print(" FSR:"); display.println(fsrRaw);
   display.print("Lux:"); display.print(luxValue,0); display.print(" MicHz:"); display.println(micPitchHz,0);
@@ -380,7 +380,7 @@ void loop(){
   return;
 #endif
   unsigned long now=millis();
-  if(now-lastPPG>=PPG_PERIOD_MS){ lastPPG=now; readPPG(); }
+  if(now-lastPulse>=PPG_PERIOD_MS){ lastPulse=now; readPPG(); }
   if(now-lastIMU>=IMU_PERIOD_MS){ lastIMU=now; readIMU(); }
   if(now-lastAnalog>=ANALOG_PERIOD_MS){ lastAnalog=now; readAnalogSensors(); }
   if(now-lastTemp>=TEMP_PERIOD_MS){ lastTemp=now; readTemperatures(); }
