@@ -32,6 +32,42 @@ jobs:
       - name: Run architecture acceptance
         run: python apps/main/main_app.py
 
+
+  model-training:
+    name: Train and verify PCOS model
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install scientific dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Train reproducible clinical model
+        working-directory: chrono_pcos_project V8
+        run: |
+          python scripts/train_pcos_risk_model.py             --csv ../data/public/PCOS_data.csv             --out models/pcos_risk_model.joblib
+      - name: Verify model bundle
+        working-directory: chrono_pcos_project V8
+        run: |
+          python - <<'PY'
+          import joblib
+          from pathlib import Path
+          p = Path("models/pcos_risk_model.joblib")
+          assert p.exists() and p.stat().st_size > 1000
+          bundle = joblib.load(p)
+          assert "model" in bundle and "feature_names" in bundle and "meta" in bundle
+          assert bundle["target"].lower().startswith("pcos")
+          assert bundle["meta"]["n_real_rows"] >= 500
+          print("MODEL_BUNDLE_OK")
+          print(bundle["meta"])
+          PY
+
   android-patient:
     name: Patient APK
     runs-on: ubuntu-latest
