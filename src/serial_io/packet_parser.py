@@ -5,8 +5,14 @@ Supported packets:
 Legacy UNO:
 $CP,ms,ir,red,ax,ay,az,gx,gy,gz,tempC,gsr,lux,status,crc
 
-Enhanced Mega:
+Enhanced Mega / wearable:
 $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+
+V8.8 analog-pulse wearable compatibility:
+- When status bit 12 (ST_PPG_ANALOG) is set, the $CP2 ir field is an
+  ADC pulse waveform sample from the generic analog Pulse Sensor module.
+- red is -1 because there is no optical red channel.
+- Do not infer SpO2 from this packet.
 
 CRC is XOR of all characters in the payload before the final comma.
 """
@@ -112,7 +118,7 @@ class PacketParser:
                 pressure_hpa=float(parts[21]),
                 buttons=int(float(parts[22])),
                 status=int(float(parts[23])),
-                source="serial-mega",
+                source=("serial-mega-analog-pulse" if (int(float(parts[23])) & (1 << 12)) else "serial-mega"),
             )
         except (ValueError, IndexError) as exc:
             raise PacketParseError(f"numeric conversion failed: {exc}") from exc
