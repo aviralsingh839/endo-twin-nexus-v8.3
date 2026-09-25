@@ -33,6 +33,11 @@ def test_legible_menstrual_terms_are_normalized():
     assert result["model_ready"] is False
 
 
+def test_one_phrase_can_contain_multiple_terms():
+    result = normalize_terms(["pain in lower back and lower abdomen"])
+    assert result["terms_found"] == ["lower_back_pain", "lower_abdominal_pain"]
+
+
 def test_unknown_terms_are_not_silently_mapped():
     result = normalize_terms(["an unclear handwritten phrase"])
     assert result["terms_found"] == []
