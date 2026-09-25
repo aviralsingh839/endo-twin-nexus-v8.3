@@ -79,7 +79,7 @@ class SensorReading:
     """Raw sensor reading - general"""
     reading_id: str = field(default_factory=lambda: f"READ-{uuid.uuid4().hex[:8]}")
     patient_id: str = ""
-    sensor_type: str = ""  # MAX30102, MPU6050, DS18B20, GSR, etc.
+    sensor_type: str = ""  # generic analog Pulse Sensor, MPU6050, DS18B20, GSR, etc.
     timestamp: float = field(default_factory=time.time)
     values: Dict[str, Any] = field(default_factory=dict)  # raw values
     quality: float = 0.0  # 0-1
@@ -114,7 +114,7 @@ class Measurement:
     timestamp: float = field(default_factory=time.time)
     quality: float = 0.0  # 0-1
     provenance: ProvenanceLabel = ProvenanceLabel.MEASURED
-    source: str = ""  # MAX30102, USER-ENTERED, etc.
+    source: str = ""  # generic analog Pulse Sensor, USER-ENTERED, etc.
     confidence: Optional[float] = None
     limitations: str = ""
     is_demo: bool = False
