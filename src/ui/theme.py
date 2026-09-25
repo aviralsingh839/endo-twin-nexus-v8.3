@@ -288,26 +288,26 @@ QToolTip {{ background: {PANEL_ALT}; color: {TEXT}; border: 1px solid {BORDER_LI
             padding: 7px; border-radius: 7px; font-size: 10pt; }}
 
 /* ENDO-TWIN NEXUS COMMAND CENTER V8.8 */
-QWidget#CentralRoot {
+QWidget#CentralRoot {{
     background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
         stop:0 #050d18, stop:0.52 #081526, stop:1 #0d2034);
-}
-QFrame#AppHeader {
+}}
+QFrame#AppHeader {{
     background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #091729,stop:1 #0d2036);
     border: 1px solid #274766;
     border-radius: 18px;
-}
-QLabel#AppTitle { font-size: 20pt; font-weight: 800; color: #f6fbff; letter-spacing: 0.6px; }
-QLabel#AppSubtitle { font-size: 9.5pt; color: #88a7c7; }
-QLabel#HeaderDate { color: #87a5c4; font-size: 9pt; }
-QLabel#HeaderClock { color: #9fdcff; font-size: 16pt; font-weight: 800; }
-QLabel#BrandMark { color: #38d9ff; font-size: 18pt; font-weight: 900; }
-QFrame#Sidebar {
+}}
+QLabel#AppTitle {{ font-size: 20pt; font-weight: 800; color: #f6fbff; letter-spacing: 0.6px; }}
+QLabel#AppSubtitle {{ font-size: 9.5pt; color: #88a7c7; }}
+QLabel#HeaderDate {{ color: #87a5c4; font-size: 9pt; }}
+QLabel#HeaderClock {{ color: #9fdcff; font-size: 16pt; font-weight: 800; }}
+QLabel#BrandMark {{ color: #38d9ff; font-size: 18pt; font-weight: 900; }}
+QFrame#Sidebar {{
     background: #071321;
     border: 1px solid #1c3652;
     border-radius: 16px;
-}
-QPushButton#SideNav {
+}}
+QPushButton#SideNav {{
     text-align: left;
     background: transparent;
     border: 1px solid transparent;
@@ -317,62 +317,62 @@ QPushButton#SideNav {
     min-height: 34px;
     font-size: 10pt;
     font-weight: 600;
-}
-QPushButton#SideNav:hover { background: #10243a; color: #eaf7ff; border-color: #1d4666; }
-QPushButton#SideNav:checked {
+}}
+QPushButton#SideNav:hover {{ background: #10243a; color: #eaf7ff; border-color: #1d4666; }}
+QPushButton#SideNav:checked {{
     background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0e5c91,stop:1 #143f78);
     color: #ffffff;
     border-color: #1d91ce;
-}
-QFrame#StatStrip {
+}}
+QFrame#StatStrip {{
     background: transparent;
     border: none;
-}
-QFrame#MetricTile {
+}}
+QFrame#MetricTile {{
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #10253b,stop:1 #0b1b2d);
     border: 1px solid #244663;
     border-radius: 13px;
-}
-QFrame#MetricTile:hover { border-color: #3c789e; }
-QLabel#MetricLabel { color: #8da8c2; font-size: 8.5pt; }
-QLabel#MetricValue { color: #f4fbff; font-size: 16pt; font-weight: 800; }
-QLabel#MetricDelta { color: #4ee6ad; font-size: 8pt; font-weight: 700; }
-QGroupBox {
+}}
+QFrame#MetricTile:hover {{ border-color: #3c789e; }}
+QLabel#MetricLabel {{ color: #8da8c2; font-size: 8.5pt; }}
+QLabel#MetricValue {{ color: #f4fbff; font-size: 16pt; font-weight: 800; }}
+QLabel#MetricDelta {{ color: #4ee6ad; font-size: 8pt; font-weight: 700; }}
+QGroupBox {{
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #102239,stop:1 #0c1b2d);
     border: 1px solid #244663;
     border-radius: 16px;
     margin-top: 13px;
     padding: 12px;
-}
-QGroupBox::title {
+}}
+QGroupBox::title {{
     subcontrol-origin: margin; left: 12px; padding: 0 7px;
     color: #d9efff; font-weight: 750; font-size: 10pt; background: #102239;
-}
-QTabWidget::pane { border: 0; background: transparent; }
-QTabBar::tab { min-width: 0; padding: 6px; border: 0; background: transparent; color: transparent; }
-QTabBar::tab:selected { background: transparent; color: transparent; }
-QPushButton#HeaderAction {
+}}
+QTabWidget::pane {{ border: 0; background: transparent; }}
+QTabBar::tab {{ min-width: 0; padding: 6px; border: 0; background: transparent; color: transparent; }}
+QTabBar::tab:selected {{ background: transparent; color: transparent; }}
+QPushButton#HeaderAction {{
     background: #102b45;
     border: 1px solid #28577a;
     border-radius: 9px;
     padding: 7px 12px;
     color: #bfeaff;
-}
-QPushButton#HeaderAction:hover { background: #143a59; border-color: #3f9ed0; }
-QPushButton#PrimaryAction {
+}}
+QPushButton#HeaderAction:hover {{ background: #143a59; border-color: #3f9ed0; }}
+QPushButton#PrimaryAction {{
     background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #28bfe9,stop:1 #4f8cff);
     border: 0;
     color: #ffffff;
     border-radius: 10px;
     padding: 9px 15px;
     font-weight: 800;
-}
-QPushButton#PrimaryAction:hover { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #42d5f6,stop:1 #6c9dff); }
-QLabel#SectionEyebrow { color: #47d7ff; font-size: 8pt; font-weight: 800; letter-spacing: 1px; }
-QLabel#SectionTitle { color: #f4f9ff; font-size: 18pt; font-weight: 800; }
-QLabel#SectionSubtitle { color: #8ea7c2; font-size: 9.5pt; }
-QLabel#LivePill {
+}}
+QPushButton#PrimaryAction:hover {{ background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #42d5f6,stop:1 #6c9dff); }}
+QLabel#SectionEyebrow {{ color: #47d7ff; font-size: 8pt; font-weight: 800; letter-spacing: 1px; }}
+QLabel#SectionTitle {{ color: #f4f9ff; font-size: 18pt; font-weight: 800; }}
+QLabel#SectionSubtitle {{ color: #8ea7c2; font-size: 9.5pt; }}
+QLabel#LivePill {{
     background: #073d32; border: 1px solid #149a78; color: #50e5bb;
     border-radius: 10px; padding: 4px 9px; font-weight: 800; font-size: 8pt;
-}
+}}
 """
