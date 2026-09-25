@@ -25,17 +25,8 @@ src_path = str(PROJECT_ROOT / "src")
 if src_path in sys.path:
     sys.path.remove(src_path)
 
-# Try to import existing V8.3 main window - preserve it
-try:
-    from src.ui.main_window import MainWindow as V83MainWindow
-    V83_AVAILABLE = True
-except ImportError as e:
-    V83_AVAILABLE = False
-    V83MainWindow = None
-    print(f"V8.3 MainWindow not available: {e}")
-
-# New modular enhancements
-from database.database import LocalDatabase
+# The enhanced workstation is the primary Doctor PC entry point.\n# The legacy scientific window remains available elsewhere in the repo.\n\n# New modular enhancements
+from database.database import LocalDatabase\nfrom disease_models.chrono_pcos.features.menstrual_terms import normalize_terms, summarize_context\n
 from desktop.doctor_app.patient_management import (
     DoctorDashboard, PatientManager, PhysiologicalDataViewer,
     AdvancedAnalysisViewer, UltrasoundViewer, LongitudinalViewer, ReportGenerator
@@ -62,7 +53,7 @@ class EnhancedDoctorApp:
         self.physio_viewer = PhysiologicalDataViewer(self.db)
         self.advanced_viewer = AdvancedAnalysisViewer(self.db)
         self.ultrasound_viewer = UltrasoundViewer(self.db)
-        self.longitudinal_viewer = LongitudinalViewer()
+        self.longitudinal_viewer = LongitudinalViewer(self.db)
         self.report_gen = ReportGenerator(db=self.db)
 
     def run_console_demo(self):
@@ -84,9 +75,9 @@ class EnhancedDoctorApp:
 
         print("\n[Signals] Physiological Data: raw/filtered PPG, HR, HRV, GSR, motion, temp, quality, artifacts, visualization, time-series")
         session_data = self.physio_viewer.get_session_data("session_001")
-        print(f"Session data quality overall: {session_data['quality']['overall']}")
-        print(f"  - HR: {session_data['hr']['mean']} bpm MEASURED quality 0.91")
-        print(f"  - HRV RMSSD: {session_data['hrv']['rmssd']} ms DERIVED quality 0.85 limitations PPG less accurate than ECG")
+        print(f"Session found: {session_data.get('found', False)}")\n        print(f"Session data quality overall: {session_data.get('quality',{}).get('overall')}")
+        print(f"  - HR mean: {session_data.get('hr',{}).get('mean')} bpm (MEASURED when present)")
+        print(f"  - HRV RMSSD: {session_data.get('hrv',{}).get('rmssd')} ms (DERIVED when present)")
         print(f"  - Artifacts: {session_data['artifacts']}")
 
         print("\n[Longitudinal] Longitudinal Analysis: comparison trends baseline deviation")
@@ -118,7 +109,7 @@ class EnhancedDoctorApp:
         print("\n[AI/ML] AI/ML Laboratory: Dataset, Data validation, Preprocessing, Feature engineering, Training, Validation, Testing, Leakage detection, Model comparison, Explainability, Model registry, Model approval, Rollback, Inference, Uncertainty")
         print("Prevent data leakage, clearly distinguish TRAIN VALIDATION TEST, never allow same patient/time-series samples to silently appear across incompatible splits")
         for ai_out in analysis['ai_outputs']:
-            print(f"  - {ai_out['module']}: {ai_out['output']} confidence {ai_out['confidence']} - {ai_out.get('validation','')}")
+            print(f"  - {ai_out['module']}: {ai_out.get('output')} confidence {ai_out.get('confidence','not available')} - {ai_out.get('validation', ai_out.get('reason',''))}")
 
         print("\n[Reports] Reports: Professional with disclaimer Research / risk-screening output — not a medical diagnosis")
         report = self.report_gen.generate("patient_001", analysis)
@@ -152,23 +143,7 @@ class EnhancedDoctorApp:
 
         app = QApplication(sys.argv)
 
-        # If V8.3 main window available, use it as base, else create new
-        if V83_AVAILABLE and V83MainWindow:
-            print("Launching V8.3 existing MainWindow preserved - Polished")
-            try:
-                window = V83MainWindow()
-                window.setWindowTitle("CHRONO-PCOS V8.3+ Doctor PC - Clinical/Research Workstation - Research Prototype - Not Medical Diagnosis")
-                window.resize(1450, 950)
-                window.show()
-                sys.exit(app.exec())
-                return
-            except Exception as e:
-                print(f"V8.3 MainWindow failed to launch: {e}, using enhanced fallback")
-                import traceback
-                traceback.print_exc()
-
-        # Enhanced fallback GUI - Polished Clinical/Research Workstation
-        window = QMainWindow()
+        # Enhanced Doctor PC is the primary GUI; do not silently route to the legacy window.\n        window = QMainWindow()
         window.setWindowTitle("CHRONO-PCOS V8.3+ Doctor PC - Clinical/Research Workstation - Research Prototype - Not Medical Diagnosis")
         window.resize(1450, 950)
         window.setMinimumSize(1200, 800)
@@ -339,7 +314,7 @@ Safety: ultrasound analysis research not diagnosis requires clinical evaluation 
         ai_layout.addWidget(QLabel("AI/ML Laboratory - Real Research Interface - Dataset, Validation, Preprocessing, Training, Testing, Leakage Detection, Model Registry, Explainability, Uncertainty"))
         ai_layout.addWidget(QLabel("Prevent data leakage, clearly distinguish TRAIN VALIDATION TEST, never allow same patient/time-series samples to silently appear across incompatible splits"))
 
-        analysis = self.advanced_viewer.analyze("demo_patient")
+        selected_patient_id = None\n        current_analysis = self.advanced_viewer.analyze(selected_patient_id or "__NO_PATIENT__")\n        analysis = current_analysis
         ai_text = QTextEdit()
         ai_text.setReadOnly(True)
         ai_text.setText(f"""AI/ML Laboratory - Research Interface
@@ -395,7 +370,7 @@ Fingerprint: {len(analysis['fingerprint']['components'])} components
 AI Outputs:
 """)
         for ai_out in analysis['ai_outputs']:
-            ai_text.append(f"  - {ai_out['module']}: {ai_out['output']} confidence {ai_out['confidence']} - {ai_out.get('validation','')}")
+            confidence = ai_out.get('confidence')\n            confidence_text = "not available" if confidence is None else str(confidence)\n            ai_text.append(f"  - {ai_out['module']}: {ai_out.get('output')} | confidence {confidence_text} | {ai_out.get('validation', ai_out.get('reason',''))}")
         ai_layout.addWidget(ai_text)
         tabs.addTab(ai_widget, "🧠 AI/ML")
 
