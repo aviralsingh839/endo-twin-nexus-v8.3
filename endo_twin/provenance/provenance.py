@@ -20,7 +20,7 @@ class ProvenanceRecord:
     data_id: str
     patient_id: str
     label: ProvenanceLabel
-    source: str  # MAX30102, DS18B20, MPU6050, USER-ENTERED, image path, model name
+    source: str  # generic analog Pulse Sensor, DS18B20, MPU6050, USER-ENTERED, image path, model name
     quality: float  # 0-1
     confidence: float = None  # 0-1 if applicable, None unless computed, never hard-code fake
     timestamp: float = 0
@@ -42,9 +42,9 @@ class ProvenanceTracker:
             "patient_id": patient_id,
             "provenance_labels": {
                 "MEASURED": {
-                    "description": "Directly measured HR 72 bpm quality 0.91 source MAX30102, Skin Temp 32.5°C quality 0.88 source DS18B20, Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level quality 0.8 source MPU6050, GSR raw gsr_raw quality source GSR",
+                    "description": "Directly measured HR 72 bpm quality 0.91 source generic analog Pulse Sensor, Skin Temp 32.5°C quality 0.88 source DS18B20, Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level quality 0.8 source MPU6050, GSR raw gsr_raw quality source GSR",
                     "category": "ESTABLISHED_MEASUREMENT",
-                    "examples": ["HR bpm MAX30102", "Skin Temp C DS18B20", "Motion MPU6050", "GSR raw"]
+                    "examples": ["HR bpm generic analog Pulse Sensor", "Skin Temp C DS18B20", "Motion MPU6050", "GSR raw"]
                 },
                 "CLINICALLY_ENTERED": {
                     "description": "Age 22 years, BMI 23.5, cycle length 28 days, irregularity regular, symptoms irregular_cycle mild, notes free text, Glucose BP if entered",
