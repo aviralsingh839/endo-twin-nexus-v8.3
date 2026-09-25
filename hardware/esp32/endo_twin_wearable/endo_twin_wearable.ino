@@ -3,11 +3,11 @@
   Primary wearable controller.
 
   PPG HARDWARE MIGRATION (V8.8):
-    Old: MAX3010x optical PPG (IR + red over I2C)
+    Legacy: MAX3010x optical PPG (IR + red over I2C)
     New: generic analog Pulse Sensor module shown in project BOM/screenshot.
 
   The new module provides a single analog pulse waveform. It does NOT provide
-  IR/red optical channels, so SpO2 and MAX3010x-specific features are marked
+  IR/red optical channels, so SpO2 and legacy optical-specific features are marked
   unavailable rather than fabricated.
 
   Wiring for ESP32-S3 / ESP32-class board:
