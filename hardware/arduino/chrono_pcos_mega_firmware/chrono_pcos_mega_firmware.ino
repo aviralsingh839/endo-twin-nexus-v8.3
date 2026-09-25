@@ -5,7 +5,7 @@
   Serial: 115200 baud
 
   Sensors included:
-    Generic analog Pulse Sensor  SIG -> PULSE_PIN (A4 default)
+    Generic analog Pulse Sensor  SIG -> PULSE_PIN (A4 default; analog input)
     MPU6050 IMU                 I2C
     DS18B20 x1/x2 temperature   D2 OneWire, 4.7k pull-up
     GSR analog                  A0
@@ -20,7 +20,7 @@
     Buzzer                      D6
 
   Packet:
-  $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+  $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc\n  V8.8 mapping: ir=analog pulse ADC, red=-1, status bit 12=ANALOG_PULSE.
 
   Medical safety:
   Educational physiological monitoring only. Not a diagnostic medical device.
