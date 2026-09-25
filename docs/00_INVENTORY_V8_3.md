@@ -24,7 +24,7 @@
 - explanation_engine.py: ExplanationEngine, explain_longitudinal, explain_module, explain_fusion, explain_shared_features, generate_report_explanation
 
 ### Signal Processing (src/signal_processing/)
-- ppg.py: PPGProcessor, DCBlocker, ExponentialSmoother, peak detection, HRV time domain, SpO2 (unavailable with analog pulse sensor), waveform
+- ppg.py: PPGProcessor, DCBlocker, ExponentialSmoother, peak detection, HRV time domain, SpO2, waveform
 - imu.py: IMUProcessor, motion_index, activity_level, low_activity_risk
 - gsr.py: GSRProcessor, tonic, phasic
 - temperature.py: TemperatureProcessor, skin_temp, slope
@@ -95,7 +95,7 @@
 
 ## Signal Processing Modules
 
-- PPG, IMU, GSR, temperature, ECG, filters, HRV, SpO2 (unavailable with analog pulse sensor)
+- PPG, IMU, GSR, temperature, ECG, filters, HRV, SpO2
 - Quality control per channel
 - Feature extraction streaming
 - Baseline calibration
