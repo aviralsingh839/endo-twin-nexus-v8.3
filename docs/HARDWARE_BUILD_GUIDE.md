@@ -3,7 +3,7 @@
 ## Overview
 
 - **ESP32 DevKit: primary wearable controller. Arduino Nano is not required.**
-- **Arduino UNO: bench/prototype validation** for MAX30102 + MPU6050 + DS18B20 + optional GSR.
+- **Arduino UNO: bench/prototype validation** for Generic Analog Pulse Sensor + MPU6050 + DS18B20 + optional GSR.
 - **Arduino Mega 2560: expanded laboratory/hub platform** for ECG, microphone, FSR, environment sensors, OLED, buttons and other extensions.
 - **ESP32 BLE → Android** is the preferred wearable transport; USB serial at 115200 remains available for PC diagnostics.
 - The canonical data contract remains newline-delimited **$CP2** with XOR CRC.
@@ -22,7 +22,7 @@
 ### ESP32 wearable
 
 - ESP32 DevKit
-- MAX30102 PPG
+- Generic Analog Pulse Sensor PPG (single-channel analog waveform)
 - MPU6050 IMU
 - DS18B20 + 4.7k resistor
 - GSR module (optional)
@@ -32,7 +32,7 @@
 ### UNO bench
 
 - Arduino UNO
-- Same MAX30102, MPU6050, DS18B20 and optional GSR
+- Same Generic Analog Pulse Sensor, MPU6050, DS18B20 and optional GSR
 - USB cable
 - Breadboard/jumper wires
 
@@ -45,7 +45,7 @@ Use the existing Mega firmware for ECG (AD8232), microphone, FSR, BH1750, BME280
 ## ESP32 wiring
 
 ```
-MAX30102:
+Generic Analog Pulse Sensor:
   VIN/VCC -> compatible 3.3V supply for your breakout
   GND     -> GND
   SDA     -> GPIO21
@@ -79,7 +79,7 @@ Optional status LED:
 ## UNO bench wiring
 
 ```
-MAX30102/MPU6050: SDA=A4, SCL=A5
+Generic Analog Pulse Sensor/MPU6050: SDA=A4, SCL=A5
 DS18B20:          DATA=D2, 4.7k pull-up to 5V
 GSR:              SIG=A0
 USB serial:       115200 baud
@@ -98,7 +98,7 @@ Install the ESP32 board package in Arduino IDE, select your exact ESP32 board, t
 `hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
 Libraries:
-- SparkFun MAX3010x Pulse and Proximity Sensor Library
+- SparkFun Generic Analog Pulse Sensor Pulse and Proximity Sensor Library
 - Adafruit MPU6050
 - Adafruit Unified Sensor
 - OneWire
@@ -142,8 +142,8 @@ The notify characteristic sends complete $CP2 lines. Android should preserve the
 2. Open USB serial at 115200 and verify $CP2 lines.
 3. Confirm the device advertises as **ENDO-TWIN-ESP32**.
 4. Send `WHOAMI` over USB and verify the identity response.
-5. With no finger on MAX30102, verify the PPG-absent status bit instead of fabricated signal.
-6. Place a finger gently on the MAX30102 and verify IR/RED change.
+5. With no finger on Generic Analog Pulse Sensor, verify the PPG-absent status bit instead of fabricated signal.
+6. Place a finger gently on the Generic Analog Pulse Sensor and verify IR/RED change.
 7. Move the MPU6050 and verify accelerometer/gyro fields.
 8. Verify DS18B20 temperature changes.
 9. Verify GSR only after its module is wired correctly.
@@ -171,3 +171,10 @@ ESP32/UNO do not provide every extended channel, so absent channels are sent as 
 - Insulate exposed conductors and strain-relieve sensor wiring.
 - Remove the prototype if skin irritation or heating occurs.
 - Do not base medical decisions on this hardware alone.
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.
