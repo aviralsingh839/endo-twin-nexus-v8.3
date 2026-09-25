@@ -170,7 +170,6 @@ def normalize_terms(terms: Iterable[Any]) -> Dict[str, Any]:
                     found.append(term.key)
                 evidence.setdefault(term.key, []).append(raw)
                 matched = True
-                break
 
         if not matched:
             unmapped.append(raw)
