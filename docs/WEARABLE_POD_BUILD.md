@@ -18,7 +18,7 @@ The project now uses an ESP32 DevKit as the body-worn controller. **No Arduino N
 
 `hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
-The ESP32 samples PPG/IMU at 50 Hz, GSR at 10 Hz, temperature at 1 Hz, and publishes a $CP2 packet every 50 ms. BLE is used for Android; USB serial is retained for PC bring-up and diagnostics.
+The ESP32 samples the single-channel analog pulse waveform and IMU at 50 Hz, GSR at 10 Hz, temperature at 1 Hz, and publishes a $CP2 packet every 50 ms. BLE is used for Android; USB serial is retained for PC bring-up and diagnostics.
 
 ### Android connection
 
