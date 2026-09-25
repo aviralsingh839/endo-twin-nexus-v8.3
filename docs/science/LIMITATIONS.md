@@ -24,14 +24,14 @@ Clearly distinguish OBSERVED DERIVED MODEL-INFERRED EXPERIMENTAL DEMO SIMULATED
 - Skin temp not core temp, affected environment, DS18B20 skin temp room temp temp slope
 - Wrist activity not whole-body calorimetry, MPU6050 motion ax ay az gx gy gz motion index activity level
 - GSR raw tonic phasic, affected environment
-- MAX30102 PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP2
+- generic analog Pulse Sensor PPG IR+RED HR SpO2 pulse amplitude 20Hz $CP2
 - Quality affected by motion, pressure, skin tone
 - Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
 
 ### Models
 
 - pcos_risk_model.joblib 17M dict CalibratedClassifierCV VotingClassifier 37 features target PCOS Y/N meta dataset PCOS_data_without_infertility.xlsx 541 rows leaky dropped Pregnant/Abortions/HCG CV 5-fold stratified-group patient-level CV ROC AUC 0.9594 AP 0.9324 notes synthetic excluded - GOOD methodology but sample 541 small, requires lab values FSH LH etc. not wearable alone, distribution may have selection bias, CV only no separate test set may be optimistic
-- ppg_quality_model.joblib 5.1M Pipeline RF 15 features PhysioNet wrist PPG 19 rec 8 subj 903 windows usable_rate 0.3477 window 10s label |PPG HR - ECG HR|<=5 bpm CV GroupKFold by subject ROC AUC 0.624 std 0.141 AP 0.5043 keep_rate_0_5 0.2835 top_features zero_cross_rate/hr_bpm/ibi_cv/dom_peak_diff/band_power notes educational artifact wrist PPG sensor differs from MAX30102 blended at 40% weight - HONEST low metrics, small sample 19 rec 8 subj, performance low 0.624 barely above random 0.5 std 0.141 high unstable, usable_rate low 34% wrist PPG during exercise very noisy, sensor mismatch wrist vs MAX30102 different characteristics may not transfer, label quality heuristic not gold standard
+- ppg_quality_model.joblib 5.1M Pipeline RF 15 features PhysioNet wrist PPG 19 rec 8 subj 903 windows usable_rate 0.3477 window 10s label |PPG HR - ECG HR|<=5 bpm CV GroupKFold by subject ROC AUC 0.624 std 0.141 AP 0.5043 keep_rate_0_5 0.2835 top_features zero_cross_rate/hr_bpm/ibi_cv/dom_peak_diff/band_power notes educational artifact wrist PPG sensor differs from generic analog Pulse Sensor blended at 40% weight - HONEST low metrics, small sample 19 rec 8 subj, performance low 0.624 barely above random 0.5 std 0.141 high unstable, usable_rate low 34% wrist PPG during exercise very noisy, sensor mismatch wrist vs generic analog Pulse Sensor different characteristics may not transfer, label quality heuristic not gold standard
 - Deterministic research logic src/disease_modules/pcos.py CYCLE_W 1.20 etc sigmoid research risk signal wearable+clinical not real joblib, research priors not clinical model, when lab values unavailable
 - Never display fabricated confidence number, if model cannot produce reliable uncertainty show Uncertainty not established rather than inventing one
 - No fake AI - real models with honest metrics not 100% accuracy claims
