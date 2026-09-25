@@ -41,6 +41,9 @@ class SensorSample:
     ms: int
     ir: int
     red: int
+    # V8.8: for the analog Pulse Sensor wearable, ir stores the single-channel
+    # ADC waveform and red remains -1. The explicit source/status metadata keeps
+    # optical MAX3010x data distinguishable from analog pulse data.
     ax_g: float
     ay_g: float
     az_g: float
@@ -63,6 +66,8 @@ class SensorSample:
     status: int = 0
     ppg_quality: float = 1.0
     source: str = "serial"
+    # V8.8: explicit PPG hardware/provenance.
+    ppg_input_type: str = "OPTICAL_IR_RED"
     # V8.3 quality metadata
     quality_meta: Dict[str, SensorQuality] = field(default_factory=dict)
 

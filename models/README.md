@@ -10,7 +10,7 @@
 
 - **Stress**: Formula-based stress estimation from autonomic and arousal features. HR z, RMSSD z, motion z, temp drop z, phasic GSR z, GSR z. Motion gate activity >45 reduces stress 0.65.
 
-- **PPG Quality**: Heuristic + trained model blended 60/40. Heuristic: amplitude, saturation, motion penalty. Model: trained on wrist_ppg_during_exercise (different sensor and sampling rate than MAX30102) - features: ppg_amp, ppg_amp_cv, ppg_regularity, ppg_dominant_hr_bpm, ppg_band_power, ppg_peak_rate, ppg_hr_bpm, ppg_ibi_rmssd_ms, ppg_ibi_cv, ppg_beat_consistency, ppg_zero_cross_rate, ppg_dom_peak_diff, ppg_half_hr_diff, motion_index, ppg_quality_heuristic. Target: |PPG HR - ECG HR| <=5 bpm reliable. Model only soft correction, heuristic dominant.
+- **PPG Quality**: Heuristic + trained model blended 60/40. Heuristic: amplitude, saturation, motion penalty. Model: trained on wrist_ppg_during_exercise (different sensor and sampling rate than the active generic analog Pulse Sensor; retained only for legacy optical PPG quality experiments) - features: ppg_amp, ppg_amp_cv, ppg_regularity, ppg_dominant_hr_bpm, ppg_band_power, ppg_peak_rate, ppg_hr_bpm, ppg_ibi_rmssd_ms, ppg_ibi_cv, ppg_beat_consistency, ppg_zero_cross_rate, ppg_dom_peak_diff, ppg_half_hr_diff, motion_index, ppg_quality_heuristic. Target: |PPG HR - ECG HR| <=5 bpm reliable. Model only soft correction, heuristic dominant.
 
 ### Legacy Models (Preserved from V8.1)
 

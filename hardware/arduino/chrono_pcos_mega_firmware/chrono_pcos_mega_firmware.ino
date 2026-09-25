@@ -5,7 +5,7 @@
   Serial: 115200 baud
 
   Sensors included:
-    MAX30102/MAX3010x PPG       I2C  SDA=20 SCL=21 on Mega
+    Generic analog Pulse Sensor  SIG -> PULSE_PIN (A4 default; analog input)
     MPU6050 IMU                 I2C
     DS18B20 x1/x2 temperature   D2 OneWire, 4.7k pull-up
     GSR analog                  A0
@@ -20,14 +20,13 @@
     Buzzer                      D6
 
   Packet:
-  $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+  $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc\n  V8.8 mapping: ir=analog pulse ADC, red=-1, status bit 12=ANALOG_PULSE.
 
   Medical safety:
   Educational physiological monitoring only. Not a diagnostic medical device.
 */
 
 #include <Wire.h>
-#include "MAX30105.h"
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <OneWire.h>
@@ -66,6 +65,7 @@
 #define MIC_PIN A1
 #define ECG_PIN A2
 #define FSR_PIN A3
+#define PULSE_PIN A4
 
 #define BAUD_RATE 115200
 #define PPG_PERIOD_MS 20
@@ -97,8 +97,9 @@
 #define ST_OLED_ERR     9
 #define ST_MIC_LOW      10
 #define ST_FSR_ARTIFACT 11
+#define ST_PPG_ANALOG 12
+#define ST_PPG_INVALID 13
 
-MAX30105 particleSensor;
 Adafruit_MPU6050 mpu;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature tempSensor(&oneWire);
@@ -106,7 +107,7 @@ DallasTemperature tempSensor(&oneWire);
 bool ppgOK=false, mpuOK=false, tempOK=false, lightOK=false, bmeOK=false, oledOK=false;
 uint16_t statusBase = 0;
 
-uint32_t irValue=0, redValue=0;
+int pulseRaw=0;
 float ax_g=0, ay_g=0, az_g=1, gx_dps=0, gy_dps=0, gz_dps=0;
 float ax_bias=0, ay_bias=0, az_bias=0, gx_bias=0, gy_bias=0, gz_bias=0;
 float temp0=NAN, temp1=NAN;
@@ -116,7 +117,7 @@ float luxValue=-1, roomT=NAN, humidity=NAN, pressure=NAN;
 uint8_t buttonMask=0;
 char ledState='Y';
 
-unsigned long lastPPG=0,lastIMU=0,lastAnalog=0,lastTemp=0,lastEnv=0,lastMic=0,lastOLED=0,lastPacket=0;
+unsigned long lastPulse=0,lastIMU=0,lastAnalog=0,lastTemp=0,lastEnv=0,lastMic=0,lastOLED=0,lastPacket=0;
 unsigned long relayCount=0;
 
 char cmdBuf[48];
@@ -145,12 +146,9 @@ void setupPins(){
 }
 
 void setupPPG(){
-  if(!particleSensor.begin(Wire, I2C_SPEED_FAST)){ ppgOK=false; statusBase|=(1<<ST_I2C_ERR); return; }
+  pinMode(PULSE_PIN, INPUT);
   ppgOK=true;
-  particleSensor.setup(0x28, 4, 2, 100, 411, 4096); // brightness, avg, red+IR, sampleRate, pulseWidth, adcRange
-  particleSensor.setPulseAmplitudeRed(0x28);
-  particleSensor.setPulseAmplitudeIR(0x28);
-  particleSensor.setPulseAmplitudeGreen(0);
+  statusBase|=(1<<ST_PPG_ANALOG);
 }
 
 void setupMPU(){
@@ -209,7 +207,7 @@ void calibrateIMU(){
   gx_bias=sgx/N; gy_bias=sgy/N; gz_bias=sgz/N;
 }
 
-void readPPG(){ if(ppgOK){ redValue=particleSensor.getRed(); irValue=particleSensor.getIR(); } }
+void readPPG(){ if(ppgOK) pulseRaw=analogRead(PULSE_PIN); }
 
 void readIMU(){
   if(!mpuOK) return;
@@ -281,7 +279,7 @@ void readMicFeatures(){
 
 uint16_t makeStatus(){
   uint16_t st=statusBase;
-  if(ppgOK){ if(irValue<5000) st|=(1<<ST_PPG_ABSENT); if(irValue>250000UL || redValue>250000UL) st|=(1<<ST_PPG_SAT); }
+  if(ppgOK){ if(pulseRaw<20) st|=(1<<ST_PPG_ABSENT); if(pulseRaw>=1018) st|=(1<<ST_PPG_SAT); if(pulseRaw<=0 || pulseRaw>=1023) st|=(1<<ST_PPG_INVALID); }
   if(tempOK && !(temp0>-20 && temp0<80)) st|=(1<<ST_TEMP_ERR);
   if(gsrRaw<5 || gsrRaw>1018) st|=(1<<ST_GSR_SAT);
   if(digitalRead(ECG_LO_PLUS)==HIGH || digitalRead(ECG_LO_MINUS)==HIGH) st|=(1<<ST_ECG_LEADS);
@@ -299,8 +297,8 @@ void sendPacket(){
   dtostrf(micRms,1,2,fmr); dtostrf(micPitchHz,1,1,fmp);
   char payload[260];
   uint16_t st=makeStatus();
-  snprintf(payload,sizeof(payload),"$CP2,%lu,%lu,%lu,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
-    millis(),(unsigned long)irValue,(unsigned long)redValue,
+  snprintf(payload,sizeof(payload),"$CP2,%lu,%d,-1,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%s,%s,%d,%d,%s,%s,%s,%s,%u,%u",
+    millis(),pulseRaw,
     fax,fay,faz,fgx,fgy,fgz,ft0,ft1,gsrRaw,micRaw,fmr,fmp,ecgRaw,fsrRaw,flux,frt,fhum,fpress,buttonMask,st);
   uint8_t crc=xorCRC(payload);
   Serial.print(payload); Serial.print(','); if(crc<16) Serial.print('0'); Serial.println(crc,HEX);
@@ -312,7 +310,7 @@ void updateOLED(){
   display.clearDisplay();
   display.setTextSize(1); display.setCursor(0,0);
   display.println("CHRONO-PCOS MEGA");
-  display.print("IR:"); display.print(irValue); display.print(" ECG:"); display.println(ecgRaw);
+  display.print("PULSE:"); display.print(pulseRaw); display.print(" ECG:"); display.println(ecgRaw);
   display.print("T0:"); display.print(temp0,1); display.print(" T1:"); display.println(temp1,1);
   display.print("GSR:"); display.print(gsrRaw); display.print(" FSR:"); display.println(fsrRaw);
   display.print("Lux:"); display.print(luxValue,0); display.print(" MicHz:"); display.println(micPitchHz,0);
@@ -382,7 +380,7 @@ void loop(){
   return;
 #endif
   unsigned long now=millis();
-  if(now-lastPPG>=PPG_PERIOD_MS){ lastPPG=now; readPPG(); }
+  if(now-lastPulse>=PPG_PERIOD_MS){ lastPulse=now; readPPG(); }
   if(now-lastIMU>=IMU_PERIOD_MS){ lastIMU=now; readIMU(); }
   if(now-lastAnalog>=ANALOG_PERIOD_MS){ lastAnalog=now; readAnalogSensors(); }
   if(now-lastTemp>=TEMP_PERIOD_MS){ lastTemp=now; readTemperatures(); }

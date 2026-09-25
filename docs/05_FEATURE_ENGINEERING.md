@@ -1,7 +1,7 @@
 # 05 - Feature Engineering - V8.3+
 
 ## Established Measurements (Directly Measured)
-- HR bpm: MAX30102 PPG peak detection, quality 0-1, source MEASURED
+- HR bpm: Generic Analog Pulse Sensor PPG (single-channel analog waveform) peak detection, quality 0-1, source MEASURED
 - Skin temp C: DS18B20 direct, quality, source MEASURED
 - Motion: MPU6050 accelerometer magnitude, activity level, source MEASURED
 - GSR raw: direct, source MEASURED
@@ -38,3 +38,10 @@ BaselineCalibrator: personal baseline, population not used for diagnosis, longit
 
 ## Explainability
 Each feature: source, quality, confidence if ML, limitations, explainability text. Example: RMSSD reflects parasympathetic activity, lower values may indicate autonomic dysregulation research signal.
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.

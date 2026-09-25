@@ -5,8 +5,14 @@ Supported packets:
 Legacy UNO:
 $CP,ms,ir,red,ax,ay,az,gx,gy,gz,tempC,gsr,lux,status,crc
 
-Enhanced Mega:
+Enhanced Mega / wearable:
 $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+
+V8.8 analog-pulse wearable compatibility:
+- When status bit 12 (ST_PPG_ANALOG) is set, the $CP2 ir field is an
+  ADC pulse waveform sample from the generic analog Pulse Sensor module.
+- red is -1 because there is no optical red channel.
+- Do not infer SpO2 from this packet.
 
 CRC is XOR of all characters in the payload before the final comma.
 """
@@ -76,6 +82,7 @@ class PacketParser:
                 gsr_raw=int(float(parts[11])),
                 lux=float(parts[12]),
                 status=int(float(parts[13])),
+                ppg_input_type="OPTICAL_IR_RED",
                 source="serial",
             )
         except (ValueError, IndexError) as exc:
@@ -112,7 +119,8 @@ class PacketParser:
                 pressure_hpa=float(parts[21]),
                 buttons=int(float(parts[22])),
                 status=int(float(parts[23])),
-                source="serial-mega",
+                ppg_input_type=("ANALOG_PULSE" if (int(float(parts[23])) & (1 << 12)) else "OPTICAL_IR_RED"),
+                source=("serial-mega-analog-pulse" if (int(float(parts[23])) & (1 << 12)) else "serial-mega"),
             )
         except (ValueError, IndexError) as exc:
             raise PacketParseError(f"numeric conversion failed: {exc}") from exc
@@ -120,8 +128,8 @@ class PacketParser:
 
 def decode_status_flags(status: int) -> list[str]:
     labels = [
-        "PPG finger absent",
-        "PPG saturated",
+        "PPG/pulse sensor absent",
+        "PPG/pulse sensor saturated or clipped",
         "MPU6050 error",
         "DS18B20 error",
         "GSR saturated",
@@ -132,5 +140,7 @@ def decode_status_flags(status: int) -> list[str]:
         "OLED error",
         "Microphone low signal",
         "FSR pressure artifact",
+        "Analog Pulse Sensor active",
+        "Analog Pulse Sensor invalid",
     ]
     return [labels[i] for i in range(min(len(labels), 16)) if status & (1 << i)]

@@ -37,7 +37,7 @@ class PhysiologicalState:
                 "hr": {
                     "value": "MEASURED - requires actual sensor data",
                     "provenance": ProvenanceLabel.MEASURED.value if hasattr(ProvenanceLabel, 'MEASURED') else "MEASURED",
-                    "source": "MAX30102 PPG IR+RED",
+                    "source": "analog Pulse Sensor single-channel waveform (legacy optical PPG may be source-specific)",
                     "quality": "0-1 per channel",
                     "limitations": "Requires good quality PPG, motion artifacts affect"
                 },

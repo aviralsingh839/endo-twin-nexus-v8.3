@@ -43,7 +43,7 @@ Every score is research estimate.
 ## Limitations - Models
 
 - Live risk engine: transparent fallback equation with research-prior weights, not trained calibrated model, labelled longitudinal wearable data does not exist publicly, ethics-approved pilot only realistic path
-- PPG quality model: trained on wrist_ppg_during_exercise (different sensor and sampling rate than MAX30102), used as soft correction 40% weight, heuristic dominant
+- PPG quality model: trained on wrist_ppg_during_exercise (different sensor and sampling rate than the active generic analog Pulse Sensor; retained only for legacy optical PPG quality experiments), used as soft correction 40% weight, heuristic dominant
 - Ultrasound: image-derived features UNKNOWN by design until validated, labelled, patient-grouped dataset exists, quality gate works on real images today, nothing invented
 - Model A-E experiment (does longitudinal or ultrasound add value?): PENDING by design
 - Python BLE client not written yet, pod connects over USB serial or ESP8266 bridge

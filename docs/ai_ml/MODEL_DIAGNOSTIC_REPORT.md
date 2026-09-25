@@ -105,7 +105,7 @@ Both are REAL, with proper scientific methodology.
   - cv_average_precision: 0.5043
   - cv_keep_rate_0_5: 0.2835
   - top_features: ppg_zero_cross_rate, ppg_hr_bpm, ppg_ibi_cv, ppg_dom_peak_diff, ppg_band_power
-  - notes: Educational artifact. Wrist PPG sensor differs from MAX30102; blended at 40% weight in src/utils/quality.ppg_quality.
+  - notes: Educational artifact. Wrist PPG training data are not validated for the generic analog Pulse Sensor; blended at 40% weight in src/utils/quality.ppg_quality.
 
 ### Scientific Validity - MIXED, HONEST
 
@@ -117,7 +117,7 @@ Both are REAL, with proper scientific methodology.
 - Usable rate: 0.3477 - only 34.77% usable - honest, not hiding poor quality
 - Keep rate 0.5: 0.2835 - only 28.35% kept at threshold 0.5 - honest
 - Educational artifact label - clearly marked as educational, not clinical
-- Sensor mismatch noted: Wrist PPG sensor differs from MAX30102; blended at 40% weight - honest about limitation
+- Sensor mismatch noted: Wrist PPG training data are not validated for the generic analog Pulse Sensor; blended at 40% weight - honest about limitation
 - Top features documented
 
 **Potential Issues**:
@@ -125,7 +125,7 @@ Both are REAL, with proper scientific methodology.
 - Sample size: recordings 19, subjects 8, windows 903 - small, limited subjects
 - Performance: ROC AUC 0.624 - low, barely above random (0.5), std 0.141 high - indicates poor or unstable model
 - Usable rate low: 0.3477 - only 34% usable - indicates wrist PPG during exercise is very noisy
-- Sensor mismatch: Wrist PPG vs MAX30102 - different sensors, different characteristics - model trained on wrist PPG may not transfer well to MAX30102
+- Sensor mismatch: Wrist PPG vs generic analog Pulse Sensor - different sensors, different characteristics - model trained on wrist PPG may not transfer well to generic analog Pulse Sensor
 - Label quality: |PPG HR - ECG HR| <=5 bpm - heuristic, not gold standard quality label, ECG gated by smoothness may have errors
 - Class imbalance: usable_rate 0.3477 - imbalanced, but class_weight balanced used
 - Window size: 10.0s - may be too short for reliable HRV
@@ -135,7 +135,7 @@ Both are REAL, with proper scientific methodology.
 
 - Keep as educational artifact, not clinical quality gate
 - Clearly label: experimental, educational artifact, ROC AUC 0.624, sensor mismatch
-- Improve: better quality features, more subjects, better label, sensor-specific training for MAX30102
+- Improve: better quality features, more subjects, better label, sensor-specific training for generic analog Pulse Sensor
 - Use alongside heuristic quality: ppg_quality_heuristic + model blended 40% weight - reasonable but document limitations
 - Never claim high accuracy for PPG quality
 

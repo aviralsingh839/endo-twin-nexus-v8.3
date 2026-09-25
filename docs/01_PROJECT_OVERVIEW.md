@@ -19,7 +19,7 @@ Tagline: Sense • Model • Predict • Personalize • Connect
 - Not claiming to diagnose PCOS, only research risk signals
 
 ## Architecture
-Sensors (MAX30102 PPG, MPU6050 motion, DS18B20 temp, GSR) → Signal Processing → Feature Extraction → Baseline Calibration → Disease Modules (risk signals only) → Fusion → Chrono-Metabolic Fingerprint → Screening Results (not diagnosis) → Reporting → Local DB → Patient/Doctor Apps/Care Discovery/Website
+Sensors (Generic Analog Pulse Sensor PPG (single-channel analog waveform), MPU6050 motion, DS18B20 temp, GSR) → Signal Processing → Feature Extraction → Baseline Calibration → Disease Modules (risk signals only) → Fusion → Chrono-Metabolic Fingerprint → Screening Results (not diagnosis) → Reporting → Local DB → Patient/Doctor Apps/Care Discovery/Website
 
 ## Components
 - Patient Android App (Kivy, offline-first)
@@ -53,3 +53,10 @@ V8.3+ - Full patient-doctor ecosystem, local DB, care discovery, website, Androi
 ## Branding
 Primary: CHRONO-PCOS V8.3+
 Historical: CHRONO-TWIN NEXUS V8.3 (keep in old notes)
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.

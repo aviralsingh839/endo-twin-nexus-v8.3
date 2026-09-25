@@ -7,7 +7,7 @@ Preserved from V8.1 as expanded experimental sensors hub in V8.3.
 ### Components
 
 - Arduino Mega 2560
-- Pod sensors: MAX30102, MPU6050, DS18B20, GSR
+- Pod sensors: generic analog Pulse Sensor, MPU6050, DS18B20, GSR
 - Plus:
   - ECG AD8232 (A1, LO- D30, LO+ D31)
   - Microphone MAX4466 (A2, RMS + pitch)

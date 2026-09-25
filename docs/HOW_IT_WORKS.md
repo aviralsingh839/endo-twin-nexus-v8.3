@@ -20,7 +20,7 @@ SENSOR
 ## 1. SENSOR
 
 **Wearable Pod (Nano):**
-- MAX30102 PPG: IR + red, 50 Hz, pulse waveform, HR, HRV, pulse amplitude, SpO2 educational
+- Generic Analog Pulse Sensor PPG (single-channel analog waveform): single analog pulse waveform, 50 Hz, pulse waveform, HR, HRV, pulse amplitude, SpO2 unavailable with analog pulse sensor
 - MPU6050 IMU: ax, ay, az, gx, gy, gz, 50 Hz, motion index, activity level
 - DS18B20: skin temperature, 1 Hz
 - Optional GSR: galvanic skin response, 10 Hz
@@ -42,7 +42,7 @@ Every reading gets quality metadata:
 {
   "value": 72,
   "quality": 0.91,
-  "source": "MAX30102",
+  "source": "Generic Analog Pulse Sensor",
   "timestamp": "...",
   "artifact": false,
   "artifact_type": null,
@@ -346,3 +346,10 @@ Data quality: 0.85, Persistence: 3.2, Confidence: 0.72
 10. Final result is research-oriented signal, NOT diagnosis
 
 **Innovation:** "We are not trying to make one sensor diagnose every disease. We are building one longitudinal physiological framework that can learn an individual's baseline and support multiple disease-specific research modules."
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.

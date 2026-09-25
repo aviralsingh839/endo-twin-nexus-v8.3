@@ -35,7 +35,8 @@ class RealtimeFeatureExtractor:
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
 
         # Signal processors
-        self.ppg = PPGProcessor()
+        self.ppg_input_type = "OPTICAL_IR_RED"
+        self.ppg = PPGProcessor(input_type=self.ppg_input_type)
         self.imu = IMUProcessor()
         self.gsr = GSRProcessor()
         self.temp = TemperatureProcessor(history_s=24 * 3600)
@@ -76,20 +77,37 @@ class RealtimeFeatureExtractor:
 
     def add_sample(self, sample: SensorSample) -> None:
         self.last_sample = sample
+        if sample.ppg_input_type:
+            self.ppg_input_type = sample.ppg_input_type.upper()
         # Quality check per channel
-        qualities = self.quality_control.evaluate_sample({
-            "ir": sample.ir,
-            "red": sample.red,
-            "ax_g": sample.ax_g,
-            "ay_g": sample.ay_g,
-            "az_g": sample.az_g,
-            "temp_c": sample.temp_c,
-            "gsr_raw": sample.gsr_raw,
-            "ecg_raw": sample.ecg_raw,
-        }, source=sample.source)
+        # Optical MAX301-style packets use ir/red. The V8.8 analog Pulse Sensor
+        # uses a single ADC waveform and must not be evaluated with optical
+        # thresholds (e.g. IR finger-present >=5000).
+        if sample.ppg_input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:
+            quality_input = {
+                "analog_pulse": sample.ir,
+                "ax_g": sample.ax_g,
+                "ay_g": sample.ay_g,
+                "az_g": sample.az_g,
+                "temp_c": sample.temp_c,
+                "gsr_raw": sample.gsr_raw,
+                "ecg_raw": sample.ecg_raw,
+            }
+        else:
+            quality_input = {
+                "ir": sample.ir,
+                "red": sample.red,
+                "ax_g": sample.ax_g,
+                "ay_g": sample.ay_g,
+                "az_g": sample.az_g,
+                "temp_c": sample.temp_c,
+                "gsr_raw": sample.gsr_raw,
+                "ecg_raw": sample.ecg_raw,
+            }
+        qualities = self.quality_control.evaluate_sample(quality_input, source=sample.source, timestamp_s=sample.timestamp_s)
         self._quality_history.append({k: v.quality for k, v in qualities.items()})
 
-        self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red)
+        self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red, input_type=sample.ppg_input_type)
         self.imu.add_sample(sample.timestamp_s, sample.ax_g, sample.ay_g, sample.az_g,
                             sample.gx_dps, sample.gy_dps, sample.gz_dps)
         self.gsr.add_sample(sample.timestamp_s, sample.gsr_raw)
@@ -189,11 +207,14 @@ class RealtimeFeatureExtractor:
             fv.stress_index = float((1 - hrv_norm) * 0.6 + hr_norm * 0.4) * 100.0
             fv.autonomic_imbalance = float((1 - hrv_norm) * 100.0)
         else:
-            fv.stress_index = 30.0
-            fv.autonomic_imbalance = 30.0
+            fv.stress_index = 0.0
+            fv.autonomic_imbalance = 0.0
 
         # Completeness adjustment
-        c = completeness_score(fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic, fv.spo2_pct)
+        completeness_values = [fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic]
+        if self.ppg_input_type not in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:
+            completeness_values.append(fv.spo2_pct)
+        c = completeness_score(*completeness_values)
         fv.signal_quality = 0.7 * fv.signal_quality + 0.3 * c
 
         # Personal baseline

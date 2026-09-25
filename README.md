@@ -866,3 +866,12 @@ Educational research prototype. Not a medical device. Not clinically validated. 
 Prioritizes: Science, Clarity, Reproducibility, Explainability, Honest Limitations, **General Platform Architecture**, **Disease Model Plugin System**, **Preserved Original Functionality**, **Extensibility**.
 
 **One Sentence: ENDO-TWIN is the platform; CHRONO-PCOS is its first disease-specific model.**
+
+
+## V8.8 wearable PPG hardware option: generic analog Pulse Sensor
+
+The wearable firmware now has an analog-pulse mode for the generic Heart Rate Pulse Sensor module shown in the project hardware reference. This module supplies one analog pulse waveform through SIG; it does not supply MAX3010x-style IR/red optical channels.
+
+The ESP32 wearable therefore maps the analog waveform into the existing `$CP2` primary pulse slot for transport compatibility, sets the red channel to `-1`, marks the packet with the explicit `ANALOG_PULSE` provenance/status bit, and keeps motion-aware signal-quality gating. Heart-rate and pulse-timing/HRV-style processing can operate on the waveform. SpO2 is intentionally unavailable in analog-pulse mode.
+
+The migration lives on branch `sensor/analog-pulse-sensor-migration` and is designed to avoid breaking the existing desktop/BLE packet contract.

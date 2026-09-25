@@ -138,7 +138,7 @@ class LocalDatabase:
         )
         """)
 
-        # Sensor data - PPG
+        # Sensor data - PPG / pulse waveform
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ppg_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +150,7 @@ class LocalDatabase:
             spo2_pct REAL,
             pulse_amplitude REAL,
             quality REAL,
+            input_type TEXT NOT NULL DEFAULT 'OPTICAL_IR_RED',
             label TEXT NOT NULL,
             FOREIGN KEY(session_id) REFERENCES sensor_sessions(session_id)
         )
@@ -479,7 +480,7 @@ class LocalDatabase:
 
         # Demo supplies
         demo_supplies = [
-            {"supply_id": "supply_001", "name": "MAX30102 Sensor Module", "category": "sensor", "description": "PPG sensor for heart rate and SpO2", "provider_id": "demo_supply_001", "price": 450.0, "availability": "In Stock"},
+            {"supply_id": "supply_001", "name": "Generic Analog Pulse Sensor Module", "category": "sensor", "description": "PPG sensor for heart rate and SpO2", "provider_id": "demo_supply_001", "price": 450.0, "availability": "In Stock"},
             {"supply_id": "supply_002", "name": "MPU6050 Motion Sensor", "category": "sensor", "description": "Motion and activity tracking", "provider_id": "demo_supply_001", "price": 250.0, "availability": "In Stock"},
             {"supply_id": "supply_003", "name": "DS18B20 Temperature Sensor", "category": "sensor", "description": "Skin temperature monitoring", "provider_id": "demo_supply_001", "price": 150.0, "availability": "In Stock"},
             {"supply_id": "supply_004", "name": "Wrist Band for Pod", "category": "accessory", "description": "Comfortable wrist strap for wearable pod", "provider_id": "demo_supply_001", "price": 200.0, "availability": "In Stock"},

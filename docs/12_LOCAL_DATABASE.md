@@ -67,7 +67,7 @@ DATA_DIR/chrono_twin_nexus_v8_3_plus.db, fallback /tmp for testing
 
 ### Supplies
 - supply_id PK, name, category sensor/accessory/menstrual/monitoring, description, provider_id FK, price, availability, image_path, created_at
-- Seeded 5 supplies: MAX30102 450, MPU6050 250, DS18B20 150, Wrist Band 200, Menstrual Care Kit 300
+- Seeded 5 supplies: generic analog Pulse Sensor 450, MPU6050 250, DS18B20 150, Wrist Band 200, Menstrual Care Kit 300
 
 ### Audit Records
 - audit_id PK, user_id FK, patient_id FK, action, details_json, timestamp, ip_address
