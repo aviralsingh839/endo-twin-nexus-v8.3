@@ -39,6 +39,8 @@ class QualityThresholds:
     gsr_max: int = 1023
     ir_min: int = 0
     ir_max: int = 262143
+    analog_pulse_min: int = 0
+    analog_pulse_max: int = 4095
     motion_max_g: float = 8.0
     stale_timeout_s: float = 6.0
 
@@ -80,7 +82,10 @@ class SensorQualityControl:
                 return True, f"GSR {value} out of range"
         elif channel in ("ir", "red"):
             if not (t.ir_min <= value <= t.ir_max):
-                return True, f"PPG {value} out of range"
+                return True, f"optical PPG {value} out of range"
+        elif channel in ("analog_pulse", "pulse_raw"):
+            if not (t.analog_pulse_min <= value <= t.analog_pulse_max):
+                return True, f"analog pulse ADC {value} out of range"
         elif channel in ("ax_g", "ay_g", "az_g"):
             if abs(value) > t.motion_max_g:
                 return True, f"accel {value} exceeds max"
@@ -180,14 +185,20 @@ class SensorQualityControl:
         # Adjust quality by channel specifics
         quality = base_quality
         if channel in ("ir", "red"):
-            # PPG quality depends on amplitude
+            # Legacy optical PPG quality depends on IR/optical amplitude.
             if float(value) < 5000:
                 quality = 0.0
                 return SensorQuality(
                     value=float(value), quality=quality, source=source,
                     timestamp=ts, artifact=True,
-                    artifact_type="low_amplitude", reason="finger absent or low PPG"
+                    artifact_type="low_amplitude", reason="finger absent or low optical PPG"
                 )
+        elif channel in ("analog_pulse", "pulse_raw"):
+            # Analog Pulse Sensor uses the ADC range, not the optical IR scale.
+            span = max(self.thresholds.analog_pulse_max - self.thresholds.analog_pulse_min, 1)
+            normalized = (float(value) - self.thresholds.analog_pulse_min) / span
+            if normalized <= 0.002 or normalized >= 0.998:
+                quality = min(quality, 0.25)
 
         return SensorQuality(
             value=float(value), quality=float(max(0.0, min(1.0, quality))),
