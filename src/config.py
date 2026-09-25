@@ -43,7 +43,7 @@ BASELINE_CONFIDENCE_MIN_OBS = 30
 FEATURE_LOG_INTERVAL_S = 10.0
 
 # Sampling targets
-PPG_FS_HZ = 50.0
+PPG_FS_HZ = 50.0  # Analog Pulse Sensor sampling/processing target
 IMU_FS_HZ = 50.0
 GSR_FS_HZ = 10.0
 TEMP_FS_HZ = 1.0
@@ -55,7 +55,7 @@ MIN_IBI_S = 60.0 / MAX_HR_BPM
 MAX_IBI_S = 60.0 / MIN_HR_BPM
 
 # Signal quality
-MIN_IR_FINGER_PRESENT = 5000
+MIN_IR_FINGER_PRESENT = 5000  # Legacy optical MAX301 threshold; not used for analog pulse input
 MAX_ADC_18BIT = 262143
 PPG_SATURATION_MARGIN = 4000
 
