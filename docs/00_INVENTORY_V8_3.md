@@ -24,14 +24,14 @@
 - explanation_engine.py: ExplanationEngine, explain_longitudinal, explain_module, explain_fusion, explain_shared_features, generate_report_explanation
 
 ### Signal Processing (src/signal_processing/)
-- ppg.py: PPGProcessor, DCBlocker, ExponentialSmoother, peak detection, HRV time domain, SpO2, waveform
+- ppg.py: PPGProcessor, DCBlocker, ExponentialSmoother, peak detection, HRV time domain, SpO2 (unavailable with analog pulse sensor), waveform
 - imu.py: IMUProcessor, motion_index, activity_level, low_activity_risk
 - gsr.py: GSRProcessor, tonic, phasic
 - temperature.py: TemperatureProcessor, skin_temp, slope
 - ecg.py: ECGProcessor, HR, RMSSD, quality
 - filters.py: DCBlocker, ExponentialSmoother
 - hrv.py: hrv_time_domain
-- spo2.py: estimate_spo2
+- SpO2.py: estimate_SpO2
 
 ### Serial IO (src/serial_io/)
 - packet_parser.py: PacketParser, XOR CRC, $CP and $CP2 support, decode_status_flags
@@ -95,7 +95,7 @@
 
 ## Signal Processing Modules
 
-- PPG, IMU, GSR, temperature, ECG, filters, HRV, SpO2
+- PPG, IMU, GSR, temperature, ECG, filters, HRV, SpO2 (unavailable with analog pulse sensor)
 - Quality control per channel
 - Feature extraction streaming
 - Baseline calibration
@@ -103,7 +103,7 @@
 
 ## Sensor Interfaces
 
-- Arduino Nano pod: MAX30102 PPG, MPU6050 IMU, DS18B20 temp, optional GSR, 20 Hz $CP2 packets, 115200 baud, XOR CRC, status bits
+- Arduino Nano/ESP32 wearable pod: Generic Analog Pulse Sensor PPG (single-channel analog waveform), MPU6050 IMU, DS18B20 temp, optional GSR, 20 Hz $CP2 packets, 115200 baud, XOR CRC, status bits
 - Mega hub: pod sensors + ECG, mic, FSR, light, BME280, OLED, LEDs, buzzer, buttons, relay mode
 - ESP8266 bridge: Wi-Fi relay TCP 7777
 - Packet parser: $CP and $CP2, CRC verification, error handling
@@ -206,7 +206,7 @@
 - All core modules: quality_control, personal_baseline, longitudinal_engine, shared_features, feature_extraction
 - All disease modules: base, pcos, sleep, cardiometabolic, autonomic, registry
 - Fusion and explainability
-- Signal processing: ppg, imu, gsr, temperature, ecg, filters, hrv, spo2
+- Signal processing: ppg, imu, gsr, temperature, ecg, filters, hrv, SpO2
 - Serial IO: packet_parser, arduino_reader, network_reader, led_controller
 - Utils: synthetic, history_store, demo_stream, quality, math_utils, replay, report, qr_encoder, logger, storage
 - UI: theme, gauges, vital_cards, live_plots, main_window (as base for doctor PC app)
@@ -242,3 +242,10 @@
 V8.3 is complete modular multimodal longitudinal health platform with 4 disease modules, personal baseline, longitudinal engine, shared representation, fusion, explainability, sensor quality, hardware handling, synthetic data with 6 scenarios, tests, documentation, hardware preserved.
 
 Ready for expansion to V8.3+ ecosystem: patient Android, doctor Android, doctor PC, local database, care discovery, supply discovery, public website, while preserving all existing functionality.
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.
