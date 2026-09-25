@@ -82,6 +82,7 @@ class PacketParser:
                 gsr_raw=int(float(parts[11])),
                 lux=float(parts[12]),
                 status=int(float(parts[13])),
+                ppg_input_type="OPTICAL_IR_RED",
                 source="serial",
             )
         except (ValueError, IndexError) as exc:
@@ -118,6 +119,7 @@ class PacketParser:
                 pressure_hpa=float(parts[21]),
                 buttons=int(float(parts[22])),
                 status=int(float(parts[23])),
+                ppg_input_type=("ANALOG_PULSE" if (int(float(parts[23])) & (1 << 12)) else "OPTICAL_IR_RED"),
                 source=("serial-mega-analog-pulse" if (int(float(parts[23])) & (1 << 12)) else "serial-mega"),
             )
         except (ValueError, IndexError) as exc:
