@@ -126,8 +126,8 @@ class PacketParser:
 
 def decode_status_flags(status: int) -> list[str]:
     labels = [
-        "PPG finger absent",
-        "PPG saturated",
+        "PPG/pulse sensor absent",
+        "PPG/pulse sensor saturated or clipped",
         "MPU6050 error",
         "DS18B20 error",
         "GSR saturated",
@@ -138,5 +138,7 @@ def decode_status_flags(status: int) -> list[str]:
         "OLED error",
         "Microphone low signal",
         "FSR pressure artifact",
+        "Analog Pulse Sensor active",
+        "Analog Pulse Sensor invalid",
     ]
     return [labels[i] for i in range(min(len(labels), 16)) if status & (1 << i)]
