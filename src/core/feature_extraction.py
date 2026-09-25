@@ -89,7 +89,7 @@ class RealtimeFeatureExtractor:
         }, source=sample.source)
         self._quality_history.append({k: v.quality for k, v in qualities.items()})
 
-        self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red)
+        self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red, input_type=sample.ppg_input_type)
         self.imu.add_sample(sample.timestamp_s, sample.ax_g, sample.ay_g, sample.az_g,
                             sample.gx_dps, sample.gy_dps, sample.gz_dps)
         self.gsr.add_sample(sample.timestamp_s, sample.gsr_raw)
