@@ -41,7 +41,7 @@
 // ESP32-safe default pins. Change PULSE_PIN to the ADC-capable GPIO actually
 // wired on your board. GPIO34 works on classic ESP32 but is input-only.
 // ESP32-S3 boards have different ADC-capable pin maps, so configure locally.
-static constexpr uint8_t SDA_PIN=21, SCL_PIN=22, PULSE_PIN=34, ONE_WIRE_BUS=18, GSR_PIN=35, STATUS_LED=2;
+static constexpr uint8_t SDA_PIN=21, SCL_PIN=22, PULSE_PIN=4, ONE_WIRE_BUS=18, GSR_PIN=5, STATUS_LED=2;
 static constexpr uint32_t BAUD_RATE=115200;
 static constexpr uint32_t PULSE_PERIOD_MS=20;   // 50 Hz packet-facing sample
 static constexpr uint32_t IMU_PERIOD_MS=20;     // 50 Hz
