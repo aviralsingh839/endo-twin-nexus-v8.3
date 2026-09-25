@@ -109,11 +109,9 @@ class PPGProcessor:
         n = int(12 * self.fs_hz)
         recent_ir = np.asarray(list(self.ir_raw)[-n:], dtype=float)
         recent_red = list(self.red_raw)[-n:]
-        if self.is_analog_pulse:
-            spo2, spo2_q = None, 0.0
-        else:
-            # Analog single-channel pulse sensors do not provide red/IR optical data.
-            spo2, spo2_q = None, 0.0
+        # A single-channel analog pulse sensor has no red/IR optical ratio,
+        # therefore SpO2 is unavailable regardless of waveform quality.
+        spo2, spo2_q = None, 0.0
         if recent_ir.size >= 10:
             ppg_amp = float((np.percentile(recent_ir, 95) - np.percentile(recent_ir, 5)) / max(np.median(recent_ir), 1.0))
         else:
