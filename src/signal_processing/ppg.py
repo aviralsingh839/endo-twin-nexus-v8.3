@@ -118,7 +118,13 @@ class PPGProcessor:
             ppg_amp = float((np.percentile(recent_ir, 95) - np.percentile(recent_ir, 5)) / max(np.median(recent_ir), 1.0))
         else:
             ppg_amp = None
-        q = ppg_quality(recent_ir, recent_red, motion_index=motion_index, fs_hz=self.fs_hz)
+        q = ppg_quality(
+            recent_ir,
+            recent_red,
+            motion_index=motion_index,
+            fs_hz=self.fs_hz,
+            input_type=self.input_type,
+        )
         q = float(0.7 * q + 0.3 * spo2_q)
 
         return {
