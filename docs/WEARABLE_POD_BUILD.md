@@ -22,7 +22,7 @@ The ESP32 samples PPG/IMU at 50 Hz, GSR at 10 Hz, temperature at 1 Hz, and publi
 
 ### Android connection
 
-The wearable advertises as **ENDO-TWIN-ESP32**. Android should scan for the documented service UUID, connect, enable notifications on the data characteristic, and feed complete newline-delimited $CP2 messages into the same validation path used by wired serial. The command characteristic supports PING/WHOAMI and future device-control commands.
+The wearable advertises as **ENDO-TWIN-PULSE**. Android should scan for the documented service UUID, connect, enable notifications on the data characteristic, and feed complete newline-delimited $CP2 messages into the same validation path used by wired serial. The command characteristic supports PING/WHOAMI and future device-control commands.
 
 ### Bench fallback
 
