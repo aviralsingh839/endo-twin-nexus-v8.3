@@ -1,8 +1,10 @@
 """Signal-quality scoring utilities.
 
-`ppg_quality()` returns a 0-1 PPG quality score used for the app's overall
-signal-quality gate. The base score is a transparent heuristic (amplitude,
-saturation, motion). If a trained model exists at `models/ppg_quality_model.joblib`
+`ppg_quality()` returns a 0-1 quality score for the active pulse waveform.
+The base score is a transparent heuristic (amplitude, saturation/clipping,
+motion). It supports both the legacy optical MAX3010x channel and the V8.8
+single-channel analog Pulse Sensor. For analog pulse input, no IR finger
+presence or SpO2 assumptions are applied. If a trained model exists at `models/ppg_quality_model.joblib`
 (see scripts/train_ppg_quality_model.py), the score is blended with the model's
 probability that the window's PPG HR estimate is reliable (|PPG HR - ECG HR| <= 5 bpm).
 
@@ -238,9 +240,22 @@ def _load_quality_model():
         return None
 
 
-def ppg_quality(ir_values, red_values=None, motion_index: float = 0.0, fs_hz: float = PPG_FS_HZ) -> float:
+def ppg_quality(ir_values, red_values=None, motion_index: float = 0.0, fs_hz: float = PPG_FS_HZ, input_type: str = "OPTICAL_IR_RED") -> float:
     """Return 0-1 PPG quality based on the heuristic plus (when available) the
     trained model's estimate that the window's HR is reliable."""
+    analog = input_type.upper() in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}
+    if analog:
+        x = np.asarray(ir_values, dtype=float)
+        if x.size < 10 or np.isfinite(x).mean() < 0.95:
+            return 0.0
+        x = x[np.isfinite(x)]
+        dc = float(np.median(x))
+        ac = float(np.percentile(x, 95) - np.percentile(x, 5))
+        amp_score = clamp((ac - 10.0) / 250.0, 0.0, 1.0)
+        rail_score = 0.0 if (dc <= 1.0 or dc >= 4094.0) else 1.0
+        motion_penalty = clamp(1.0 - motion_index / 1.5, 0.0, 1.0)
+        return float(clamp(0.65 * amp_score + 0.20 * rail_score + 0.15 * motion_penalty, 0.0, 1.0))
+
     q = _heuristic_quality(ir_values, red_values, motion_index)
     if q <= 0.0:
         return 0.0
