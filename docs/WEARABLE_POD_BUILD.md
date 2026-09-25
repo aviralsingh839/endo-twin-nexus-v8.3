@@ -7,7 +7,7 @@ The project now uses an ESP32 DevKit as the body-worn controller. **No Arduino N
 ### Core BOM
 
 - ESP32 DevKit board
-- MAX30102 PPG sensor
+- Generic Analog Pulse Sensor PPG (single-channel analog waveform) sensor
 - MPU6050 IMU
 - DS18B20 temperature sensor + 4.7k resistor
 - GSR module (optional)
@@ -35,3 +35,10 @@ Flash → verify USB $CP2 → validate parser/CRC → verify BLE advertising →
 ### Safety
 
 Research/educational prototype only. Do not interpret outputs as a diagnosis. Never power a body-worn prototype directly from mains.
+
+
+## V8.8 Analog Pulse Sensor migration
+
+The current wearable build can use the generic analog Pulse Sensor module shown in the project hardware reference image instead of the MAX3010x optical PPG. The module is a single-channel analog pulse waveform source: SIG connects to an ADC-capable GPIO, VCC to the sensor's supported supply, and GND to common ground. ENDO-TWIN keeps the existing $CP2 transport so the rest of the desktop/BLE pipeline remains compatible. The primary waveform is carried in the existing `ir` slot for transport compatibility and is explicitly marked as `ANALOG_PULSE`/status bit 12. The `red` field is `-1` because there is no optical red channel.
+
+The processing layer continues to support heart-rate and pulse-timing/HRV-style analysis from the waveform, with motion-aware quality scoring. It must not estimate SpO2 from this single-channel analog sensor. This hardware is suitable for an educational research prototype, not for diagnosis or clinical measurement.
