@@ -211,7 +211,10 @@ class RealtimeFeatureExtractor:
             fv.autonomic_imbalance = 0.0
 
         # Completeness adjustment
-        completeness_values = [fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic]\n        if self.ppg_input_type not in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:\n            completeness_values.append(fv.spo2_pct)\n        c = completeness_score(*completeness_values)
+        completeness_values = [fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic]
+        if self.ppg_input_type not in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:
+            completeness_values.append(fv.spo2_pct)
+        c = completeness_score(*completeness_values)
         fv.signal_quality = 0.7 * fv.signal_quality + 0.3 * c
 
         # Personal baseline
