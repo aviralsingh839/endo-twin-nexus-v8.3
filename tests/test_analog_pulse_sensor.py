@@ -45,3 +45,12 @@ def test_sensor_sample_keeps_backward_compatible_field_order():
         temp_c=32.5, gsr_raw=450, lux=-1
     )
     assert s.ppg_input_type == "OPTICAL_IR_RED"
+
+
+def test_quality_control_accepts_midscale_analog_pulse():
+    from src.core.quality_control import SensorQualityControl
+    qc = SensorQualityControl()
+    result = qc.evaluate("analog_pulse", 2048, source="serial-mega-analog-pulse", timestamp_s=time.time())
+    assert result.quality > 0.0
+    assert not result.artifact
+
