@@ -78,7 +78,7 @@ Optional status LED:
 ## UNO bench wiring
 
 ```
-Generic Analog Pulse Sensor/MPU6050: SDA=A4, SCL=A5
+Analog Pulse Sensor: SIG -> A1 (or another analog-capable input); MPU6050: SDA=A4, SCL=A5
 DS18B20:          DATA=D2, 4.7k pull-up to 5V
 GSR:              SIG=A0
 USB serial:       115200 baud
