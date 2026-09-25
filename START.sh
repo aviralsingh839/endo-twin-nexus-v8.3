@@ -31,7 +31,7 @@ EOF
   case "$choice" in
    1) runpy -m src.ui.main_window ;;
    2) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
-   3) runpy "$ROOT/desktop/patient_app/main.py" ;;
+   3) runpy "$ROOT/android/patient_app/main.py" ;;
    4) runpy "$ROOT/apps/main/main_app.py" ;;
    5) bash "$ROOT/LAUNCH/WEBSITE.sh" ;;
    6) "$ROOT/build_apks.sh" menu ;;
@@ -50,7 +50,7 @@ case "$MODE" in
  menu) menu ;;
  unified|workstation) runpy -m src.ui.main_window ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
- patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
+ patient|patient-pc) runpy "$ROOT/android/patient_app/main.py" ;;
  endo-twin|endo|general) runpy "$ROOT/apps/main/main_app.py" ;;
  website|web|site) bash "$ROOT/LAUNCH/WEBSITE.sh" ;;
  gui|control-center) runpy "$ROOT/launcher/main.py" ;;
