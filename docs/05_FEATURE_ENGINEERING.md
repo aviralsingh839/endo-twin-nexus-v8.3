@@ -14,7 +14,7 @@
 - GSR phasic per min: highpass, derived
 - Activity level %: classified from motion, derived
 - Temp slope C per min: derivative, derived
-- Pulse amplitude, SpO2 (unavailable with analog pulse sensor): IR/RED ratio, derived
+- Pulse amplitude, SpO2: IR/RED ratio, derived
 
 ## Experimental Research Signals
 - Circadian rhythm: sleep-wake estimation HR/HRV 24h pattern, model-inferred, experimental, limitations not polysomnography
