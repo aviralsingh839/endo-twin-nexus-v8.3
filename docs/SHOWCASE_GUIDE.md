@@ -32,7 +32,7 @@ Sense • Model • Predict • Personalize • Connect
 
 What is: Local-first multimodal AI-assisted PCOS/PCOD risk pre-screening research ecosystem
 
-- Sensing: MAX30102 PPG HR HRV, MPU6050 motion, DS18B20 temp, GSR, ECG, BME280
+- Sensing: generic analog Pulse Sensor PPG HR HRV, MPU6050 motion, DS18B20 temp, GSR, ECG, BME280
 - Signal Processing: Filtering, baseline removal, artifact detection, quality control, feature extraction
 - Chrono-Metabolic Fingerprinting: Circadian, autonomic, variability, activity, temp, metabolic, longitudinal, baseline calibration, distinguishing established/derived/experimental/ML/clinical, explainability
 - AI/ML: PCOS, Sleep, Cardiometabolic, Autonomic risk signals only, confidence, limitations, NOT ESTABLISHED clinical validation, model transparency name/version/input/data quality/confidence/features/limitations never hide uncertainty
@@ -52,7 +52,7 @@ PCOS challenges: irregular cycles, hyperandrogenism, polycystic ovaries, metabol
 
 ### Step 3: Hardware - Actual Sensors
 
-- MAX30102 PPG IR+RED HR HRV what/why/signal/limitations/implemented MEASURED
+- generic analog Pulse Sensor PPG IR+RED HR HRV what/why/signal/limitations/implemented MEASURED
 - MPU6050 accelerometer+gyroscope motion activity what/why/signal/limitations/implemented MEASURED
 - DS18B20 temperature skin temp what/why/signal/limitations/implemented MEASURED skin not core affected environment
 - GSR galvanic skin response tonic/phasic what/why/signal/limitations/implemented MEASURED+DERIVED
@@ -63,7 +63,7 @@ Each with what measured, why relevant to PCOS/chrono-metabolic, signal character
 
 ### Step 4: Physiology
 
-- HR bpm MEASURED source MAX30102 quality 0.91
+- HR bpm MEASURED source generic analog Pulse Sensor quality 0.91
 - HRV RMSSD SDNN pNN50 DERIVED source PPG-derived limitations PPG less accurate than ECG quality 0.85
 - Motion ax_g ay_g az_g gx_dps gy_dps gz_dps motion_index activity_level MEASURED source MPU6050 quality 0.8 limitations wrist not whole-body
 - Temp skin temp C room temp slope MEASURED+DERIVED source DS18B20 quality 0.88 limitations skin not core affected environment
@@ -81,7 +81,7 @@ Pipeline: SENSOR → TRANSPORT → PARSING → QUALITY CONTROL → FILTERING →
 - Artifact detection: motion MPU6050 correlation PPG amplitude HR outlier GSR jumps quality 0-1 per channel source labeling
 - Missing handling: short gaps interpolation quality penalty long gaps mark missing not fabricate
 - Quality: overall 0-1 per channel ppg motion temp reason codes
-- Feature extraction: established MEASURED HR bpm MAX30102 skin temp C DS18B20 motion MPU6050 GSR raw derived HRV RMSSD SDNN pNN50 resting HR GSR tonic lowpass phasic highpass activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV+GSR metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation
+- Feature extraction: established MEASURED HR bpm generic analog Pulse Sensor skin temp C DS18B20 motion MPU6050 GSR raw derived HRV RMSSD SDNN pNN50 resting HR GSR tonic lowpass phasic highpass activity level classified temp slope derivative pulse amplitude SpO2 IR/RED ratio experimental circadian sleep-wake estimation HR/HRV 24h pattern model-inferred limitations not polysomnography autonomic HRV+GSR metabolic multimodal chrono-metabolic fingerprint longitudinal trend personal baseline deviation
 - Gracefully handle sensor unavailable/disconnected/noisy/missing/invalid/serial failure/partial
 
 ### Step 6: Chrono-Metabolic Fingerprinting
@@ -161,7 +161,7 @@ Example: Nearby ABC Women's Clinic 1.2km Gynecology Verified [View][Directions] 
 
 Home tagline What is Problem How it Works flow Sensors→Signal→Feature→Baseline→Longitudinal→Multimodal→Fingerprint→Screening→Doctor Review Technology Arduino/PPG/HR/HRV/GSR/motion/temp/ultrasound/AI/signal Patient App Doctor App Care Discovery Research hypothesis/methodology Benefits without unsupported claims Safety limitations Privacy local-first role offline Docs links 25 docs Footer Design serious modern scientific clean typography diagrams accessible colors responsive mobile strong identity avoid excessive animations/fake claims/stock AI doctor/100% accurate/fake hospital branding
 
-Structure: HOME hero Sense•Model•Predict•Personalize with architecture preview PROBLEM PCOS challenges longitudinal importance HOW IT WORKS interactive flow Sensors→Signal→Quality→Features→Baseline→Longitudinal→AI→Ultrasound→Fusion→Explanation→Patient/Doctor with MEASURED/CLINICALLY-ENTERED/IMAGE-DERIVED/MODEL-INFERRED/UNKNOWN labels HARDWARE actual sensors MAX30102/MPU6050/DS18B20/GSR/ECG/BME280 with what/why/signal/limitations/implemented PHYSIOLOGY HR/HRV/motion/temp/GSR/sleep/autonomic/metabolic CHRONO-METABOLIC major section circadian/autonomic/metabolic/temporal/baseline/multisystem with provenance DIGITAL TWIN computational representation not simulation AI/ML Data/Features/Training/Validation/Registry/Explainability distinction Data vs Model vs Inference vs Clinical ULTRASOUND pipeline 11 steps quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS Patient/Doctor detailed sections ANDROID APK build workflow DATABASE 18 tables local-first REPORTING professional with disclaimer CARE DISCOVERY FIND CARE demo providers TIMELINE V0-V8.3+ interactive with IMPLEMENTED/PROPOSED/CONCEPT SAFETY research prototype disclaimer ROADMAP CHRONO-PCOS→ENDO-TWIN NEXUS DEMO 16 steps DOCS 25+2
+Structure: HOME hero Sense•Model•Predict•Personalize with architecture preview PROBLEM PCOS challenges longitudinal importance HOW IT WORKS interactive flow Sensors→Signal→Quality→Features→Baseline→Longitudinal→AI→Ultrasound→Fusion→Explanation→Patient/Doctor with MEASURED/CLINICALLY-ENTERED/IMAGE-DERIVED/MODEL-INFERRED/UNKNOWN labels HARDWARE actual sensors generic analog Pulse Sensor/MPU6050/DS18B20/GSR/ECG/BME280 with what/why/signal/limitations/implemented PHYSIOLOGY HR/HRV/motion/temp/GSR/sleep/autonomic/metabolic CHRONO-METABOLIC major section circadian/autonomic/metabolic/temporal/baseline/multisystem with provenance DIGITAL TWIN computational representation not simulation AI/ML Data/Features/Training/Validation/Registry/Explainability distinction Data vs Model vs Inference vs Clinical ULTRASOUND pipeline 11 steps quality gate UNKNOWN by design provenance CLINICALLY-ENTERED vs IMAGE-DERIVED PLATFORMS Patient/Doctor detailed sections ANDROID APK build workflow DATABASE 18 tables local-first REPORTING professional with disclaimer CARE DISCOVERY FIND CARE demo providers TIMELINE V0-V8.3+ interactive with IMPLEMENTED/PROPOSED/CONCEPT SAFETY research prototype disclaimer ROADMAP CHRONO-PCOS→ENDO-TWIN NEXUS DEMO 16 steps DOCS 25+2
 
 Design: serious modern scientific clean typography diagrams accessible colors responsive mobile strong identity avoid excessive animations/fake claims/stock AI doctor/100% accurate/fake hospital branding
 
