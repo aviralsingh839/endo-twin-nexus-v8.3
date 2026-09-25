@@ -20,7 +20,7 @@ class GeneralProvenanceTracker:
             "labels": ["MEASURED", "CLINICALLY_ENTERED", "IMAGE-DERIVED", "MODEL-INFERRED", "DEMO_DATA", "UNKNOWN"],
             "description": "Provenance first-class - every important data object indicates its origin",
             "examples": {
-                "MEASURED": "Directly measured HR, temp, motion, GSR raw - quality, source MAX30102, MPU6050, DS18B20",
+                "MEASURED": "Directly measured HR, temp, motion, GSR raw - quality, source generic analog Pulse Sensor, MPU6050, DS18B20",
                 "CLINICALLY_ENTERED": "USER-ENTERED age, BMI, cycle, symptoms, glucose, BP - minimal collection",
                 "IMAGE_DERIVED": "Cyst size, volume, morphology from ultrasound image - quality UNKNOWN by design unless computed",
                 "MODEL_INFERRED": "Sleep regularity, circadian disruption, HRV derived, risk signals - confidence, limitations",
