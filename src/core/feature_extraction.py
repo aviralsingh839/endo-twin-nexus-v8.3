@@ -77,16 +77,31 @@ class RealtimeFeatureExtractor:
     def add_sample(self, sample: SensorSample) -> None:
         self.last_sample = sample
         # Quality check per channel
-        qualities = self.quality_control.evaluate_sample({
-            "ir": sample.ir,
-            "red": sample.red,
-            "ax_g": sample.ax_g,
-            "ay_g": sample.ay_g,
-            "az_g": sample.az_g,
-            "temp_c": sample.temp_c,
-            "gsr_raw": sample.gsr_raw,
-            "ecg_raw": sample.ecg_raw,
-        }, source=sample.source)
+        # Optical MAX301-style packets use ir/red. The V8.8 analog Pulse Sensor
+        # uses a single ADC waveform and must not be evaluated with optical
+        # thresholds (e.g. IR finger-present >=5000).
+        if sample.ppg_input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:
+            quality_input = {
+                "analog_pulse": sample.ir,
+                "ax_g": sample.ax_g,
+                "ay_g": sample.ay_g,
+                "az_g": sample.az_g,
+                "temp_c": sample.temp_c,
+                "gsr_raw": sample.gsr_raw,
+                "ecg_raw": sample.ecg_raw,
+            }
+        else:
+            quality_input = {
+                "ir": sample.ir,
+                "red": sample.red,
+                "ax_g": sample.ax_g,
+                "ay_g": sample.ay_g,
+                "az_g": sample.az_g,
+                "temp_c": sample.temp_c,
+                "gsr_raw": sample.gsr_raw,
+                "ecg_raw": sample.ecg_raw,
+            }
+        qualities = self.quality_control.evaluate_sample(quality_input, source=sample.source, timestamp_s=sample.timestamp_s)
         self._quality_history.append({k: v.quality for k, v in qualities.items()})
 
         self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red, input_type=sample.ppg_input_type)
