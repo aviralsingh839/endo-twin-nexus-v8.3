@@ -9,7 +9,6 @@ import numpy as np
 from src.config import MAX_HR_BPM, MIN_HR_BPM, PPG_FS_HZ
 from src.signal_processing.filters import DCBlocker, ExponentialSmoother
 from src.signal_processing.hrv import hrv_time_domain
-from src.signal_processing.spo2 import estimate_spo2
 from src.utils.quality import ppg_quality
 
 
@@ -113,7 +112,8 @@ class PPGProcessor:
         if self.is_analog_pulse:
             spo2, spo2_q = None, 0.0
         else:
-            spo2, spo2_q = estimate_spo2(recent_red, recent_ir)
+            # Analog single-channel pulse sensors do not provide red/IR optical data.
+            spo2, spo2_q = None, 0.0
         if recent_ir.size >= 10:
             ppg_amp = float((np.percentile(recent_ir, 95) - np.percentile(recent_ir, 5)) / max(np.median(recent_ir), 1.0))
         else:
