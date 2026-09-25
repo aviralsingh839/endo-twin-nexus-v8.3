@@ -42,7 +42,7 @@ VOCABULARY: tuple[MenstrualTerm, ...] = (
     MenstrualTerm(
         "lower_back_pain",
         "Lower back pain",
-        ("lower back pain", "back pain", "lumbar pain"),
+        ("lower back pain", "pain in lower back", "back pain", "lumbar pain"),
         "pain",
         "during_period",
         "handwritten research note",
@@ -50,7 +50,7 @@ VOCABULARY: tuple[MenstrualTerm, ...] = (
     MenstrualTerm(
         "lower_abdominal_pain",
         "Lower abdominal pain",
-        ("lower abdomen pain", "lower abdominal pain", "pelvic pain"),
+        ("lower abdomen pain", "pain in lower abdomen", "lower abdominal pain", "pelvic pain"),
         "pain",
         "during_period",
         "handwritten research note",
