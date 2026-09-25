@@ -2,7 +2,7 @@
 
 ## Wearable Pod (Nano)
 - MCU: Arduino Nano
-- Sensors: Generic Analog Pulse Sensor PPG (single-channel analog waveform) (HR, SpO2 (unavailable with analog pulse sensor), pulse amplitude), MPU6050 (ax,ay,az,gx,gy,gz, motion index), DS18B20 (skin temp), GSR (raw, tonic, phasic)
+- Sensors: Generic Analog Pulse Sensor PPG (single-channel analog waveform) (HR, SpO2, pulse amplitude), MPU6050 (ax,ay,az,gx,gy,gz, motion index), DS18B20 (skin temp), GSR (raw, tonic, phasic)
 - Sampling: 20Hz
 - Protocol: $CP2 packet, CRC XOR, fields ir, red, hr, SpO2, gsr, ax,ay,az, etc.
 - Power: LiPo + charging
@@ -16,7 +16,7 @@
 - See MEGA_HUB_BUILD.md
 
 ## Sensor Specifications
-- Generic Analog Pulse Sensor: PPG single analog pulse waveform, HR bpm, SpO2 (unavailable with analog pulse sensor) %, pulse amplitude, quality - established
+- Generic Analog Pulse Sensor: PPG single analog pulse waveform, HR bpm, SpO2 %, pulse amplitude, quality - established
 - MPU6050: accelerometer + gyroscope, motion index, activity level - established
 - DS18B20: skin temp C, room temp C, temp slope - established
 - GSR: galvanic skin response, tonic/phasic - established
