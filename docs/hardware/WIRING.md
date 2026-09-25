@@ -4,13 +4,13 @@
 
 | Device | ESP32 connection |
 |---|---|
-| Analog Pulse Sensor SIG | ADC-capable GPIO configured as `PULSE_PIN` (default GPIO34 for classic ESP32; choose an ADC GPIO on ESP32-S3) |
+| Analog Pulse Sensor SIG | ADC-capable GPIO configured as `PULSE_PIN` (current firmware default GPIO4; choose another ADC GPIO if your exact ESP32/ESP32-S3 board requires it) |
 | Analog Pulse Sensor VCC | 3.3V or the module's specified supply |
 | Analog Pulse Sensor GND | Common GND |
 | MPU6050 SDA | GPIO21 (or board-specific SDA) |
 | MPU6050 SCL | GPIO22 (or board-specific SCL) |
 | DS18B20 data | GPIO18 + 4.7k pull-up to 3.3V |
-| GSR analog | GPIO35 (or another ADC-capable GPIO) |
+| GSR analog | GPIO5 (or another ADC-capable GPIO) |
 | Status LED | GPIO2 (optional) |
 
 The analog pulse module is **not I2C**. Only the MPU6050 uses the I2C bus. Connect the pulse sensor's **SIG** line to an ADC-capable input and keep its signal within the ESP32 ADC voltage range. Check the breakout's supply requirement before connecting power.
