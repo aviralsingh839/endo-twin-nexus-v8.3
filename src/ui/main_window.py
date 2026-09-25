@@ -668,7 +668,7 @@ class MainWindow(QMainWindow):
             "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
             "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED\n"
             "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED\n"
-            "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
+            "- Hardware failure tests: disconnected/invalid analog Pulse Sensor, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
             "- Synthetic longitudinal data with 6 scenarios - IMPLEMENTED\n"
             "- Multimodal fusion with provenance - IMPLEMENTED\n"
             "- Explainability - IMPLEMENTED\n"
@@ -680,7 +680,7 @@ class MainWindow(QMainWindow):
             "- Requires ethics-approved prospective study\n"
             "- Model confidence vs data quality vs clinical validation separated\n\n"
             "Hardware:\n"
-            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
+            "- Wearable Pod: generic analog Pulse Sensor + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
             "- Mega Hub: expanded experimental sensors - PRESERVED\n"
             "- Software gracefully handles missing sensors - IMPLEMENTED\n"
         )
