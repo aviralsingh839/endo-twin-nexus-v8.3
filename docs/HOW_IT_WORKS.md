@@ -20,7 +20,7 @@ SENSOR
 ## 1. SENSOR
 
 **Wearable Pod (Nano):**
-- Generic Analog Pulse Sensor PPG (single-channel analog waveform): single analog pulse waveform, 50 Hz, pulse waveform, HR, HRV, pulse amplitude, SpO2 (unavailable with analog pulse sensor) unavailable with analog pulse sensor
+- Generic Analog Pulse Sensor PPG (single-channel analog waveform): single analog pulse waveform, 50 Hz, pulse waveform, HR, HRV, pulse amplitude, SpO2 unavailable with analog pulse sensor
 - MPU6050 IMU: ax, ay, az, gx, gy, gz, 50 Hz, motion index, activity level
 - DS18B20: skin temperature, 1 Hz
 - Optional GSR: galvanic skin response, 10 Hz
