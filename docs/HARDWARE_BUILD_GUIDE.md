@@ -46,10 +46,9 @@ Use the existing Mega firmware for ECG (AD8232), microphone, FSR, BH1750, BME280
 
 ```
 Generic Analog Pulse Sensor:
-  VIN/VCC -> compatible 3.3V supply for your breakout
+  SIG     -> PULSE_PIN (ADC-capable GPIO; choose the correct pin for your ESP32/ESP32-S3)
+  VCC     -> the module's supported supply voltage
   GND     -> GND
-  SDA     -> GPIO21
-  SCL     -> GPIO22
 
 MPU6050:
   VCC     -> compatible supply for your breakout
@@ -98,7 +97,6 @@ Install the ESP32 board package in Arduino IDE, select your exact ESP32 board, t
 `hardware/esp32/endo_twin_wearable/endo_twin_wearable.ino`
 
 Libraries:
-- SparkFun Generic Analog Pulse Sensor Pulse and Proximity Sensor Library
 - Adafruit MPU6050
 - Adafruit Unified Sensor
 - OneWire
@@ -121,7 +119,7 @@ Select Arduino Mega 2560 and use the existing:
 
 ## ESP32 BLE interface
 
-Device name: **ENDO-TWIN-ESP32**
+Device name: **ENDO-TWIN-PULSE**
 
 Service:
 `7f300001-6c12-4f70-9e6b-8e9f7b8b1001`
