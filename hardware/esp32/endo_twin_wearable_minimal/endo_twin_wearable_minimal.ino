@@ -98,20 +98,22 @@ void setup(){
 void loop(){
   static uint32_t tPulse=0, tTemp=0, tPack=0, tGsr=0;
   static float baseline=250;
+  static float filt=250;
   uint32_t now=millis();
   if(now - tPulse >= 20){ 
     tPulse=now; 
     int raw=analogRead(activePulsePin);
+    float filt = raw*0.3f + 250*0.7f; // quick low-pass
     if(raw>0 && raw<500){
-      baseline = baseline*0.995f + raw*0.005f;
-      float diff = raw - baseline;
-      int amplified = (int)(1850 + diff*6.0f);
+      baseline = baseline*0.997f + filt*0.003f;
+      float diff = filt - baseline;
+      int amplified = (int)(1850 + diff*3.0f);
       if(amplified<0) amplified=0;
       if(amplified>4095) amplified=4095;
       pulseRaw=amplified;
     } else {
       pulseRaw=raw;
-      baseline = baseline*0.995f + raw*0.005f;
+      baseline = baseline*0.997f + raw*0.005f;
     } 
   }
   if(now - tGsr >= 100){ tGsr=now; gsrRaw=analogRead(GSR_PIN); }

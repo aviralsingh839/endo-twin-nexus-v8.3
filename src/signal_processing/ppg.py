@@ -22,24 +22,32 @@ class PPGProcessor:
         self.ir_raw: Deque[float] = deque(maxlen=self.maxlen)
         self.red_raw: Deque[float] = deque(maxlen=self.maxlen)
         self.ir_filt: Deque[float] = deque(maxlen=self.maxlen)
-        self._dc = DCBlocker(r=0.97)
-        self._smooth = ExponentialSmoother(alpha=0.35)
+        # V8.4.3 tuned for calm HR: slower DC block, more smoothing for analog forearm
+        if self.is_analog_pulse:
+            self._dc = DCBlocker(r=0.995)
+            self._smooth = ExponentialSmoother(alpha=0.15)
+        else:
+            self._dc = DCBlocker(r=0.97)
+            self._smooth = ExponentialSmoother(alpha=0.35)
+        self._smooth2 = ExponentialSmoother(alpha=0.25)
         self.last_peaks: list[float] = []
         self.last_ibi_s: list[float] = []
+        self._last_hr = 72.0
 
     def add_sample(self, timestamp_s: float, ir: int, red: int = -1, input_type: str | None = None) -> None:
         # The generic analog Pulse Sensor has one waveform channel; transport maps it into ir and red=-1.
         if input_type:
             self.input_type = input_type.upper()
             self.is_analog_pulse = self.input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}
-        # Prime the DC blocker from the first sample so its initial condition
-        # does not create a synthetic step transient (which previously made the
-        # peak detector blind for the first ~20 s of every session).
         if not self.times:
             self._dc.x_prev = float(ir)
             self._dc.y_prev = 0.0
+            self._smooth.y = float(0)
+            self._smooth2.y = float(0)
         y = self._dc.update(float(ir))
         y = self._smooth.update(y)
+        if self.is_analog_pulse:
+            y = self._smooth2.update(y)
         self.times.append(float(timestamp_s))
         self.ir_raw.append(float(ir))
         self.red_raw.append(float(red))
@@ -71,12 +79,20 @@ class PPGProcessor:
         noise = np.std(y)
         if noise < 1e-6:
             return []
-        # V8.4: lower threshold for analog pulse sensor (forearm mount has lower amplitude than finger)
+        # V8.4.3: tuned for calm resting HR - higher threshold for analog to avoid noise false peaks
+        # User reports 100 bpm while calm -> previous 0.20*noise too low, caused noise peaks
         if self.is_analog_pulse:
-            threshold = max(np.median(y) + 0.20 * noise, np.percentile(y, 55))
+            # For calm, use 0.65*std and 70th percentile, requires stronger peak
+            threshold = max(np.median(y) + 0.65 * noise, np.percentile(y, 70))
+            # For resting, enforce at least 0.5s between beats (max 120 bpm resting)
+            # If last HR was low, be more strict
+            if self._last_hr < 80:
+                min_distance_s = 0.50  # max 120 bpm for calm
+            else:
+                min_distance_s = 0.40  # max 150 bpm
         else:
             threshold = max(np.median(y) + 0.45 * noise, np.percentile(y, 60))
-        min_distance_s = 60.0 / MAX_HR_BPM
+            min_distance_s = 60.0 / MAX_HR_BPM
         peaks: list[float] = []
         last_peak_t = -1e9
         for i in range(1, y.size - 1):
@@ -88,9 +104,9 @@ class PPGProcessor:
                     if peaks and y[i] > y[np.argmin(np.abs(t - peaks[-1]))]:
                         peaks[-1] = float(t[i])
                         last_peak_t = float(t[i])
-        # Fallback for analog pulse: if still no peaks but signal has variation, try lower threshold
+        # Fallback for analog pulse: only if truly no peaks, try slightly lower threshold (65th percentile)
         if not peaks and self.is_analog_pulse and y.size > 50:
-            low_thr = np.percentile(y, 52)
+            low_thr = np.percentile(y, 65)
             for i in range(1, y.size - 1):
                 if y[i] > low_thr and y[i] >= y[i-1] and y[i] > y[i+1]:
                     if t[i] - last_peak_t >= min_distance_s:
@@ -113,6 +129,17 @@ class PPGProcessor:
 
         hrv = hrv_time_domain(self.last_ibi_s)
         hr = hrv.get("mean_hr_bpm")
+        # Smooth HR for calm accuracy: exponential smoothing, avoid jumps to 100 when calm
+        if hr is not None:
+            if self._last_hr is None:
+                self._last_hr = hr
+            else:
+                # If HR jumps >20 bpm suddenly, smooth heavily (likely noise)
+                if abs(hr - self._last_hr) > 20:
+                    hr = 0.2 * hr + 0.8 * self._last_hr
+                else:
+                    hr = 0.4 * hr + 0.6 * self._last_hr
+                self._last_hr = hr
 
         # SpO2 and pulse-envelope amplitude from recent 12-second window.
         n = int(12 * self.fs_hz)
