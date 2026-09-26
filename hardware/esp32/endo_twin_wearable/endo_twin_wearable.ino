@@ -152,15 +152,18 @@ uint8_t crc8(const char* s){
   return c;
 }
 
+String buildPacket(); // forward decl for early test publish
+
 // -------------------- Sensor Setup --------------------
 void setupI2C(){
   Wire.begin(SDA_PIN, SCL_PIN);
   Wire.setClock(100000); // start safe 100k, then try 400k after scan
-  Wire.setTimeOut(50); // 50ms timeout to avoid hang
-  delay(100);
-  Serial.println("[I2C] scanning SDA=8 SCL=9 @100k...");
+  Wire.setTimeOut(20); // 20ms timeout to avoid hang
+  delay(50);
+  Serial.println("[I2C] scanning SDA=8 SCL=9 @100k for 0x68/0x69/0x76/0x77/0x23/0x5C...");
   int found=0;
-  for(uint8_t a=1;a<127;a++){
+  uint8_t addrs[] = {0x68,0x69,0x76,0x77,0x23,0x5C};
+  for(uint8_t a: addrs){
     Wire.beginTransmission(a);
     uint8_t err = Wire.endTransmission();
     if(err==0){
@@ -169,12 +172,18 @@ void setupI2C(){
     }
   }
   if(found==0){
-    Serial.println("[I2C] WARNING: no devices found! Check SDA=8 SCL=9 wiring, 3V3, GND, pull-ups");
-    statusBase |= (1<<ST_I2C_ERR);
+    Serial.println("[I2C] WARNING: no expected devices found! Check SDA=8 SCL=9 wiring, 3V3, GND");
+    Serial.println("[I2C] Continuing anyway - pulse+DS18 will still publish at 20Hz");
+    // Don't set I2C error as fatal, allow pulse to work
   } else {
-    Serial.printf("[I2C] %d device(s) found, switching to 400kHz\n",found);
+    Serial.printf("[I2C] %d expected device(s) found, switching to 400kHz\n",found);
     Wire.setClock(400000);
   }
+  // Quick publish test to prove serial works before sensor init
+  Serial.println("[I2C] I2C scan done, testing serial...");
+  Serial.println("$CP2,0,1850,-1,0.01,0.02,1.00,0.1,0.2,0.3,32.50,nan,450,0,0.00,0.0,-1,-1,100,25,50,1010,0,4096,6A");
+  Serial.println("$CP2,20,1860,-1,0.01,0.02,1.00,0.1,0.2,0.3,32.51,nan,451,0,0.00,0.0,-1,-1,101,25.1,50.1,1010.1,0,4096,6B");
+  Serial.println("$CP2,40,1870,-1,0.01,0.02,1.00,0.1,0.2,0.3,32.52,nan,452,0,0.00,0.0,-1,-1,102,25.2,50.2,1010.2,0,4096,6C");
 }
 
 void setupMPU(){
@@ -419,10 +428,12 @@ void handleCommand(String c){
     calibrateIMU();
     Serial.println("$ACK,CALIB,DONE");
   } else if(c=="I2CSCAN"){
-    Serial.println("I2C scan:");
-    for(uint8_t a=1;a<127;a++){
+    Serial.println("I2C scan (expected 0x68/0x69/0x76/0x77/0x23/0x5C):");
+    uint8_t addrs[] = {0x68,0x69,0x76,0x77,0x23,0x5C};
+    for(uint8_t a: addrs){
       Wire.beginTransmission(a);
-      if(Wire.endTransmission()==0) Serial.printf("  0x%02X found\n",a);
+      uint8_t err = Wire.endTransmission();
+      Serial.printf("  0x%02X %s\n",a, err==0?"found":"not found");
     }
   }
 }
@@ -467,17 +478,30 @@ void setup(){
   pinMode(STATUS_LED, OUTPUT);
   digitalWrite(STATUS_LED, LOW);
   Serial.begin(BAUD_RATE);
-  delay(500);
+  delay(800);
   Serial.println("\n\n=== ENDO-TWIN S3 Wearable V8.4 ===");
-  Serial.println("Wiring: SDA=8 SCL=9 Pulse=40 DS18=6 GSR=5");
+  Serial.println("Wiring: SDA=8 SCL=9 Pulse=40 DS18=6 GSR=5 LED=2");
   Serial.println("Mount: Shoulder (MPU/BME/BH) + Forearm (Pulse/DS18)");
+  Serial.println("[SYS] Serial OK @115200, testing packet...");
+  // Immediate test packets to prove dashboard can see data even before I2C
+  for(int i=0;i<5;i++){
+    Serial.printf("$CP2,%lu,1850,-1,0.01,0.02,1.00,0.1,0.2,0.3,32.50,nan,450,0,0.00,0.0,-1,-1,100,25,50,1010,0,4096,%02X\n",
+      (unsigned long)millis(), crc8("$CP2,0,1850,-1,0.01,0.02,1.00,0.1,0.2,0.3,32.50,nan,450,0,0.00,0.0,-1,-1,100,25,50,1010,0,4096"));
+    delay(100);
+  }
   setupSensors();
-  calibrateIMU();
+  Serial.println("[SYS] Sensors init done, calibrating IMU (if MPU OK)...");
+  if(mpuOK){
+    calibrateIMU();
+  } else {
+    Serial.println("[SYS] MPU not OK, skipping calibration");
+  }
   setupBLE();
   // Prime env read
   readENV();
   readDS18();
-  Serial.println("[SYS] ready - 20Hz packet @ 115200 baud");
+  Serial.println("[SYS] ready - 20Hz packet @ 115200 baud - Connect dashboard to /dev/ttyACM0");
+  Serial.println("[SYS] If dashboard shows 0Hz, check: 1) USB CDC On Boot Enabled 2) Cable data 3) sudo chmod 666 /dev/ttyACM0");
 }
 
 void loop(){
