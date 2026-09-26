@@ -16,7 +16,7 @@
 #include <DallasTemperature.h>
 
 static constexpr uint8_t PULSE_PIN_PRIMARY = 40;
-static constexpr uint8_t PULSE_PINS_ALT[] = {4, 5, 1, 2, 3, 10, 8, 9, 6};
+static constexpr uint8_t PULSE_PINS_ALT[] = {44,4, 5, 1, 2, 3, 10, 8, 9, 6};
 static constexpr uint8_t ONE_WIRE_BUS = 6;
 static constexpr uint8_t GSR_PIN = 5;
 
@@ -59,10 +59,10 @@ void setup(){
     delay(100);
   }
 
-  // Auto-select pin with most variation (likely pulse)
+  // Auto-select pin with most variation (likely pulse) - includes 44 which you joined to 40
   int bestVar=0;
   uint8_t bestPin=PULSE_PIN_PRIMARY;
-  for(uint8_t pin: {40,4,5,1,2,3,10}){
+  for(uint8_t pin: {40,44,4,5,1,2,3,10}){
     int minV=4095, maxV=0;
     for(int k=0;k<50;k++){
       int v=analogRead(pin);

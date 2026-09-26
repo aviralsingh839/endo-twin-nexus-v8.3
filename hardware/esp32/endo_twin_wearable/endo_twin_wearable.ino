@@ -238,7 +238,8 @@ void setupBH1750(){
 
 void setupPulse(){
   pinMode(PULSE_PIN, INPUT);
-  // Also setup alt pins for auto-detect
+  // Also setup alt pins for auto-detect (including 44 which you joined to 40)
+  pinMode(44, INPUT);
   pinMode(4, INPUT);
   pinMode(5, INPUT);
   pinMode(1, INPUT);
@@ -246,6 +247,7 @@ void setupPulse(){
   analogReadResolution(12);
   #if defined(ADC_11db)
     analogSetPinAttenuation(PULSE_PIN, ADC_11db);
+    analogSetPinAttenuation(44, ADC_11db);
     analogSetPinAttenuation(4, ADC_11db);
     analogSetPinAttenuation(5, ADC_11db);
     analogSetPinAttenuation(1, ADC_11db);
@@ -257,7 +259,7 @@ void setupPulse(){
   delay(100);
   int bestVar=0;
   uint8_t bestPin=PULSE_PIN;
-  uint8_t candidates[] = {40,4,1,2,3,10};
+  uint8_t candidates[] = {40,44,4,1,2,3,10,5};
   Serial.println("[PULSE] scanning ADC pins for variation...");
   for(uint8_t pin: candidates){
     int minV=4095, maxV=0;
