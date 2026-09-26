@@ -434,8 +434,13 @@ class ServerCB: public BLEServerCallbacks{
 
 class CmdCB: public BLECharacteristicCallbacks{
   void onWrite(BLECharacteristic* ch) override{
-    std::string v = ch->getValue();
-    if(!v.empty()) handleCommand(String(v.c_str()));
+    // Compatible with both old (std::string) and new (Arduino String) BLE API
+    auto v = ch->getValue();
+    if(v.length() > 0){
+      // v.c_str() works for both String and std::string
+      String cmd = String(v.c_str());
+      handleCommand(cmd);
+    }
   }
 };
 
