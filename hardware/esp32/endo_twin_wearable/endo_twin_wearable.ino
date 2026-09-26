@@ -142,6 +142,7 @@ float bmeTempC = NAN;       // BME280 room temp (shoulder)
 float bmeHum = NAN;         // %
 float bmePress = NAN;       // hPa
 float lux = NAN;            // BH1750
+uint8_t activePulsePin = 40; // will auto-select if 40 is flat
 
 uint32_t tPulse=0, tImu=0, tGsr=0, tTemp=0, tEnv=0, tPack=0;
 
@@ -237,11 +238,47 @@ void setupBH1750(){
 
 void setupPulse(){
   pinMode(PULSE_PIN, INPUT);
+  // Also setup alt pins for auto-detect
+  pinMode(4, INPUT);
+  pinMode(5, INPUT);
+  pinMode(1, INPUT);
+  pinMode(2, INPUT);
   analogReadResolution(12);
   #if defined(ADC_11db)
     analogSetPinAttenuation(PULSE_PIN, ADC_11db);
+    analogSetPinAttenuation(4, ADC_11db);
+    analogSetPinAttenuation(5, ADC_11db);
+    analogSetPinAttenuation(1, ADC_11db);
+    analogSetPinAttenuation(2, ADC_11db);
   #endif
   statusBase |= (1<<ST_PPG_ANALOG); // mark analog pulse active
+
+  // Auto-detect best pulse pin (since GPIO40 is PSRAM on some S3 Feather boards and reads 0)
+  delay(100);
+  int bestVar=0;
+  uint8_t bestPin=PULSE_PIN;
+  uint8_t candidates[] = {40,4,1,2,3,10};
+  Serial.println("[PULSE] scanning ADC pins for variation...");
+  for(uint8_t pin: candidates){
+    int minV=4095, maxV=0;
+    for(int k=0;k<40;k++){
+      int v=analogRead(pin);
+      if(v<minV) minV=v;
+      if(v>maxV) maxV=v;
+      delay(5);
+    }
+    int var = maxV-minV;
+    Serial.printf("  GPIO%d var %d (min %d max %d)\n", pin, var, minV, maxV);
+    if(var>bestVar){
+      bestVar=var;
+      bestPin=pin;
+    }
+  }
+  activePulsePin=bestPin;
+  Serial.printf("[PULSE] selected GPIO%d var %d\n", activePulsePin, bestVar);
+  if(bestVar<5){
+    Serial.println("[PULSE] WARNING: all pins flat, check VCC=3V3 GND S wiring, sensor needs light pressure");
+  }
 }
 
 void setupDS18(){
@@ -302,7 +339,7 @@ void calibrateIMU(){
 
 // -------------------- Readers --------------------
 void readPulse(){
-  pulseRaw = analogRead(PULSE_PIN);
+  pulseRaw = analogRead(activePulsePin);
 }
 
 void readIMU(){
