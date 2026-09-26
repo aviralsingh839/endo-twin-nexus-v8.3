@@ -38,11 +38,14 @@ class IMUProcessor:
         acc_dyn = vmw - 1.0
         jerk = np.diff(vmw, prepend=vmw[0])
         motion_index = rolling_rms(acc_dyn) + 0.3 * rolling_rms(jerk) + 0.002 * rolling_rms(gyw)
-        # Activity level 0-100. 0.02g quiet, 0.4g active movement.
-        activity_level = clamp((motion_index - 0.02) / 0.40 * 100.0, 0.0, 100.0)
+        # V8.4: shoulder mount is more stable, lower threshold for activity
+        # 0.01g quiet, 0.25g active
+        activity_level = clamp((motion_index - 0.01) / 0.25 * 100.0, 0.0, 100.0)
         low_activity_risk = clamp(100.0 - activity_level, 0.0, 100.0)
         return {
             "motion_index": float(motion_index),
             "activity_level": float(activity_level),
             "low_activity_risk": float(low_activity_risk),
+            "acc_mag": float(np.mean(vmw)),
+            "gyro_mag": float(np.mean(gyw)),
         }

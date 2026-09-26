@@ -316,8 +316,8 @@ void readIMU(){
   float ngx = g.gyro.x*57.29578f - gxb;
   float ngy = g.gyro.y*57.29578f - gyb;
   float ngz = g.gyro.z*57.29578f - gzb;
-  // Simple exponential smoothing for dashboard smoothness
-  const float alpha = 0.35f;
+  // V8.4.1: more responsive for activity detection (0.7), still smooth for display
+  const float alpha = 0.70f;
   ax = ax* (1-alpha) + nax*alpha;
   ay = ay* (1-alpha) + nay*alpha;
   az = az* (1-alpha) + naz*alpha;

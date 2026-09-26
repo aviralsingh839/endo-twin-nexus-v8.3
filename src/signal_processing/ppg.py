@@ -63,8 +63,7 @@ class PPGProcessor:
         y = y[mask]
         if y.size < 20:
             return []
-        # Skip the warm-up segment (first 2 s) as a safety net against any
-        # residual filter transient contaminating the median/percentile scale.
+        # Skip warm-up
         warmup = int(2 * self.fs_hz)
         if y.size > warmup + 10:
             t, y = t[warmup:], y[warmup:]
@@ -72,20 +71,30 @@ class PPGProcessor:
         noise = np.std(y)
         if noise < 1e-6:
             return []
-        threshold = max(np.median(y) + 0.45 * noise, np.percentile(y, 60))
+        # V8.4: lower threshold for analog pulse sensor (forearm mount has lower amplitude than finger)
+        if self.is_analog_pulse:
+            threshold = max(np.median(y) + 0.20 * noise, np.percentile(y, 55))
+        else:
+            threshold = max(np.median(y) + 0.45 * noise, np.percentile(y, 60))
         min_distance_s = 60.0 / MAX_HR_BPM
         peaks: list[float] = []
         last_peak_t = -1e9
-        # Local maximum detection with refractory period.
         for i in range(1, y.size - 1):
             if y[i] > threshold and y[i] >= y[i - 1] and y[i] > y[i + 1]:
                 if t[i] - last_peak_t >= min_distance_s:
                     peaks.append(float(t[i]))
                     last_peak_t = float(t[i])
                 else:
-                    # If the new peak is higher within refractory period, replace previous.
                     if peaks and y[i] > y[np.argmin(np.abs(t - peaks[-1]))]:
                         peaks[-1] = float(t[i])
+                        last_peak_t = float(t[i])
+        # Fallback for analog pulse: if still no peaks but signal has variation, try lower threshold
+        if not peaks and self.is_analog_pulse and y.size > 50:
+            low_thr = np.percentile(y, 52)
+            for i in range(1, y.size - 1):
+                if y[i] > low_thr and y[i] >= y[i-1] and y[i] > y[i+1]:
+                    if t[i] - last_peak_t >= min_distance_s:
+                        peaks.append(float(t[i]))
                         last_peak_t = float(t[i])
         return peaks
 
