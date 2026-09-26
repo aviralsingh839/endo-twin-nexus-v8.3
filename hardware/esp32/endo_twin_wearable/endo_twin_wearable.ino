@@ -155,56 +155,75 @@ uint8_t crc8(const char* s){
 // -------------------- Sensor Setup --------------------
 void setupI2C(){
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(400000); // fast mode
+  Wire.setClock(100000); // start safe 100k, then try 400k after scan
+  Wire.setTimeOut(50); // 50ms timeout to avoid hang
   delay(100);
-  // Scan quickly for debug
-  // Serial.println("I2C scan...");
-  // for(uint8_t a=1;a<127;a++){ Wire.beginTransmission(a); if(Wire.endTransmission()==0) { Serial.printf("I2C 0x%02X found\n",a);} }
+  Serial.println("[I2C] scanning SDA=8 SCL=9 @100k...");
+  int found=0;
+  for(uint8_t a=1;a<127;a++){
+    Wire.beginTransmission(a);
+    uint8_t err = Wire.endTransmission();
+    if(err==0){
+      Serial.printf("  I2C 0x%02X found\n",a);
+      found++;
+    }
+  }
+  if(found==0){
+    Serial.println("[I2C] WARNING: no devices found! Check SDA=8 SCL=9 wiring, 3V3, GND, pull-ups");
+    statusBase |= (1<<ST_I2C_ERR);
+  } else {
+    Serial.printf("[I2C] %d device(s) found, switching to 400kHz\n",found);
+    Wire.setClock(400000);
+  }
 }
 
 void setupMPU(){
-  if(mpu.begin(0x68, &Wire)){
-    mpuOK = true;
-    mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
-    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-  } else if(mpu.begin(0x69, &Wire)){
-    mpuOK = true;
-    mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
-    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-  } else {
-    statusBase |= (1<<ST_MPU_ERR);
-    Serial.println("[MPU] not found at 0x68/0x69");
+  // Try 0x68 then 0x69 with small delay, don't block forever
+  for(int attempt=0; attempt<2; attempt++){
+    uint8_t addr = (attempt==0)?0x68:0x69;
+    if(mpu.begin(addr, &Wire, 0)){
+      mpuOK = true;
+      mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
+      mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+      mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+      Serial.printf("[MPU] OK at 0x%02X (MPU6050/2060 compatible)\n",addr);
+      return;
+    }
+    delay(50);
   }
+  statusBase |= (1<<ST_MPU_ERR);
+  Serial.println("[MPU] not found at 0x68/0x69 - check wiring SDA=8 SCL=9, VCC=3V3, AD0=GND for 0x68");
 }
 
 void setupBME280(){
-  // Try 0x76 then 0x77
-  bool ok = bme.begin(0x76, &Wire);
-  if(!ok) ok = bme.begin(0x77, &Wire);
-  if(ok){
-    bmeOK = true;
-    // Forced mode config handled by library default; set sampling
-    // Normal mode will be used via read
-    Serial.println("[BME280] OK");
-  } else {
-    statusBase |= (1<<ST_BME_ERR);
-    Serial.println("[BME280] not found at 0x76/0x77");
+  // Try 0x76 then 0x77, with timeout
+  for(int attempt=0; attempt<2; attempt++){
+    uint8_t addr = (attempt==0)?0x76:0x77;
+    if(bme.begin(addr, &Wire)){
+      bmeOK = true;
+      Serial.printf("[BME280] OK at 0x%02X\n",addr);
+      return;
+    }
+    delay(30);
   }
+  statusBase |= (1<<ST_BME_ERR);
+  Serial.println("[BME280] not found at 0x76/0x77 - check wiring, 3V3");
 }
 
 void setupBH1750(){
   if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire)){
     bh1750OK = true;
     Serial.println("[BH1750] OK at 0x23");
-  } else if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire)){
+    return;
+  }
+  delay(30);
+  if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire)){
     bh1750OK = true;
     Serial.println("[BH1750] OK at 0x5C");
-  } else {
-    statusBase |= (1<<ST_BH1750_ERR);
-    Serial.println("[BH1750] not found");
+    return;
   }
+  statusBase |= (1<<ST_BH1750_ERR);
+  Serial.println("[BH1750] not found at 0x23/0x5C - check wiring, lens not covered");
 }
 
 void setupPulse(){

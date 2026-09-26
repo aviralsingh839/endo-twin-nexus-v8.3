@@ -554,6 +554,23 @@ class MainWindow(QMainWindow):
         stats_row.addWidget(self.env_panel, 2)
         root.addLayout(stats_row)
 
+        # Debug console for serial troubleshooting
+        debug_box = QGroupBox("Serial Debug - V8.4 Troubleshooting")
+        dbg_layout = QVBoxLayout(debug_box)
+        dbg_row = QHBoxLayout()
+        self.debug_text = QTextEdit()
+        self.debug_text.setReadOnly(True)
+        self.debug_text.setMaximumHeight(90)
+        self.debug_text.setPlaceholderText("Serial raw log / errors appear here... Click Demo V8.4 to test UI without hardware. If Rate=0, check port, permissions, firmware.")
+        self.debug_text.setStyleSheet("font-family: monospace; font-size: 8.5pt;")
+        dbg_layout.addWidget(self.debug_text)
+        hint = QLabel("No data? 1) ls /dev/ttyACM* /dev/ttyUSB*  2) sudo chmod 666 /dev/ttyACM0  3) Check ESP32-S3 flashed V8.4  4) Try Demo V8.4 button  5) screen /dev/ttyACM0 115200 to see $CP2 packets")
+        hint.setObjectName("SmallMuted")
+        hint.setStyleSheet("font-size: 8pt; color: #fbbf24;")
+        hint.setWordWrap(True)
+        dbg_layout.addWidget(hint)
+        root.addWidget(debug_box)
+
         # Vital cards (live) - 2 rows
         key_box = QGroupBox("Key Vitals - Live (Smooth)")
         vg = QGridLayout(key_box)
@@ -986,6 +1003,13 @@ class MainWindow(QMainWindow):
             # Stop existing
             if self.arduino_reader:
                 self.arduino_reader.stop()
+            # Reset stats
+            self.packet_count = 0
+            self.crc_errors = 0
+            self._rate_window.clear()
+            self.last_packet_time = time.time()
+            if hasattr(self, 'debug_text'):
+                self.debug_text.append(f"[{time.strftime('%H:%M:%S')}] Opening {p} @115200 SDA8 SCL9 Pulse40 DS18-6...")
             self.arduino_reader = ArduinoReader(port=p, baud=115200)
             self.arduino_reader.sample_received.connect(self._on_sample_received)
             self.arduino_reader.error_received.connect(self._on_error)
@@ -993,10 +1017,15 @@ class MainWindow(QMainWindow):
             self.arduino_reader.start()
             self.mode_label.setText(f"Mode: LIVE SERIAL {p} - SDA8 SCL9 Pulse40 DS18-6")
             self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
-            self.status_label.setText(f"Connected to {p} | V8.4 Shoulder+Forearm | Smooth 20Hz")
+            self.status_label.setText(f"Connected to {p} | V8.4 Shoulder+Forearm | Smooth 20Hz | If no data, check firmware + permissions")
+            if hasattr(self, 'debug_text'):
+                self.debug_text.append(f"[{time.strftime('%H:%M:%S')}] Connected, waiting for $CP2 packets... Try Demo V8.4 if hardware not ready.")
         except Exception as e:
             self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
             self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+            if hasattr(self, 'debug_text'):
+                self.debug_text.append(f"[{time.strftime('%H:%M:%S')}] SERIAL FAILED {e}")
+            self.status_label.setText(f"Serial failed {e} | Try: ls /dev/ttyACM* && sudo chmod 666 {p}")
 
     def connect_network(self, hostport: str):
         if not hostport:
@@ -1020,12 +1049,19 @@ class MainWindow(QMainWindow):
     def start_demo(self):
         if self.demo_stream:
             self.demo_stream.stop()
+        if hasattr(self, 'debug_text'):
+            self.debug_text.append(f"[{time.strftime('%H:%M:%S')}] Starting DEMO V8.4 Shoulder+Forearm 50Hz smooth...")
         self.demo_stream = DemoSensorStream(fs_hz=50.0)
         self.demo_stream.sample_received.connect(self._on_sample_received)
         self.demo_stream.state_changed.connect(self._on_state_changed)
         self.demo_stream.start()
         self.mode_label.setText("Mode: DEMO V8.4 Shoulder+Forearm - 50Hz smooth - clearly labelled")
         self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
+        self.status_label.setText("DEMO mode: synthetic data 50Hz, tests UI without hardware")
+        # Reset stats for demo
+        self.packet_count = 0
+        self._rate_window.clear()
+        self.last_packet_time = time.time()
 
     def stop_stream(self):
         if self.arduino_reader:
@@ -1083,12 +1119,25 @@ class MainWindow(QMainWindow):
     def _on_error(self, msg: str):
         if "crc" in msg.lower() or "mismatch" in msg.lower():
             self.crc_errors += 1
-        # print for debug
-        # print(f"[ERR] {msg}")
+        if hasattr(self, 'debug_text'):
+            # Limit log length
+            if self.debug_text.document().blockCount() > 200:
+                self.debug_text.clear()
+            self.debug_text.append(f"[ERR {time.strftime('%H:%M:%S')}] {msg}")
+            if "crc" in msg.lower():
+                self.debug_text.append("  -> CRC error: check baud 115200, wiring, or flash V8.4 firmware")
 
     def _on_state_changed(self, state: str):
-        # print(f"[STATE] {state}")
-        pass
+        if hasattr(self, 'debug_text'):
+            self.debug_text.append(f"[STATE {time.strftime('%H:%M:%S')}] {state}")
+        if "connected" in state:
+            self.status_label.setText(f"{state} | V8.4 Shoulder+Forearm | Waiting for $CP2...")
+        elif "reconnecting" in state:
+            self.status_label.setText(f"Reconnecting {self.port_combo.currentText()}... Check USB cable / permissions / dmesg")
+            if hasattr(self, 'debug_text'):
+                self.debug_text.append("  -> No data >6s, auto-reconnecting. Check: ls /dev/ttyACM* ; dmesg | tail")
+        elif "stopped" in state:
+            pass
 
     def _refresh_smooth_plots(self):
         # Called at 20 fps
