@@ -80,24 +80,51 @@ uint32_t tPulse=0, tImu=0, tGsr=0, tTemp=0, tEnv=0, tPack=0;
 uint8_t crc8(const char* s){ uint8_t c=0; while(*s) c^=(uint8_t)(*s++); return c; }
 String buildPacket();
 
+void i2cBusRecovery(){
+  // Toggle SCL 9 times if bus stuck (SDA=8 SCL=9)
+  pinMode(SCL_PIN, OUTPUT);
+  pinMode(SDA_PIN, OUTPUT);
+  for(int i=0;i<9;i++){
+    digitalWrite(SCL_PIN, LOW); delayMicroseconds(10);
+    digitalWrite(SCL_PIN, HIGH); delayMicroseconds(10);
+  }
+  pinMode(SDA_PIN, INPUT_PULLUP);
+  pinMode(SCL_PIN, INPUT_PULLUP);
+  delay(10);
+}
+
 void setupI2C(){
+  i2cBusRecovery();
   Wire.begin(SDA_PIN, SCL_PIN);
   Wire.setClock(100000);
-  Wire.setTimeOut(20);
-  delay(50);
-  Serial.println("[I2C] scanning SDA=8 SCL=9 for 0x68/0x69/0x76/0x77/0x23/0x5C...");
+  Wire.setTimeOut(50);
+  delay(100);
+  Serial.println("[I2C] scanning SDA=8 SCL=9 full range 0x03-0x77...");
   int found=0;
-  uint8_t addrs[] = {0x68,0x69,0x76,0x77,0x23,0x5C};
-  for(uint8_t a: addrs){
+  int foundExpected=0;
+  for(uint8_t a=0x03;a<=0x77;a++){
     Wire.beginTransmission(a);
     uint8_t err = Wire.endTransmission();
-    if(err==0){ Serial.printf("  I2C 0x%02X found\n",a); found++; }
+    if(err==0){
+      Serial.printf("  I2C 0x%02X FOUND - ",a);
+      if(a==0x68||a==0x69){ Serial.println("MPU6050/2060"); foundExpected++; }
+      else if(a==0x76||a==0x77){ Serial.println("BME280"); foundExpected++; }
+      else if(a==0x23||a==0x5C){ Serial.println("BH1750"); foundExpected++; }
+      else Serial.println("unknown");
+      found++;
+    }
+    delay(2);
   }
   if(found==0){
-    Serial.println("[I2C] WARNING: no expected devices, check SDA=8 SCL=9 VCC=3V3 GND");
+    Serial.println("[I2C] WARNING: NO I2C DEVICES AT ALL!");
+    Serial.println("[I2C] Check: SDA=8 SCL=9 wired to ALL modules? VCC=3V3 GND common?");
+    Serial.println("[I2C] Check: modules have pull-ups? If not, add 4.7k SDA->3V3 SCL->3V3");
+    Serial.println("[I2C] Try: disconnect all, connect ONE module (MPU) alone, rescan");
     Serial.println("[I2C] Continuing - pulse+DS18 will still work at 20Hz");
+  } else if(foundExpected==0){
+    Serial.printf("[I2C] %d device(s) found but NOT expected 0x68/69/76/77/23/5C - check wiring\n",found);
   } else {
-    Serial.printf("[I2C] %d device(s) found, switching to 400kHz\n",found);
+    Serial.printf("[I2C] %d device(s) found, %d expected - OK, switching to 400kHz\n",found,foundExpected);
     Wire.setClock(400000);
   }
   Serial.println("[I2C] testing serial with 3 dummy $CP2...");
@@ -107,50 +134,69 @@ void setupI2C(){
 }
 
 void setupMPU(){
-  for(int attempt=0; attempt<2; attempt++){
-    uint8_t addr = (attempt==0)?0x68:0x69;
+  Wire.setClock(100000);
+  for(int attempt=0; attempt<3; attempt++){
+    uint8_t addr = (attempt%2==0)?0x68:0x69;
+    Serial.printf("[MPU] trying 0x%02X attempt %d...\n",addr,attempt+1);
     if(mpu.begin(addr, &Wire, 0)){
       mpuOK = true;
       mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
       mpu.setGyroRange(MPU6050_RANGE_500_DEG);
       mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
       Serial.printf("[MPU] OK at 0x%02X (MPU6050/2060 compatible)\n",addr);
+      Wire.setClock(400000);
       return;
     }
-    delay(50);
+    delay(100);
+    i2cBusRecovery();
+    Wire.begin(SDA_PIN, SCL_PIN);
+    Wire.setClock(100000);
   }
   statusBase |= (1<<ST_MPU_ERR);
-  Serial.println("[MPU] not found at 0x68/0x69 - check SDA=8 SCL=9 VCC=3V3");
+  Serial.println("[MPU] FAILED at 0x68/0x69 after 3 tries");
+  Serial.println("[MPU] Check: SDA=8 SCL=9 VCC=3V3 GND, module AD0 to GND for 0x68");
+  Wire.setClock(400000);
 }
 
 void setupBME280(){
-  for(int attempt=0; attempt<2; attempt++){
-    uint8_t addr = (attempt==0)?0x76:0x77;
+  Wire.setClock(100000);
+  for(int attempt=0; attempt<3; attempt++){
+    uint8_t addr = (attempt%2==0)?0x76:0x77;
+    Serial.printf("[BME280] trying 0x%02X attempt %d...\n",addr,attempt+1);
     if(bme.begin(addr, &Wire)){
       bmeOK = true;
       Serial.printf("[BME280] OK at 0x%02X\n",addr);
+      Wire.setClock(400000);
       return;
     }
-    delay(30);
+    delay(100);
   }
   statusBase |= (1<<ST_BME_ERR);
-  Serial.println("[BME280] not found at 0x76/0x77");
+  Serial.println("[BME280] FAILED at 0x76/0x77 - check wiring, try 0x76 only");
+  Wire.setClock(400000);
 }
 
 void setupBH1750(){
+  Wire.setClock(100000);
+  delay(200); // BH1750 needs power-on time
+  Serial.println("[BH1750] trying 0x23...");
   if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire)){
     bh1750OK = true;
     Serial.println("[BH1750] OK at 0x23");
+    Wire.setClock(400000);
     return;
   }
-  delay(30);
+  delay(100);
+  Serial.println("[BH1750] trying 0x5C...");
   if(bh1750.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire)){
     bh1750OK = true;
     Serial.println("[BH1750] OK at 0x5C");
+    Wire.setClock(400000);
     return;
   }
   statusBase |= (1<<ST_BH1750_ERR);
-  Serial.println("[BH1750] not found at 0x23/0x5C");
+  Serial.println("[BH1750] FAILED at 0x23/0x5C - check VCC=3V3");
+  Wire.setClock(400000);
 }
 
 void setupPulse(){
@@ -353,9 +399,11 @@ void handleCommand(String c){
   else if(c=="STATUS") Serial.printf("$STAT,MPU:%d BME:%d BH:%d DS18:%d PULSE:%d(GPIO%d) GSR:%d ST:0x%04X\n", mpuOK,bmeOK,bh1750OK,ds18OK,pulseRaw,activePulsePin,gsrRaw,currentStatus());
   else if(c=="CALIB"){ calibrateIMU(); Serial.println("$ACK,CALIB,DONE"); }
   else if(c=="I2CSCAN"){
-    Serial.println("I2C scan 0x68/69/76/77/23/5C:");
-    uint8_t addrs[]={0x68,0x69,0x76,0x77,0x23,0x5C};
-    for(uint8_t a: addrs){ Wire.beginTransmission(a); uint8_t e=Wire.endTransmission(); Serial.printf("  0x%02X %s\n",a,e==0?"found":"not found"); }
+    Serial.println("I2C full scan 0x03-0x77 SDA=8 SCL=9:");
+    int f=0;
+    for(uint8_t a=0x03;a<=0x77;a++){ Wire.beginTransmission(a); uint8_t e=Wire.endTransmission(); if(e==0){ Serial.printf("  0x%02X FOUND - ",a); if(a==0x68||a==0x69) Serial.println("MPU"); else if(a==0x76||a==0x77) Serial.println("BME280"); else if(a==0x23||a==0x5C) Serial.println("BH1750"); else Serial.println("unknown"); f++; } delay(2); }
+    Serial.printf("Scan done: %d device(s)\n",f);
+    if(f==0) Serial.println("NO DEVICES! Check SDA=8 SCL=9 VCC=3V3 GND, add 4.7k pull-ups, test one module at a time");
   }
 }
 
@@ -395,7 +443,7 @@ void setup(){
   digitalWrite(STATUS_LED, LOW);
   Serial.begin(BAUD_RATE);
   delay(800);
-  Serial.println("\n\n=== ENDO-TWIN S3 V8.4.2 FINAL ===");
+  Serial.println("\n\n=== ENDO-TWIN S3 V8.4.3 FINAL - I2C ROBUST ===");
   Serial.println("Wiring: SDA=8 SCL=9 VCC=3V3 GND Pulse S=40 joined to 4, DS18 DATA=6 GSR=5 LED=2");
   Serial.println("Shoulder: MPU6050/2060+BME280+BH1750, Forearm: Pulse+DS18");
   Serial.println("[SYS] Serial OK @115200, early test packets...");
@@ -406,11 +454,12 @@ void setup(){
   }
   setupSensors();
   Serial.println("[SYS] Sensors init done, calibrating IMU if MPU OK...");
-  if(mpuOK) calibrateIMU(); else Serial.println("[SYS] MPU not OK, skip calib");
+  if(mpuOK) calibrateIMU(); else Serial.println("[SYS] MPU not OK, skip calib - but pulse+DS18 still work");
   setupBLE();
   readENV();
   readDS18();
   Serial.println("[SYS] ready - 20Hz $CP2 @115200 - Dashboard: /dev/ttyACM0, Demo V8.4 button for test");
+  Serial.println("[SYS] Type STATUS or I2CSCAN in serial monitor for diagnostics");
 }
 
 void loop(){
