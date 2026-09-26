@@ -248,7 +248,21 @@ void calibrateIMU(){
   }
 }
 
-void readPulse(){ pulseRaw = analogRead(activePulsePin); }
+void readPulse(){ 
+  int raw = analogRead(activePulsePin);
+  static float baseline = 250;
+  if(raw > 0 && raw < 500){
+    baseline = baseline*0.995f + raw*0.005f;
+    float diff = raw - baseline;
+    int amplified = (int)(1850 + diff*6.0f);
+    if(amplified<0) amplified=0;
+    if(amplified>4095) amplified=4095;
+    pulseRaw = amplified;
+  } else {
+    pulseRaw = raw;
+    baseline = baseline*0.995f + raw*0.005f;
+  }
+}
 
 void readIMU(){
   if(!mpuOK) return;
