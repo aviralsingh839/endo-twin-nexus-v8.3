@@ -24,10 +24,12 @@
 
 static constexpr uint8_t SDA_PIN = 8;
 static constexpr uint8_t SCL_PIN = 9;
-static constexpr uint8_t PULSE_PIN = 40;
+static constexpr uint8_t PULSE_PIN_PHYSICAL = 40; // your wire at 40
+static constexpr uint8_t PULSE_PIN_SAFE = 4;      // joined to 40 with wire, PSRAM-safe
 static constexpr uint8_t ONE_WIRE_BUS = 6;
 static constexpr uint8_t GSR_PIN = 5;
 static constexpr uint8_t STATUS_LED = 2;
+static constexpr uint8_t PULSE_PIN = PULSE_PIN_SAFE; // default safe pin to avoid PSRAM crash
 
 static constexpr uint32_t BAUD_RATE = 115200;
 static constexpr uint32_t PULSE_PERIOD_MS = 20;
@@ -200,9 +202,14 @@ void setupBH1750(){
 }
 
 void setupPulse(){
-  pinMode(PULSE_PIN, INPUT);
-  pinMode(44, INPUT);
-  pinMode(4, INPUT);
+  // V8.4.5 PSRAM-safe: Feather S3 2MB PSRAM uses GPIO35-48 for Octal PSRAM.
+  // Using GPIO40 as INPUT crashes PSRAM and causes connect/disconnect while wearing.
+  // FIX: Don't touch GPIO40/44 at all when PSRAM present. Use GPIO4 (your wire 40->4).
+  bool hasPSRAM = (ESP.getPsramSize() > 0);
+  Serial.printf("[PULSE] PSRAM %d bytes %s - using PSRAM-safe mode\n", ESP.getPsramSize(), hasPSRAM?"(skip GPIO40/44)":"");
+  
+  // Only configure safe ADC pins, never touch 40/44 if PSRAM present
+  pinMode(PULSE_PIN_SAFE, INPUT);
   pinMode(5, INPUT);
   pinMode(1, INPUT);
   pinMode(2, INPUT);
@@ -210,34 +217,42 @@ void setupPulse(){
   pinMode(10, INPUT);
   analogReadResolution(12);
   #if defined(ADC_11db)
-    analogSetPinAttenuation(PULSE_PIN, ADC_11db);
-    analogSetPinAttenuation(44, ADC_11db);
-    analogSetPinAttenuation(4, ADC_11db);
+    analogSetPinAttenuation(PULSE_PIN_SAFE, ADC_11db);
     analogSetPinAttenuation(5, ADC_11db);
     analogSetPinAttenuation(1, ADC_11db);
     analogSetPinAttenuation(2, ADC_11db);
   #endif
   statusBase |= (1<<ST_PPG_ANALOG);
   delay(100);
+  
+  // Auto-select best variation among PSRAM-safe pins only
   int bestVar=0;
-  uint8_t bestPin=PULSE_PIN;
-  uint8_t candidates[] = {40,44,4,1,2,3,10,5};
-  Serial.println("[PULSE] scanning ADC pins for variation (you joined 40->4)...");
-  for(uint8_t pin: candidates){
-    int minV=4095, maxV=0;
-    for(int k=0;k<40;k++){
-      int v=analogRead(pin);
-      if(v<minV) minV=v;
-      if(v>maxV) maxV=v;
-      delay(5);
+  uint8_t bestPin=PULSE_PIN_SAFE;
+  uint8_t candidates[] = {4,1,2,3,5,10}; // PSRAM-safe only, no 40/44
+  if(!hasPSRAM){
+    // If PSRAM disabled, we can also try 40
+    uint8_t with40[] = {40,44,4,1,2,3,10,5};
+    Serial.println("[PULSE] scanning ADC pins for variation (PSRAM disabled, can use 40)...");
+    for(uint8_t pin: with40){
+      int minV=4095, maxV=0;
+      for(int k=0;k<40;k++){ int v=analogRead(pin); if(v<minV) minV=v; if(v>maxV) maxV=v; delay(5); }
+      int var = maxV-minV;
+      Serial.printf("  GPIO%d var %d (min %d max %d)\n", pin, var, minV, maxV);
+      if(var>bestVar){ bestVar=var; bestPin=pin; }
     }
-    int var = maxV-minV;
-    Serial.printf("  GPIO%d var %d (min %d max %d)\n", pin, var, minV, maxV);
-    if(var>bestVar){ bestVar=var; bestPin=pin; }
+  } else {
+    Serial.println("[PULSE] scanning PSRAM-safe ADC pins (wire 40->4 joined, reading GPIO4)...");
+    for(uint8_t pin: candidates){
+      int minV=4095, maxV=0;
+      for(int k=0;k<40;k++){ int v=analogRead(pin); if(v<minV) minV=v; if(v>maxV) maxV=v; delay(5); }
+      int var = maxV-minV;
+      Serial.printf("  GPIO%d var %d (min %d max %d)\n", pin, var, minV, maxV);
+      if(var>bestVar){ bestVar=var; bestPin=pin; }
+    }
   }
   activePulsePin=bestPin;
-  Serial.printf("[PULSE] selected GPIO%d var %d (wire can stay at 40, joined to %d)\n", activePulsePin, bestVar, activePulsePin);
-  if(bestVar<5) Serial.println("[PULSE] WARNING: all pins flat, check VCC=3V3/5V GND S, press finger");
+  Serial.printf("[PULSE] selected GPIO%d var %d - WEARABLE STABLE (no PSRAM touch)\n", activePulsePin, bestVar);
+  if(bestVar<5) Serial.println("[PULSE] WARNING: all pins flat, check VCC=3V3 GND S, press finger firmly");
 }
 
 void setupDS18(){
@@ -446,8 +461,9 @@ void setup(){
   digitalWrite(STATUS_LED, LOW);
   Serial.begin(BAUD_RATE);
   delay(800);
-  Serial.println("\n\n=== ENDO-TWIN S3 V8.4.3 FINAL - I2C ROBUST ===");
-  Serial.println("Wiring: SDA=8 SCL=9 VCC=3V3 GND Pulse S=40 joined to 4, DS18 DATA=6 GSR=5 LED=2");
+  Serial.println("\n\n=== ENDO-TWIN S3 V8.4.5 WEARABLE STABLE ===");
+  Serial.printf("Chip: %s PSRAM: %d bytes FreeHeap: %d\n", ESP.getChipModel(), ESP.getPsramSize(), ESP.getFreeHeap());
+  Serial.println("Wiring: SDA=8 SCL=9 VCC=3V3 GND Pulse S=40 PHYSICALLY joined to 4 (read GPIO4 PSRAM-safe), DS18 DATA=6 GSR=5 LED=2");
   Serial.println("Shoulder: MPU6050/2060+BME280+BH1750, Forearm: Pulse+DS18");
   Serial.println("[SYS] Serial OK @115200, early test packets...");
   for(int i=0;i<3;i++){
@@ -461,8 +477,10 @@ void setup(){
   setupBLE();
   readENV();
   readDS18();
-  Serial.println("[SYS] ready - 20Hz $CP2 @115200 - Dashboard: /dev/ttyACM0, Demo V8.4 button for test");
+  Serial.println("[SYS] ready - 20Hz $CP2 @115200 - WEARABLE STABLE: no GPIO40 touch when PSRAM enabled");
+  Serial.println("[SYS] Dashboard: /dev/ttyACM0, Demo V8.4 button for test");
   Serial.println("[SYS] Type STATUS or I2CSCAN in serial monitor for diagnostics");
+  Serial.println("[SYS] WEARING TIP: Use battery or secure USB cable with strain relief to avoid disconnect");
 }
 
 void loop(){

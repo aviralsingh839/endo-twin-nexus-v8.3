@@ -1,22 +1,22 @@
 /*
-  MINIMAL TEST V8.4.1 - ESP32-S3 Pulse Debug
-  Scans multiple ADC pins to find pulse sensor, since GPIO40 may be PSRAM on some boards.
-  Also shows DS18B20 on GPIO6.
+  MINIMAL TEST V8.4.5 - ESP32-S3 Pulse Debug - WEARABLE STABLE
+  PSRAM-safe: Feather S3 2MB PSRAM uses GPIO40/44 for Octal PSRAM.
+  Using GPIO40 as INPUT crashes PSRAM and causes connect/disconnect while wearing.
+  FIX: Use GPIO4 (joined to 40 with wire) as safe pin.
 
-  Wiring for test:
-  Pulse S -> try GPIO40, then GPIO4, GPIO5, GPIO6 (but 6 is DS18), GPIO1,2,3,8,9,10
+  Wiring:
+  Pulse S -> 40 physically, joined to 4 with wire (read GPIO4)
   DS18 DATA -> GPIO6 + 4.7k to 3V3
   GSR -> GPIO5
 
-  This sketch publishes $CP2 at 20Hz with pulseRaw from best pin.
+  Publishes $CP2 at 20Hz
 */
 
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-static constexpr uint8_t PULSE_PIN_PRIMARY = 40;
-static constexpr uint8_t PULSE_PINS_ALT[] = {44,4, 5, 1, 2, 3, 10, 8, 9, 6};
+static constexpr uint8_t PULSE_PIN_SAFE = 4;
 static constexpr uint8_t ONE_WIRE_BUS = 6;
 static constexpr uint8_t GSR_PIN = 5;
 
@@ -26,43 +26,43 @@ bool ds18OK=false;
 float skinTemp=NAN;
 int pulseRaw=0;
 int gsrRaw=0;
-uint8_t activePulsePin = PULSE_PIN_PRIMARY;
+uint8_t activePulsePin = PULSE_PIN_SAFE;
 
 uint8_t crc8(const char* s){ uint8_t c=0; while(*s) c^=(uint8_t)(*s++); return c; }
 
 void setup(){
   Serial.begin(115200);
   delay(1000);
-  Serial.println("\n\n=== MINIMAL TEST V8.4.1 - PULSE DEBUG ===");
-  Serial.println("Scanning ADC pins for pulse sensor (S should be 3V3 powered, GND, Signal to GPIO)");
-  Serial.println("Primary: GPIO40, Alt: 4,5,1,2,3,10,8,9");
-
-  // Setup all candidate pins
-  pinMode(PULSE_PIN_PRIMARY, INPUT);
-  for(uint8_t p: PULSE_PINS_ALT) pinMode(p, INPUT);
-  pinMode(GSR_PIN, INPUT);
+  Serial.println("\n\n=== MINIMAL TEST V8.4.5 - PULSE DEBUG - WEARABLE STABLE ===");
+  bool hasPSRAM = (ESP.getPsramSize() > 0);
+  Serial.printf("PSRAM %d bytes %s\n", ESP.getPsramSize(), hasPSRAM?"PSRAM-safe mode, using GPIO4 only":"no PSRAM");
+  Serial.println("Wiring: Pulse S=40 joined to 4 with wire, reading GPIO4 (PSRAM-safe)");
+  
+  pinMode(PULSE_PIN_SAFE, INPUT);
+  pinMode(5, INPUT);
+  pinMode(1, INPUT);
+  pinMode(2, INPUT);
+  pinMode(3, INPUT);
+  pinMode(10, INPUT);
   analogReadResolution(12);
   #if defined(ADC_11db)
-    analogSetPinAttenuation(PULSE_PIN_PRIMARY, ADC_11db);
-    for(uint8_t p: PULSE_PINS_ALT) analogSetPinAttenuation(p, ADC_11db);
+    analogSetPinAttenuation(4, ADC_11db);
+    analogSetPinAttenuation(5, ADC_11db);
+    analogSetPinAttenuation(1, ADC_11db);
+    analogSetPinAttenuation(2, ADC_11db);
   #endif
 
-  // Quick ADC scan
-  Serial.println("ADC scan (10 readings each):");
+  Serial.println("ADC scan PSRAM-safe (GPIO4,5,1,2,3,10):");
   for(int i=0;i<10;i++){
-    Serial.printf("  GPIO40=%4d", analogRead(40));
-    Serial.printf("  GPIO4=%4d", analogRead(4));
-    Serial.printf("  GPIO5=%4d", analogRead(5));
-    Serial.printf("  GPIO1=%4d", analogRead(1));
-    Serial.printf("  GPIO2=%4d", analogRead(2));
-    Serial.printf("  GPIO3=%4d\n", analogRead(3));
+    Serial.printf("  GPIO4=%4d GPIO5=%4d GPIO1=%4d GPIO2=%4d GPIO3=%4d\n",
+      analogRead(4), analogRead(5), analogRead(1), analogRead(2), analogRead(3));
     delay(100);
   }
 
-  // Auto-select pin with most variation (likely pulse) - includes 44 which you joined to 40
   int bestVar=0;
-  uint8_t bestPin=PULSE_PIN_PRIMARY;
-  for(uint8_t pin: {40,44,4,5,1,2,3,10}){
+  uint8_t bestPin=PULSE_PIN_SAFE;
+  uint8_t candidates[] = {4,1,2,3,5,10};
+  for(uint8_t pin: candidates){
     int minV=4095, maxV=0;
     for(int k=0;k<50;k++){
       int v=analogRead(pin);
@@ -71,18 +71,12 @@ void setup(){
       delay(5);
     }
     int var = maxV-minV;
-    Serial.printf("  Pin %d variation %d (min %d max %d)\n", pin, var, minV, maxV);
-    if(var>bestVar){
-      bestVar=var;
-      bestPin=pin;
-    }
+    Serial.printf("  Pin %d var %d (min %d max %d)\n", pin, var, minV, maxV);
+    if(var>bestVar){ bestVar=var; bestPin=pin; }
   }
   activePulsePin=bestPin;
-  Serial.printf("Selected pulse pin: GPIO%d with variation %d\n", activePulsePin, bestVar);
-  if(bestVar<5){
-    Serial.println("WARNING: All pins flat! Check pulse sensor VCC=3V3 GND, S to GPIO, and sensor powered.");
-    Serial.println("Try: 1) Pulse sensor VCC to 3V3 (not 5V) 2) S to GPIO4 (often more stable than 40 on Feather) 3) Cover sensor, press finger");
-  }
+  Serial.printf("Selected pulse pin: GPIO%d var %d - STABLE\n", activePulsePin, bestVar);
+  if(bestVar<5) Serial.println("WARNING: All pins flat! Check VCC=3V3 GND S, press finger firmly");
 
   ds18.begin();
   ds18OK = ds18.getDeviceCount()>0;
@@ -92,18 +86,19 @@ void setup(){
     ds18.setWaitForConversion(false);
     ds18.requestTemperatures();
   }
-  Serial.println("Publishing $CP2 at 20Hz with active pulse pin...");
+  Serial.println("Publishing $CP2 at 20Hz - WEARABLE STABLE, no GPIO40 touch");
 }
 
 void loop(){
   static uint32_t tPulse=0, tTemp=0, tPack=0, tGsr=0;
   static float baseline=250;
-  static float filt=250;
   uint32_t now=millis();
   if(now - tPulse >= 20){ 
     tPulse=now; 
     int raw=analogRead(activePulsePin);
-    float filt = raw*0.3f + 250*0.7f; // quick low-pass
+    // Low-pass + gain x3 for calm HR
+    static float filt=250;
+    filt = filt*0.7f + raw*0.3f;
     if(raw>0 && raw<500){
       baseline = baseline*0.997f + filt*0.003f;
       float diff = filt - baseline;
@@ -112,8 +107,8 @@ void loop(){
       if(amplified>4095) amplified=4095;
       pulseRaw=amplified;
     } else {
-      pulseRaw=raw;
-      baseline = baseline*0.997f + raw*0.005f;
+      pulseRaw=(int)filt;
+      baseline = baseline*0.997f + filt*0.003f;
     } 
   }
   if(now - tGsr >= 100){ tGsr=now; gsrRaw=analogRead(GSR_PIN); }
