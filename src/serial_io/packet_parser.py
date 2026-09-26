@@ -1,18 +1,25 @@
-"""Arduino serial packet parsing.
+"""Arduino serial packet parsing - V8.4 Shoulder+Forearm build.
 
 Supported packets:
 
 Legacy UNO:
 $CP,ms,ir,red,ax,ay,az,gx,gy,gz,tempC,gsr,lux,status,crc
 
-Enhanced Mega / wearable:
+Enhanced Mega / wearable V8.4:
 $CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
 
-V8.8 analog-pulse wearable compatibility:
-- When status bit 12 (ST_PPG_ANALOG) is set, the $CP2 ir field is an
-  ADC pulse waveform sample from the generic analog Pulse Sensor module.
-- red is -1 because there is no optical red channel.
-- Do not infer SpO2 from this packet.
+V8.4 hardware map:
+- I2C bus SDA=8 SCL=9: MPU6050/2060 (shoulder), BME280 (room temp/hum/press), BH1750 (lux)
+- Pulse S=40 analog (forearm) -> ir field, red=-1
+- DS18B20 DATA=6 (forearm skin temp) -> temp0
+- GSR optional -> gsr_raw
+- BME280 -> roomT, hum, press
+- BH1750 -> lux
+
+V8.8 analog-pulse compatibility:
+- When status bit 12 (ST_PPG_ANALOG) is set, ir = ADC pulse waveform.
+- red = -1 because no optical red channel.
+- Do NOT infer SpO2 from analog pulse.
 
 CRC is XOR of all characters in the payload before the final comma.
 """
@@ -128,19 +135,35 @@ class PacketParser:
 
 def decode_status_flags(status: int) -> list[str]:
     labels = [
-        "PPG/pulse sensor absent",
-        "PPG/pulse sensor saturated or clipped",
-        "MPU6050 error",
-        "DS18B20 error",
+        "Pulse sensor absent / no finger",
+        "Pulse sensor saturated / clipped",
+        "MPU6050/2060 error (shoulder IMU)",
+        "DS18B20 error (forearm skin temp)",
         "GSR saturated",
-        "I2C error",
+        "I2C bus error (SDA=8 SCL=9)",
         "Low signal quality",
-        "ECG leads off",
-        "BME280 error",
-        "OLED error",
-        "Microphone low signal",
-        "FSR pressure artifact",
-        "Analog Pulse Sensor active",
-        "Analog Pulse Sensor invalid",
+        "ECG leads off (unused)",
+        "BME280 error (shoulder env)",
+        "OLED error (unused)",
+        "Microphone low signal (unused)",
+        "FSR pressure artifact (unused)",
+        "Analog Pulse Sensor active (forearm GPIO40)",
+        "Analog Pulse Sensor invalid ADC",
+        "BH1750 error (shoulder lux)",
+        "Reserved / future",
     ]
     return [labels[i] for i in range(min(len(labels), 16)) if status & (1 << i)]
+
+
+def decode_hardware_health(status: int) -> dict:
+    """Return per-sensor health dict for live dashboard."""
+    return {
+        "pulse": not (status & (1<<0) or status & (1<<1) or status & (1<<13)),
+        "mpu": not (status & (1<<2)),
+        "ds18": not (status & (1<<3)),
+        "gsr": not (status & (1<<4)),
+        "i2c": not (status & (1<<5)),
+        "bme280": not (status & (1<<8)),
+        "bh1750": not (status & (1<<14)),
+        "analog_active": bool(status & (1<<12)),
+    }

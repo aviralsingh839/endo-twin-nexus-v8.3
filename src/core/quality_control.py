@@ -74,9 +74,18 @@ class SensorQualityControl:
         elif channel in ("temp_c", "skin_temp", "skin_temp_c"):
             if not (t.skin_temp_min <= value <= t.skin_temp_max):
                 return True, f"skin temp {value} out of range"
-        elif channel in ("temp1_c", "room_temp_c"):
+        elif channel in ("temp1_c", "room_temp_c", "bme_temp", "room_temp"):
             if not (t.temp_min <= value <= t.temp_max):
-                return True, f"temp {value} out of range"
+                return True, f"room temp {value} out of range"
+        elif channel in ("humidity_pct", "hum", "bme_hum"):
+            if not (0 <= value <= 100):
+                return True, f"humidity {value} out of range"
+        elif channel in ("pressure_hpa", "press", "bme_press"):
+            if not (300 <= value <= 1100):
+                return True, f"pressure {value} out of range"
+        elif channel in ("lux", "bh1750_lux", "bh1750"):
+            if not (0 <= value <= 120000):
+                return True, f"lux {value} out of range"
         elif channel == "gsr_raw":
             if not (t.gsr_min <= value <= t.gsr_max):
                 return True, f"GSR {value} out of range"
@@ -206,10 +215,10 @@ class SensorQualityControl:
             reason=reason
         )
 
-    def evaluate_sample(self, sample: dict, source: str = "wearable") -> Dict[str, SensorQuality]:
+    def evaluate_sample(self, sample: dict, source: str = "wearable", timestamp_s: float | None = None) -> Dict[str, SensorQuality]:
         """Evaluate a dict of channel->value."""
         results = {}
-        ts = sample.get("timestamp_s", time.time())
+        ts = timestamp_s or sample.get("timestamp_s", time.time())
         for ch, val in sample.items():
             if ch == "timestamp_s":
                 continue

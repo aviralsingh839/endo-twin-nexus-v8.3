@@ -7,6 +7,7 @@ Produces FeatureVector and SharedPhysiologicalFeatures.
 from __future__ import annotations
 
 import time
+import math
 from collections import deque
 from typing import Deque, Optional
 
@@ -79,31 +80,28 @@ class RealtimeFeatureExtractor:
         self.last_sample = sample
         if sample.ppg_input_type:
             self.ppg_input_type = sample.ppg_input_type.upper()
-        # Quality check per channel
-        # Optical MAX301-style packets use ir/red. The V8.8 analog Pulse Sensor
-        # uses a single ADC waveform and must not be evaluated with optical
-        # thresholds (e.g. IR finger-present >=5000).
+        # Quality check per channel - V8.4 shoulder+forearm
+        # Analog Pulse Sensor uses ADC, not optical thresholds
+        # Includes BME280 (room temp/hum/press) + BH1750 (lux) + DS18B20 (skin temp)
+        base_channels = {
+            "ax_g": sample.ax_g,
+            "ay_g": sample.ay_g,
+            "az_g": sample.az_g,
+            "temp_c": sample.temp_c,
+            "gsr_raw": sample.gsr_raw,
+            "ecg_raw": sample.ecg_raw,
+            "room_temp_c": sample.room_temp_c if sample.room_temp_c and not math.isnan(sample.room_temp_c) else None,
+            "humidity_pct": sample.humidity_pct if sample.humidity_pct and not math.isnan(sample.humidity_pct) else None,
+            "pressure_hpa": sample.pressure_hpa if sample.pressure_hpa and not math.isnan(sample.pressure_hpa) else None,
+            "lux": sample.lux if sample.lux and not math.isnan(sample.lux) else None,
+        }
+        # Remove None for quality check
+        quality_input_clean = {k: v for k, v in base_channels.items() if v is not None and not (isinstance(v, float) and math.isnan(v))}
         if sample.ppg_input_type in {"ANALOG_PULSE", "ANALOG_PULSE_SENSOR"}:
-            quality_input = {
-                "analog_pulse": sample.ir,
-                "ax_g": sample.ax_g,
-                "ay_g": sample.ay_g,
-                "az_g": sample.az_g,
-                "temp_c": sample.temp_c,
-                "gsr_raw": sample.gsr_raw,
-                "ecg_raw": sample.ecg_raw,
-            }
+            quality_input = {"analog_pulse": sample.ir, **quality_input_clean}
         else:
-            quality_input = {
-                "ir": sample.ir,
-                "red": sample.red,
-                "ax_g": sample.ax_g,
-                "ay_g": sample.ay_g,
-                "az_g": sample.az_g,
-                "temp_c": sample.temp_c,
-                "gsr_raw": sample.gsr_raw,
-                "ecg_raw": sample.ecg_raw,
-            }
+            quality_input = {"ir": sample.ir, "red": sample.red, **quality_input_clean}
+
         qualities = self.quality_control.evaluate_sample(quality_input, source=sample.source, timestamp_s=sample.timestamp_s)
         self._quality_history.append({k: v.quality for k, v in qualities.items()})
 
@@ -114,6 +112,17 @@ class RealtimeFeatureExtractor:
         self.temp.add_sample(sample.timestamp_s, sample.temp_c)
         self.ecg.add_sample(sample.timestamp_s, sample.ecg_raw)
         self.last_lux = sample.lux if sample.lux is not None and sample.lux >= 0 else self.last_lux
+        # Env history for trends
+        if not hasattr(self, '_env_history'):
+            self._env_history = deque(maxlen=3600)
+        self._env_history.append({
+            "room_temp": sample.room_temp_c,
+            "hum": sample.humidity_pct,
+            "press": sample.pressure_hpa,
+            "lux": sample.lux,
+            "skin_temp": sample.temp_c,
+            "ts": sample.timestamp_s
+        })
 
     def compute(self) -> FeatureVector:
         now = time.time()
