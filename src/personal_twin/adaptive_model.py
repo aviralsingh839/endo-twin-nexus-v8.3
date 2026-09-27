@@ -78,6 +78,9 @@ class PersonalAdaptiveModel:
             for name, s in self.metrics.items()
         }
         learning["updated_at"] = time.time()
+        learning["quality_sum"] = float(learning.get("quality_sum", 0.0))
+        learning["first_observation_ts"] = learning.get("first_observation_ts")
+        learning["last_observation_ts"] = learning.get("last_observation_ts")
         learning["version"] = "adaptive-personal-twin-v1"
         replace_learning(self.participant_id, learning)
         self.state = load_state()
@@ -98,6 +101,9 @@ class PersonalAdaptiveModel:
             self._restore()
 
         ts = float(getattr(feature, "timestamp_s", time.time()))
+        if learning.get("first_observation_ts") is None:
+            learning["first_observation_ts"] = ts
+        learning["last_observation_ts"] = ts
         hour_key = str(int(time.localtime(ts).tm_hour))
         learning = self.learning
         hp = learning.setdefault("hourly_profiles", {})
@@ -133,6 +139,7 @@ class PersonalAdaptiveModel:
 
         learning["samples"] = int(learning.get("samples", 0)) + 1
         learning["quality_weighted_samples"] = float(learning.get("quality_weighted_samples", 0.0)) + q
+        learning["quality_sum"] = float(learning.get("quality_sum", 0.0)) + q
         # Persist every observation so Doctor, Patient, Unified and ENDO-TWIN
         # processes see the same patient-scoped learning state without waiting
         # for another polling cycle.
@@ -144,6 +151,25 @@ class PersonalAdaptiveModel:
             "quality": q,
             "metrics": {k: getattr(feature, k, None) for k in METRICS},
         })
+
+    def reset_learning(self) -> None:
+        """Reset only this participant's adaptive learning state."""
+        learning = _empty_learning()
+        self.state = load_state()
+        if self.participant_id not in self.state.get("people", {}):
+            ensure_person(self.participant_id, make_active=False)
+            self.state = load_state()
+        self.state["people"][self.participant_id]["learning"] = learning
+        replace_learning(self.participant_id, learning)
+        self._restore()
+        append_event({"kind": "learning_reset", "participant_id": self.participant_id})
+
+    @property
+    def baseline_ready(self) -> bool:
+        return int(self.learning.get("samples", 0)) >= 60
+
+    def quality_average(self) -> float:
+        return float(self.learning.get("quality_sum", 0.0)) / max(int(self.learning.get("samples", 0)), 1)
 
     def flush(self) -> None:
         self._persist()
@@ -167,6 +193,10 @@ class PersonalAdaptiveModel:
             "version": learning.get("version", "adaptive-personal-twin-v1"),
             "samples": int(learning.get("samples", 0)),
             "quality_weighted_samples": round(float(learning.get("quality_weighted_samples", 0.0)), 2),
+            "quality_average": round(float(learning.get("quality_sum", 0.0)) / max(int(learning.get("samples", 0)), 1), 3),
+            "baseline_ready": int(learning.get("samples", 0)) >= 60,
+            "first_observation_ts": learning.get("first_observation_ts"),
+            "last_observation_ts": learning.get("last_observation_ts"),
             "metrics": {
                 name: {
                     "mean": round(s.mean, 4),
