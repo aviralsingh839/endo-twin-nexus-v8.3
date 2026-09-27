@@ -185,6 +185,11 @@ class SelfLearningWindow(QWidget):
         capture_row.addWidget(QLabel("Research baseline duration"))
         capture_row.addWidget(self.duration)
 
+        self.ppg_calibrate = QPushButton("Calibrate PPG (5 s)")
+        self.ppg_calibrate.setEnabled(False)
+        self.ppg_calibrate.clicked.connect(self._calibrate_ppg)
+        capture_row.addWidget(self.ppg_calibrate)
+
         self.capture = QPushButton("Start Baseline Capture")
         self.capture.setObjectName("primary")
         self.capture.clicked.connect(self._start_capture)
@@ -306,6 +311,14 @@ class SelfLearningWindow(QWidget):
         if self.personal_model is None:
             self.personal_model = PersonalAdaptiveModel(self.participant_id)
 
+    def _calibrate_ppg(self):
+        if self.session is None:
+            self.progress.setText("Start a LIVE baseline session first.")
+            return
+        self.session.write_command(f"PPG_PERSON={self.participant_id}")
+        self.session.write_command("PPG_NEW_PERSON")
+        self.progress.setText(f"PPG calibration started for {self.participant_id} • keep finger still for 5 s.")
+
     def _start_capture(self):
         if not self.participant_id:
             QMessageBox.warning(self, "Baseline", "Create or select a patient first.")
@@ -339,6 +352,7 @@ class SelfLearningWindow(QWidget):
         self.session.start()
         self.capture.setEnabled(False)
         self.stop.setEnabled(True)
+        self.ppg_calibrate.setEnabled(True)
         self.progress.setText(
             f"CAPTURING BASELINE • {self.duration.value()} min • keep the wearable positioned calmly."
         )
@@ -365,6 +379,7 @@ class SelfLearningWindow(QWidget):
             self.session_id = None
         self.stop.setEnabled(False)
         self.capture.setEnabled(True)
+        self.ppg_calibrate.setEnabled(False)
 
     def _on_ppg_calibration(self, event):
         self.progress.setText(f"PPG calibration saved • {event.profile_id} • quality {event.quality:.0f}%")
