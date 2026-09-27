@@ -722,31 +722,55 @@ class MainWindow(QMainWindow):
         self.port_combo.addItem("/dev/ttyACM0")
 
     def connect_serial(self, port=None):
-        p = port or self.port_combo.currentText()
+        self.stop_stream()
+        p = (port or self.port_combo.currentText()).strip()
+        if not p:
+            self.mode_label.setText("Mode: NO SERIAL PORT SELECTED")
+            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+            return
+        self.feature_history.clear()
+        self.shared_history.clear()
+        self.current_shared = None
+        self.last_packet_time = None
         try:
             self.arduino_reader = ArduinoReader(port=p, baud=115200)
+            self.arduino_reader.state_changed.connect(self._on_device_state)
+            self.arduino_reader.error_received.connect(self._on_device_error)
             self.arduino_reader.start()
-            self.mode_label.setText(f"Mode: LIVE SERIAL {p}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+            self.mode_label.setText(f"Mode: CONNECTING {p} — waiting for sensor packets")
+            self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
         except Exception as e:
             self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
             self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
 
     def connect_network(self, hostport: str):
+        self.stop_stream()
         if not hostport:
+            self.mode_label.setText("Mode: NO WI-FI BRIDGE")
             return
+        self.feature_history.clear()
+        self.shared_history.clear()
+        self.current_shared = None
+        self.last_packet_time = None
         try:
             parts = hostport.split(":")
             host = parts[0]
             port = int(parts[1]) if len(parts) > 1 else 7777
             self.network_reader = NetworkReader(host=host, port=port)
+            self.network_reader.state_changed.connect(self._on_device_state)
+            self.network_reader.error_received.connect(self._on_device_error)
             self.network_reader.start()
-            self.mode_label.setText(f"Mode: LIVE NETWORK {hostport}")
+            self.mode_label.setText(f"Mode: CONNECTING WI-FI {hostport} — waiting for sensor packets")
             self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
         except Exception as e:
             self.mode_label.setText(f"Mode: NETWORK FAILED {e}")
 
     def start_demo(self):
+        self.stop_stream()
+        self.feature_history.clear()
+        self.shared_history.clear()
+        self.current_shared = None
+        self.last_packet_time = None
         self.demo_stream = DemoSensorStream()
         self.demo_stream.start()
         self.mode_label.setText("Mode: DEMO SYNTHETIC - clearly labelled")
@@ -762,8 +786,38 @@ class MainWindow(QMainWindow):
         if self.demo_stream:
             self.demo_stream.stop()
             self.demo_stream = None
+        self.current_shared = None
+        self.last_packet_time = None
         self.mode_label.setText("Mode: NO STREAM")
         self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+        self._clear_live_state()
+
+    def _on_device_state(self, state: str):
+        if state.startswith("connected:"):
+            self.mode_label.setText("Mode: CONNECTED — waiting for sensor data")
+            self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
+        elif state == "reconnecting":
+            self.mode_label.setText("Mode: RECONNECTING — no sensor packets")
+            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+
+    def _on_device_error(self, message: str):
+        if "went silent" in message.lower() or "unreachable" in message.lower():
+            self.mode_label.setText("Mode: NO SENSOR DATA — check wearable wiring/firmware")
+            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+
+    def _clear_live_state(self):
+        self.current_shared = None
+        for key in ("hr", "hrv", "temp", "activity", "gsr", "stress", "sleep", "quality", "recovery"):
+            if key in self.cards:
+                self.cards[key].set_value("—")
+        self.risk_gauge.set_value(0)
+        self.confidence_label.setText("Model Confidence: —")
+        self.quality_label.setText("Data Quality: —")
+        self.coverage_label.setText("Coverage: —")
+        self.baseline_label.setText("Baseline: NO LIVE DATA")
+        self.quality_gauge.set_value(0)
+        if hasattr(self, "complication_text"):
+            self.complication_text.setPlainText("No live sensor data. Complication-related research signals are withheld.")
 
     def _load_scenario_dialog(self):
         # Load one of the 6 scenarios as demo
