@@ -26,7 +26,7 @@ Personal Twin • Wearable • Unified Workstation • Research
  10) Exit
 ============================================================
 EOF
-  read -r -p "Select [1-11]: " choice || exit 0
+  read -r -p "Select [1-10]: " choice || exit 0
   case "$choice" in
    1) runpy -m src.personal_twin.onboarding ;;
    2) runpy -m src.ui.main_window ;;
