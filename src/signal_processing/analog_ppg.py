@@ -67,6 +67,32 @@ class AnalogPPGProcessor:
         filtered = np.fft.irfft(out, n)
         return filtered.astype(float)
 
+    def _autocorrelation_hr(self, y: np.ndarray) -> tuple[float | None, float]:
+        if y.size < int(self.fs_hz * 6):
+            return None, 0.0
+        y = y - np.mean(y)
+        sd = float(np.std(y))
+        if sd < 1e-8:
+            return None, 0.0
+        ac = np.correlate(y, y, mode="full")[y.size-1:]
+        if ac[0] <= 0:
+            return None, 0.0
+        ac = ac / ac[0]
+        lo=int(self.fs_hz * 60.0 / 180.0)
+        hi=min(len(ac)-2,int(self.fs_hz * 60.0 / 40.0))
+        if hi<=lo+2:
+            return None,0.0
+        seg=ac[lo:hi+1]
+        k=int(np.argmax(seg))
+        if k<=0 or k>=len(seg)-1:
+            return None,0.0
+        a,b,d=seg[k-1],seg[k],seg[k+1]
+        den=a-2*b+d
+        delta=0.5*(a-d)/den if abs(den)>1e-9 else 0.0
+        lag=max(float(lo+k+delta),1.0)
+        hr=60.0*self.fs_hz/lag
+        return (float(hr) if 40.0<=hr<=180.0 else None), float(clamp(b,0.0,1.0))
+
     def _peaks(self, window_s: float = 20.0) -> tuple[list[float], float, float]:
         if len(self.times) < int(self.fs_hz * 6):
             return [], 0.0, 0.0
@@ -120,11 +146,18 @@ class AnalogPPGProcessor:
         peaks, pulse_quality, hr = self._peaks()
         self.last_peaks = peaks
 
-        ibi = np.diff(peaks) if len(peaks) >= 3 else np.array([], dtype=float)
-        ibi = ibi[(ibi >= 60.0 / MAX_HR_BPM) & (ibi <= 60.0 / MIN_HR_BPM)]
-        if ibi.size >= 3:
-            med = float(np.median(ibi))
-            ibi = ibi[np.abs(ibi - med) <= 0.25 * med]
+        t=np.asarray(self.times,dtype=float)
+        y=np.asarray(self.filtered,dtype=float)
+        mask=t >= t[-1]-20.0 if t.size else np.array([],dtype=bool)
+        ac_hr, ac_strength = self._autocorrelation_hr(self._bandpass(y[mask]) if mask.size and np.any(mask) else y)
+        if hr is not None and ac_hr is not None:
+            agreement = abs(float(hr)-float(ac_hr))
+            if agreement <= 12.0:
+                hr = float((2.0*float(hr)+float(ac_hr))/3.0)
+                pulse_quality = float(clamp(pulse_quality + 0.12*ac_strength,0.0,1.0))
+        elif hr is None and ac_hr is not None and ac_strength >= 0.35:
+            hr=float(ac_hr)
+
         self.last_ibi_s = ibi.tolist()
 
         # Motion is a reliability penalty, not a physiological value.
