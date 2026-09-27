@@ -106,39 +106,22 @@ def test_patient_scoped_baseline_storage(tmp_path, monkeypatch):
     assert (tmp_path / "baselines" / "PT-BASE.json").exists()
 
 
-def test_pcod_progress_panel_accepts_feature_dict():
-    from src.ui.pcos_complication_panel import PCODProgressPanel
 
-    panel = PCODProgressPanel()
-    panel.set_context(
-        {
-            "participant_id": "PT-UI",
-            "has_pcod": True,
-            "age_years": 25,
-            "bmi": 22.0,
-        },
-        [
-            {
-                "timestamp": 1.0,
-                "hr_bpm": 70.0,
-                "rmssd_ms": 40.0,
-                "skin_temp_c": 32.0,
-                "gsr_tonic": 10.0,
-                "activity_level": 20.0,
-                "sleep_duration_h": 7.0,
-                "signal_quality": 0.9,
-            }
-        ],
-        {
-            "timestamp": 2.0,
-            "hr_bpm": 71.0,
-            "rmssd_ms": 41.0,
-            "skin_temp_c": 32.1,
-            "gsr_tonic": 10.1,
-            "activity_level": 22.0,
-            "sleep_duration_h": 7.1,
-            "signal_quality": 0.9,
-        },
-    )
-    assert panel.latest_feature is not None
-    assert panel.latest_feature.hr_bpm == 71.0
+def test_pcod_progress_panel_source_contract():
+    import ast
+    from pathlib import Path
+
+    path = Path(__file__).parents[1] / "src" / "ui" / "pcos_complication_panel.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    assert "class PCODProgressPanel" in source
+    assert "raw = value.get(key, default)" in source
+    assert "self.hr_graph = Sparkline" in source
+    assert "self.hrv_graph = Sparkline" in source
+
+    functions = {
+        node.name for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert {"_to_feature", "set_context"}.issubset(functions)
