@@ -120,8 +120,13 @@ class RawAutoCalibrator:
         g = [self.history[k][-40:] for k in ("gx_dps", "gy_dps", "gz_dps")]
         if any(len(v) < 20 for v in a + g):
             return False
-        av = np.asarray(a, dtype=float)
-        gv = np.asarray(g, dtype=float)
+        # update() evaluates each channel immediately after append(), so
+        # the three axes can differ by one sample. Align to the common tail.
+        n = min(len(v) for v in a + g)
+        if n < 20:
+            return False
+        av = np.asarray([v[-n:] for v in a], dtype=float)
+        gv = np.asarray([v[-n:] for v in g], dtype=float)
         acc_mag = np.sqrt(np.sum(av * av, axis=0))
         gyro_mag = np.sqrt(np.sum(gv * gv, axis=0))
         return (
