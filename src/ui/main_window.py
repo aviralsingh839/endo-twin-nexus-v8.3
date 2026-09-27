@@ -1,3 +1,4 @@
+from desktop.workstation_runtime import RingGauge, metric_card, trend_panel
 """Main Window for CHRONO-TWIN NEXUS V8.3.
 
 Dashboard sections:
@@ -51,7 +52,6 @@ from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_engine
-from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 from src.ui.pcos_complication_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 
