@@ -129,6 +129,12 @@ class StreamingFeatureProcessor:
     def reset(self):
         self.__init__()
 
+    def ppg_waveform(self, last_s: float = 18.0):
+        """Return the active PPG processor waveform for the live UI."""
+        if self.analog_ppg.times:
+            return self.analog_ppg.waveform(last_s=last_s)
+        return self.ppg.waveform(last_s=last_s)
+
     def process(self,sample):
         self.samples+=1
         ts=float(sample.timestamp_s)
