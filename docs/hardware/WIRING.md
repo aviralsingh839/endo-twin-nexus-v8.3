@@ -32,7 +32,7 @@ Expected digital addresses:
 The V9 transport is USB serial at 115200 and Wi-Fi SoftAP `ENDO-TWIN-S3` on TCP port 7777. The wire packet is `$CP3`.
 ## GSR finger electrodes
 
-The electrodes connect to the **GSR module**, not directly to the ESP32 GPIO. The GSR module analog output goes to GPIO4.
+The electrodes connect to the **GSR module**, not directly to the ESP32 GPIO. The GSR module analog output goes to **D5 / GPIO5 (ADC1)**.
 
 Recommended prototype: index-finger electrode + middle-finger electrode, with approximately 20–30 mm center-to-center spacing when the fingers are relaxed.
 
