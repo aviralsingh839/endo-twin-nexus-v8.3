@@ -43,6 +43,10 @@ class ArduinoReader(QObject):
         self._stop = threading.Event()
         self._serial = None
         self.parser = PacketParser(require_crc=require_crc)
+        self._latest_sample: SensorSample | None = None
+        self._sample_pending = False
+        self._sample_lock = threading.Lock()
+        self._last_packet_time: float | None = None
 
     @staticmethod
     def available_ports() -> list[str]:
@@ -56,6 +60,20 @@ class ArduinoReader(QObject):
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+
+    def has_sample(self) -> bool:
+        with self._sample_lock:
+            return self._sample_pending
+
+    def get_sample(self) -> SensorSample | None:
+        with self._sample_lock:
+            sample = self._latest_sample
+            self._sample_pending = False
+            return sample
+
+    @property
+    def last_packet_time(self) -> float | None:
+        return self._last_packet_time
 
     def stop(self) -> None:
         self._stop.set()
@@ -119,6 +137,10 @@ class ArduinoReader(QObject):
                     continue
                 sample: SensorSample = self.parser.parse(line)
                 last_data = time.time()
+                self._last_packet_time = last_data
+                with self._sample_lock:
+                    self._latest_sample = sample
+                    self._sample_pending = True
                 self.sample_received.emit(sample)
             except PacketParseError as exc:
                 self.error_received.emit(f"Packet parse error: {exc}")
