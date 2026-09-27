@@ -7,7 +7,7 @@ arduino-cli core update-index
 arduino-cli core install arduino:avr
 arduino-cli core install esp32:esp32
 
-for lib in   "SparkFun MAX3010x Pulse and Proximity Sensor Library"   "Adafruit MPU6050"   "Adafruit Unified Sensor"   "BH1750"   "Adafruit BME280 Library"   "OneWire"   "DallasTemperature"   "Adafruit GFX Library"   "Adafruit SSD1306"; do
+for lib in   "SparkFun MAX3010x Pulse and Proximity Sensor Library"   "Adafruit MPU6050"   "Adafruit Unified Sensor"   "OneWire"   "DallasTemperature"   "BH1750"   "Adafruit BME280 Library"   "OneWire"   "DallasTemperature"   "Adafruit GFX Library"   "Adafruit SSD1306"; do
   arduino-cli lib install "$lib"
 done
 
