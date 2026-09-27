@@ -18,6 +18,16 @@ from dataclasses import dataclass
 from src.data_models import SensorSample
 
 
+@dataclass
+class PPGCalibrationEvent:
+    profile_id: str
+    baseline_adc: float
+    noise_sd: float
+    peak_to_peak: float
+    quality: float
+    wearable_event_ms: int
+
+
 class PacketParseError(ValueError):
     pass
 
@@ -32,6 +42,18 @@ def xor_crc_ascii(text: str) -> int:
 @dataclass
 class PacketParser:
     require_crc: bool = True
+
+    def parse_calibration_event(self, raw: str) -> PPGCalibrationEvent:
+        parts = raw.strip().split(",")
+        if len(parts) != 7 or parts[0] != "$PCAL":
+            raise PacketParseError("invalid $PCAL event")
+        try:
+            return PPGCalibrationEvent(
+                profile_id=parts[1], baseline_adc=float(parts[2]), noise_sd=float(parts[3]),
+                peak_to_peak=float(parts[4]), quality=float(parts[5]), wearable_event_ms=int(parts[6])
+            )
+        except (ValueError, IndexError) as exc:
+            raise PacketParseError(f"invalid $PCAL values: {exc}") from exc
 
     def parse(self, line: str) -> SensorSample:
         raw = line.strip()
