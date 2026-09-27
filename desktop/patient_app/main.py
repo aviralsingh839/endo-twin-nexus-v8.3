@@ -20,11 +20,11 @@ if str(ROOT) not in sys.path:
 from desktop.demo_data import DEMO_CASES
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
-from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant
+from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
 from src.personal_twin.participant_selector import choose_participant
-from src.ui.pcos_complication_panel import PCOSComplicationPanel
+from src.ui.pcos_progress_panel import PCODProgressPanel
 from services.bridge.server import EndoTwinBridgeServer
 
 DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
@@ -40,6 +40,7 @@ class PatientWindow(QMainWindow):
         self.profile = get_profile(self.participant_id)
         self.case = DEMO_CASES[0]
         self.latest_row = None
+        self.feature_history = []
         self.note_text = ""
         self.metric_labels = {}
         self.charts = {}
@@ -104,7 +105,7 @@ class PatientWindow(QMainWindow):
             ("reports", "▤  Reports"),
             ("connect", "⌁  Connect"),
             ("personal", "◫  Personal Twin"),
-            ("complications", "⚕  Complications"),
+            ("complications", "⚕  PCOD Healing & Complications"),
             ("notes", "✎  Notes"),
         ]:
             b = QPushButton(text)
@@ -258,73 +259,101 @@ class PatientWindow(QMainWindow):
         o.setContentsMargins(24, 16, 20, 14)
         o.setSpacing(11)
 
-        title = QLabel("How am I doing?")
+        title = QLabel("Your hormonal health overview")
         title.setObjectName("title")
         o.addWidget(title)
-        sub = QLabel("Longitudinal overview — your latest observations, baseline progress and changes worth discussing.")
+        sub = QLabel(
+            "A patient-first view of live measurements, personal baseline, longitudinal change and research context."
+        )
         sub.setObjectName("muted")
         o.addWidget(sub)
 
         banner = QFrame()
         banner.setObjectName("patientHeader")
         bh = QHBoxLayout(banner)
-        p = QLabel("Demo Patient 021" if self.mode.mode == "demo" else "Your local record")
-        p.setStyleSheet("font-size:16px;font-weight:900;")
-        bh.addWidget(p)
+        p_name = self.profile.get("patient_name") or self.profile.get("alias") or self.participant_id
+        who = QLabel(str(p_name))
+        who.setStyleSheet("font-size:18px;font-weight:900;")
+        bh.addWidget(who)
+        bh.addWidget(status_badge("PCOD: YES" if self.profile.get("has_pcod") is True else "PCOD: NO" if self.profile.get("has_pcod") is False else "PCOD: UNKNOWN", "info"))
         bh.addStretch()
-        bh.addWidget(status_badge("DEMO_DATA" if self.mode.mode=="demo" else "LOCAL RECORD", "info"))
-        bh.addWidget(status_badge("Research prototype", "neutral"))
+        bh.addWidget(status_badge("DEMO_DATA" if self.mode.mode=="demo" else "MEASURED", "demo" if self.mode.mode=="demo" else "measured"))
+        bh.addWidget(status_badge("Local-first", "neutral"))
         o.addWidget(banner)
 
         vals = self._current_values()
-        charts = QGridLayout()
-        charts.setSpacing(12)
-        series = {
-            "Heart rate": [vals["hr"] + x for x in (-4,-1,3,1,-2,2,0,4,-3,1,2)] if vals["hr"] is not None else [],
-            "HRV (RMSSD)": [vals["hrv"] + x for x in (3,-2,4,-1,2,0,-3,5)] if vals["hrv"] is not None else [],
-            "Skin temperature": [vals["temp"] + x*0.06 for x in (-3,1,4,0,-1,2,-2,3)] if vals["temp"] is not None else [],
-        }
-        cards = [
-            ("Heart rate", self._fmt(vals["hr"], " bpm", 0), "Latest processed pulse signal", "MEASURED"),
-            ("HRV (RMSSD)", self._fmt(vals["hrv"], " ms", 0), "Beat-to-beat derived feature", "DERIVED"),
-            ("Skin temperature", self._fmt(vals["temp"], " °C", 1), "Validity-gated temperature", "MEASURED"),
+        baseline = baseline_summary(self.participant_id)
+        kpi_defs = [
+            ("Heart Rate", self._fmt(vals["hr"], " bpm", 0), "Processed pulse signal", "measured"),
+            ("HRV (RMSSD)", self._fmt(vals["hrv"], " ms", 0), "Beat-to-beat feature", "derived"),
+            ("Temperature", self._fmt(vals["temp"], " °C", 1), "Temperature channel", "measured"),
+            ("GSR / Stress", self._fmt((self.latest_row or {}).get("gsr_tonic"), " rel.", 2), "EDA context", "measured"),
+            ("Activity", self._fmt(vals["activity"], " %", 0), "IMU-derived activity", "derived"),
+            ("Baseline", "READY" if baseline["available"] else "BUILDING", "Person-specific reference", "info"),
         ]
-        for i, (name, value, detail, prov) in enumerate(cards):
-            charts.addWidget(self._metric(name, value, "", detail, series[name], prov), 0, i)
-        o.addLayout(charts)
+        kpis = QGridLayout()
+        kpis.setSpacing(9)
+        for i, (name, value, detail, kind) in enumerate(kpi_defs):
+            kpis.addWidget(card(name, value, detail), 0, i)
+        o.addLayout(kpis)
 
-        lower = QGridLayout()
-        left = QFrame()
-        left.setObjectName("card")
-        lv = QVBoxLayout(left)
-        lv.addWidget(section_header("Today's snapshot", "Simple context, not a diagnosis."))
-        for a, b in [
-            ("Activity", self._fmt(vals["activity"], " %", 0)),
-            ("Sleep duration", self._fmt(vals["sleep"], " h", 1)),
-            ("Signal quality", self._fmt(vals["quality"]*100 if vals["quality"] is not None else None, " %", 0)),
+        main = QGridLayout()
+        main.setSpacing(11)
+
+        live = QFrame()
+        live.setObjectName("card")
+        lv = QVBoxLayout(live)
+        lv.addWidget(section_header("Live Sensor Data", "Heart rate • HRV • temperature • GSR • activity"))
+        for title_, val, unit, attr in [
+            ("Heart rate", vals["hr"], "bpm", "hr_bpm"),
+            ("HRV / RMSSD", vals["hrv"], "ms", "rmssd_ms"),
+            ("Activity", vals["activity"], "%", "activity_level"),
         ]:
             row = QHBoxLayout()
-            row.addWidget(QLabel(a))
+            row.addWidget(QLabel(title_))
             row.addStretch()
-            row.addWidget(QLabel(b))
+            row.addWidget(QLabel(self._fmt(val, f" {unit}", 1)))
             lv.addLayout(row)
-        lower.addWidget(left, 0, 0)
+            chart = Sparkline(title_, unit)
+            chart.setMinimumHeight(82)
+            if attr in self.charts:
+                chart.set_values(list(self.charts[title_].values))
+            lv.addWidget(chart)
+        main.addWidget(live, 0, 0, 2, 2)
 
-        right = QFrame()
-        right.setObjectName("card")
-        rv = QVBoxLayout(right)
-        rv.addWidget(section_header("What changed?", "Compare repeated observations instead of a single value."))
-        if self.mode.mode == "demo":
-            rv.addWidget(QLabel("Your demo case is shown with synthetic values to demonstrate the timeline and reporting workflow."))
-            rv.addWidget(QLabel("Discuss persistent changes, symptoms or concerns with a qualified clinician."))
-        else:
-            rv.addWidget(QLabel("Live measurements are visible here while the sensor stream is active."))
-            rv.addWidget(QLabel("No disease-model inference is generated from this patient screen."))
-        lower.addWidget(right, 0, 1)
-        lower.setColumnStretch(0, 1)
-        lower.setColumnStretch(1, 1)
-        o.addLayout(lower)
-        o.addStretch()
+        insights = QFrame()
+        insights.setObjectName("card")
+        iv = QVBoxLayout(insights)
+        iv.addWidget(section_header("Personal Twin Insights", "Existing baseline + longitudinal context"))
+        iv.addWidget(card("Learning samples", f"{self.personal_model.snapshot()['samples']:,}", "Quality-gated observations"))
+        iv.addWidget(card("Baseline confidence", f"{baseline['confidence']:.2f}" if baseline["available"] else "—", "Stored person-specific baseline"))
+        iv.addWidget(card("PCOD status", "Reported" if self.profile.get("has_pcod") is True else "Not reported" if self.profile.get("has_pcod") is False else "Unknown", "Set in Self-Learning Model"))
+        btn = QPushButton("Open PCOD Healing & Complications")
+        btn.setObjectName("primary")
+        btn.clicked.connect(lambda: self._go("complications"))
+        iv.addWidget(btn)
+        main.addWidget(insights, 0, 2)
+        o.addLayout(main, 1)
+
+        quick = QFrame()
+        quick.setObjectName("card")
+        qv = QVBoxLayout(quick)
+        qv.addWidget(section_header("Quick Actions", "Common patient workflows"))
+        grid = QGridLayout()
+        for i, (text, key) in enumerate([
+            ("Log Symptoms", "notes"),
+            ("Connect Wearable", "connect"),
+            ("Personal Twin", "personal"),
+            ("PCOD Healing", "complications"),
+            ("View Reports", "reports"),
+            ("Measurements", "measure"),
+        ]):
+            b = QPushButton(text)
+            b.setObjectName("primary" if key in {"connect","personal"} else "secondary")
+            b.clicked.connect(lambda _=False, k=key: self._go(k))
+            grid.addWidget(b, i//3, i%3)
+        qv.addLayout(grid)
+        o.addWidget(quick)
         return w
 
     def _health(self):
@@ -550,22 +579,22 @@ class PatientWindow(QMainWindow):
         return w
 
     def _complications(self):
-        panel = PCOSComplicationPanel("PCOS / Complication Context")
-        p = load_state().get("profile", {})
-        clinical = {
-            "age_years": p.get("age_years"),
-            "bmi": p.get("bmi"),
-            "systolic_bp": p.get("systolic_bp"),
-            "diastolic_bp": p.get("diastolic_bp"),
-            "glucose_mg_dl": p.get("glucose_mg_dl"),
-            "cycle_irregular": p.get("cycle_irregular"),
-            "usual_cycle_length_days": p.get("usual_cycle_length_days"),
-            "days_since_last_period": p.get("days_since_last_period"),
-            "years_post_menarche": p.get("years_post_menarche"),
-        }
-        panel.set_context(clinical, self.latest_row)
-        self.complication_panel = panel
+        panel = PCODProgressPanel("PCOD Healing & Complications")
+        panel.pcod_status_changed.connect(self._save_pcod_status)
+        panel.set_context(self.profile, self.feature_history, self.latest_row)
+        self.pcod_progress_panel = panel
         return panel
+
+    def _save_pcod_status(self, value):
+        self.profile["has_pcod"] = value
+        self.profile["updated_at"] = datetime.now().timestamp()
+        try:
+            save_profile(self.profile, set_active=True)
+        except Exception as exc:
+            self.side_state.setText(f"Profile save warning • {exc}")
+        if hasattr(self, "pages") and "home" in self.pages:
+            # Rebuild only the patient-facing status page on next navigation.
+            pass
 
     def _notes(self):
         w = QWidget()
@@ -599,6 +628,10 @@ class PatientWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        source = str(row.get("source", "")).lower()
+        if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+            self.feature_history.append(dict(row))
+            self.feature_history = self.feature_history[-1000:]
         try:
             source = str(row.get("source", "")).lower()
             if source not in {"demo", "synthetic"} and not source.startswith("demo"):
@@ -609,10 +642,8 @@ class PatientWindow(QMainWindow):
                 self._refresh_personal()
         except Exception as exc:
             self.side_state.setText(f"Learning warning • {exc}")
-        if hasattr(self, "complication_panel"):
-            self.complication_panel.set_context(
-                {k: v for k, v in load_state().get("profile", {}).items()}, row
-            )
+        if hasattr(self, "pcod_progress_panel"):
+            self.pcod_progress_panel.set_context(self.profile, self.feature_history, row)
         q = row.get("signal_quality")
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
