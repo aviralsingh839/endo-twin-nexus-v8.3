@@ -74,3 +74,33 @@ def test_multiple_people_are_isolated(tmp_path, monkeypatch):
     profile_store.select_participant("PT-B")
     assert profile_store.get_profile()["participant_id"] == "PT-B"
     assert profile_store.get_learning()["samples"] == 0
+
+def test_patient_scoped_baseline_storage(tmp_path, monkeypatch):
+    monkeypatch.setattr(profile_store, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(profile_store, "EVENTS_PATH", tmp_path / "events.jsonl")
+    monkeypatch.setattr(profile_store, "DATA_DIR", tmp_path)
+
+    from src.personal_twin import baseline_store
+    monkeypatch.setattr(baseline_store, "DATA_DIR", tmp_path)
+
+    from src.data_models import FeatureVector
+    profile_store.save_profile({"participant_id": "PT-BASE", "patient_name": "Baseline Person"})
+
+    rows = [
+        FeatureVector(
+            timestamp_s=time.time() + i,
+            hr_bpm=70.0 + (i % 3),
+            rmssd_ms=40.0,
+            activity_level=20.0,
+            gsr_tonic=10.0,
+            signal_quality=0.9,
+        )
+        for i in range(70)
+    ]
+    baseline = baseline_store.baseline_engine("PT-BASE").capture_from_features(
+        rows, min_samples=60, min_duration_s=None
+    )
+    assert baseline.has_data
+    assert baseline.samples == 70
+    assert baseline_store.baseline_summary("PT-BASE")["available"]
+    assert (tmp_path / "baselines" / "PT-BASE.json").exists()
