@@ -30,6 +30,7 @@ BASELINE_METRICS = {
     "resting_hr_bpm": "Resting HR (bpm)",
     "rmssd_ms": "HRV RMSSD (ms)",
     "skin_temp_c": "Skin temperature (°C)",
+    "room_temp_c": "Room temperature (°C)",
     "gsr_tonic": "GSR tonic",
     "activity_level": "Activity level",
     "sleep_duration_h": "Sleep duration (h)",
