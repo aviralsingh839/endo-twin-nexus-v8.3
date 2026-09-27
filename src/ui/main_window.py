@@ -1139,63 +1139,11 @@ class MainWindow(QMainWindow):
             self.mode_label.setText(f"Failed to load scenario: {e}")
 
     def _update_features(self):
-        sample = None
-        if self.arduino_reader and self.arduino_reader.has_sample():
-            sample = self.arduino_reader.get_sample()
-        elif self.network_reader and self.network_reader.has_sample():
-            sample = self.network_reader.get_sample()
-        elif self.demo_stream and self.demo_stream.has_sample():
-            sample = self.demo_stream.get_sample()
+        # Acquisition is signal-driven. The legacy polling path was removed to
+        # prevent duplicate processing and to preserve the wearable sample rate.
+        if self.feature_history and hasattr(self, "top_quality"):
+            self.top_quality.setText(f"QUALITY  {float(self.feature_history[-1].signal_quality):.2f}")
 
-        if sample:
-            # Convert to SensorSample if needed
-            if isinstance(sample, dict):
-                # demo stream dict
-                from src.data_models import SensorSample
-                import time
-                s = SensorSample(
-                    timestamp_s=time.time(),
-                    ms=int(sample.get("ms", 0)),
-                    ir=int(sample.get("ir", 5000)),
-                    red=int(sample.get("red", 5000)),
-                    ax_g=float(sample.get("ax", 0)),
-                    ay_g=float(sample.get("ay", 0)),
-                    az_g=float(sample.get("az", 1)),
-                    gx_dps=float(sample.get("gx", 0)),
-                    gy_dps=float(sample.get("gy", 0)),
-                    gz_dps=float(sample.get("gz", 0)),
-                    temp_c=float(sample.get("temp_c", 32.5)),
-                    gsr_raw=int(sample.get("gsr", 450)),
-                    lux=float(sample.get("lux", 100)),
-                    source="demo" if self.demo_stream else "serial"
-                )
-                sample = s
-
-            self.extractor.add_sample(sample)
-            fv = self.extractor.compute()
-            self.feature_history.append(fv)
-            if self.public_study.study and (time.time() - self._last_public_study_log) >= 10.0:
-                try:
-                    self.public_study.record_feature(fv)
-                    self._last_public_study_log = time.time()
-                except Exception as e:
-                    self.history_store.log_error(self.public_study.study.session_id, "study", str(e))
-            if len(self.feature_history) > 5000:
-                self.feature_history = self.feature_history[-5000:]
-
-            # Update UI vitals
-            self._update_vital_cards(fv)
-
-            # Update shared
-            try:
-                shared = self.shared_extractor.extract(fv, self.feature_history[-50:])
-                self.current_shared = shared
-                self.shared_history.append(shared)
-                if len(self.shared_history) > 500:
-                    self.shared_history = self.shared_history[-500:]
-                self.shared_text.setText(self.explanation_engine.explain_shared_features(shared))
-            except Exception as e:
-                pass
 
     def _update_vital_cards(self, fv: FeatureVector):
         def set_card(key, value, fmt="{:.0f}"):
