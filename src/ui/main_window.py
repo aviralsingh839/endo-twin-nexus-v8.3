@@ -51,7 +51,7 @@ from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_engine
-from src.ui.pcos_progress_panel import PCODProgressPanel
+from src.ui.pcos_complication_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
