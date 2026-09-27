@@ -1,6 +1,6 @@
 /*
   ENDO-TWIN ESP32 Wearable Firmware
-  Primary wearable controller. Arduino Nano is NOT required.
+  Primary wearable controller. Arduino Nano is NOT required.\n  Current harness pins are documented above; the firmware reads PPG from GPIO4.
 */
 #include <Arduino.h>
 #include <Wire.h>
@@ -14,7 +14,10 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-static constexpr uint8_t SDA_PIN=21, SCL_PIN=22, ONE_WIRE_BUS=18, GSR_PIN=34, ANALOG_PPG_PIN=4, STATUS_LED=2;
+// Current physical wearable harness:
+// SDA=GPIO8, SCL=GPIO9, VCC=3V3, GND=GND,
+// analog PPG S is bridged GPIO40 -> GPIO4, temperature DATA=GPIO6.
+static constexpr uint8_t SDA_PIN=8, SCL_PIN=9, ONE_WIRE_BUS=6, GSR_PIN=34, ANALOG_PPG_PIN=4, STATUS_LED=2;
 static constexpr uint32_t BAUD_RATE=115200, PPG_PERIOD_MS=20, IMU_PERIOD_MS=20, GSR_PERIOD_MS=100, TEMP_PERIOD_MS=1000, PACKET_PERIOD_MS=50;
 #define ST_PPG_ABSENT 0
 #define ST_PPG_SAT 1
@@ -85,5 +88,5 @@ void setupBLE(){
   BLECharacteristic* cmd=svc->createCharacteristic(CMD_UUID,BLECharacteristic::PROPERTY_WRITE|BLECharacteristic::PROPERTY_WRITE_NR);cmd->setCallbacks(new CmdCB());
   svc->start();BLEAdvertising* a=BLEDevice::getAdvertising();a->addServiceUUID(SERVICE_UUID);a->setScanResponse(true);a->setMinPreferred(0x06);a->setMinPreferred(0x12);BLEDevice::startAdvertising();
 }
-void setup(){pinMode(STATUS_LED,OUTPUT);Serial.begin(BAUD_RATE);Wire.begin(SDA_PIN,SCL_PIN);analogReadResolution(12);analogSetPinAttenuation(GSR_PIN,ADC_11db);pinMode(ANALOG_PPG_PIN,INPUT);analogSetPinAttenuation(ANALOG_PPG_PIN,ADC_11db);delay(300);setupSensors();Serial.println("ANALOG_PPG=GPIO4 (GPIO40 physically bridged to GPIO4 is supported)");calibrateIMU();setupBLE();}
+void setup(){pinMode(STATUS_LED,OUTPUT);Serial.begin(BAUD_RATE);Wire.begin(SDA_PIN,SCL_PIN);analogReadResolution(12);analogSetPinAttenuation(GSR_PIN,ADC_11db);pinMode(ANALOG_PPG_PIN,INPUT);analogSetPinAttenuation(ANALOG_PPG_PIN,ADC_11db);delay(300);setupSensors();Serial.println("ENDO-TWIN-WEARABLE READY | SDA=8 SCL=9 TEMP=6 PPG=GPIO40->GPIO4 VCC=3V3 GND=GND");calibrateIMU();setupBLE();}
 void loop(){uint32_t n=millis();if(n-lp>=PPG_PERIOD_MS){lp=n;if(ppgOK){ir=ppg.getIR();red=ppg.getRed();}else if(analogPpgOK){ir=(uint32_t)analogRead(ANALOG_PPG_PIN);red=0;}}if(n-li>=IMU_PERIOD_MS){li=n;if(mpuOK){sensors_event_t a,g,t;mpu.getEvent(&a,&g,&t);ax=a.acceleration.x/9.80665f-axb;ay=a.acceleration.y/9.80665f-ayb;az=a.acceleration.z/9.80665f-azb;gx=g.gyro.x*57.29578f-gxb;gy=g.gyro.y*57.29578f-gyb;gz=g.gyro.z*57.29578f-gzb;}}if(n-lg>=GSR_PERIOD_MS){lg=n;gsr=analogRead(GSR_PIN);}if(n-lt>=TEMP_PERIOD_MS){lt=n;if(tempOK){temp.requestTemperatures();temp0=temp.getTempCByIndex(0);}}if(n-lpack>=PACKET_PERIOD_MS){lpack=n;publish();}static String b;while(Serial.available()){char c=(char)Serial.read();if(c=='\n'||c=='\r'){if(b.length())command(b);b="";}else if(b.length()<48)b+=c;}}
