@@ -1,4 +1,3 @@
-from desktop.workstation_runtime import RingGauge, metric_card, trend_panel
 """Main Window for CHRONO-TWIN NEXUS V8.3.
 
 Dashboard sections:
@@ -47,6 +46,7 @@ from src.ui.vital_cards import VitalCard
 from src.ui.live_plots import TimeSeriesPlot
 from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
+from desktop.workstation_runtime import RingGauge, metric_card, trend_panel
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
 from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
