@@ -550,6 +550,10 @@ class PatientWindow(QMainWindow):
         self.baseline_progress.setValue(0)
         cv.addWidget(self.baseline_progress)
         br = QHBoxLayout()
+        self.ppg_calibrate_btn = QPushButton("Calibrate PPG for Patient (5 s)")
+        self.ppg_calibrate_btn.setObjectName("secondary")
+        self.ppg_calibrate_btn.clicked.connect(self._calibrate_patient_ppg)
+        br.addWidget(self.ppg_calibrate_btn)
         start_btn = QPushButton("Start / Restart 60 s Baseline")
         start_btn.setObjectName("primary")
         start_btn.clicked.connect(self._start_baseline_capture)
@@ -578,6 +582,16 @@ class PatientWindow(QMainWindow):
         switch = QPushButton("Switch Patient"); switch.setObjectName("primary"); switch.clicked.connect(self._switch_patient); row.addWidget(switch)
         row.addStretch(); o.addLayout(row)
         return w
+
+    def _calibrate_patient_ppg(self):
+        if self.mode.mode == "demo" or self.session is None:
+            self.baseline_capture_status.setText("Connect the wearable in LIVE mode before starting PPG calibration.")
+            return
+        self.session.write_command(f"PPG_PERSON={self.participant_id}")
+        self.session.write_command("PPG_NEW_PERSON")
+        self.baseline_capture_status.setText(
+            f"PPG calibration started for {self.participant_id} • keep finger still for 5 s."
+        )
 
     def _start_baseline_capture(self):
         if self.mode.mode == "demo":
