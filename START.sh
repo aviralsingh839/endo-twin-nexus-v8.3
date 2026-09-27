@@ -50,7 +50,7 @@ if [[ -z "$MODE" ]]; then
 fi
 case "$MODE" in
  menu) menu ;;
- self-learning|personal-twin) runpy -m src.personal_twin.self_learning_app
+ self-learning|personal-twin) runpy -m src.personal_twin.self_learning_app ;;
  onboard|profile) runpy -m src.personal_twin.onboarding ;;
  unified|workstation) runpy -m src.ui.main_window ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
