@@ -101,9 +101,11 @@ static void calibratePPG(const String& id){
   Serial.print("[PPG] p2p=");Serial.println(ppgP2P,2);
   Serial.print("[PPG] quality=");Serial.println(q,1);
   if(ppgP2P<8)Serial.println("[PPG] WARNING: very small waveform; check contact/wiring.");
-  Serial.print("$PCAL,");Serial.print(id);Serial.print(",");Serial.print(ppgBaseline,3);
-  Serial.print(",");Serial.print(ppgNoise,3);Serial.print(",");Serial.print(ppgP2P,3);
-  Serial.print(",");Serial.print(q,1);Serial.print(",");Serial.println((unsigned long)millis());
+  char pcal[180];
+  snprintf(pcal,sizeof(pcal),"$PCAL,%s,%.3f,%.3f,%.3f,%.1f,%lu",
+    id.c_str(),ppgBaseline,ppgNoise,ppgP2P,q,(unsigned long)millis());
+  Serial.println(pcal);
+  if(tcpClient&&tcpClient.connected()) tcpClient.println(pcal);
 }
 static void setupMPU(){
   if(!mpu.begin(0x68,&Wire)){if(!mpu.begin(0x69,&Wire)){statusBase|=(1u<<ST_MPU_ERR);return;}}
