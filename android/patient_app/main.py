@@ -51,6 +51,18 @@ class PatientDashboard(BoxLayout):
         self.add_widget(Label(text='CHRONO-PCOS Patient Dashboard', size_hint_y=None, height=dp(40), font_size='20sp', bold=True))
         self.add_widget(Label(text='Research / Risk-Screening - Not a Medical Diagnosis', size_hint_y=None, height=dp(30), color=(1, 0.8, 0.2, 1)))
 
+        # Patient-specific PPG calibration
+        calibration = self.db.get_latest_ppg_calibration("DEMO-001")
+        cal_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(125), padding=dp(10))
+        if calibration:
+            cal_box.add_widget(Label(text=f"PPG calibration: {calibration['profile_id']} • quality {calibration['quality']:.0f}%"))
+            cal_box.add_widget(Label(text=f"Baseline {calibration['baseline_adc']:.1f} ADC • P2P {calibration['peak_to_peak']:.1f} • noise {calibration['noise_sd']:.1f}"))
+            cal_box.add_widget(Label(text="Patient-specific calibration stored locally"))
+        else:
+            cal_box.add_widget(Label(text="PPG calibration: Not established for this patient"))
+            cal_box.add_widget(Label(text="Connect the wearable and start a new-person calibration"))
+        self.add_widget(cal_box)
+
         # Data collection status
         status_box = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(150), padding=dp(10))
         status_box.add_widget(Label(text='Data Collection Status: Ready', font_size='16sp'))
