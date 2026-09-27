@@ -67,9 +67,10 @@ def test_care_discovery():
     sensor_supplies = supply_engine.list_supplies(category='sensor')
     assert len(sensor_supplies) == 3
 
-    search_supplies = supply_engine.search_supplies("MAX30102")
+    # The V8.8 migration replaced the MAX30102 module with the analog Pulse Sensor.
+    search_supplies = supply_engine.search_supplies("Analog Pulse Sensor")
     assert len(search_supplies) == 1
-    assert search_supplies[0]['name'] == "MAX30102 Sensor Module"
+    assert search_supplies[0]['name'] == "Generic Analog Pulse Sensor Module"
 
     categories = supply_engine.get_categories()
     assert 'sensor' in categories

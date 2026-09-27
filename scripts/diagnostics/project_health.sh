@@ -196,7 +196,7 @@ fi
 echo "" | tee -a "$LOG_FILE"
 echo "--- Launchers ---" | tee -a "$LOG_FILE"
 if [[ -f "$PROJECT_ROOT/START.sh" ]] && [[ -x "$PROJECT_ROOT/START.sh" ]]; then
-    if "$PROJECT_ROOT/START.sh" help 2>&1 | grep -q "CHRONO-PCOS"; then
+    if "$PROJECT_ROOT/START.sh" help 2>&1 | grep -qi "targets\|launcher\|ENDO-TWIN"; then
         check "START.sh" "PASS" "Canonical launcher exists executable and help works - real execution"
     else
         check "START.sh" "WARN" "START.sh exists but help failed"

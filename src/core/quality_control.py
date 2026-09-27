@@ -195,8 +195,21 @@ class SensorQualityControl:
                 )
         elif channel in ("analog_pulse", "pulse_raw"):
             # Analog Pulse Sensor uses the ADC range, not the optical IR scale.
+            # A reading pinned to either rail means the electrode is unplugged,
+            # shorted or the amplifier is saturated - there is no waveform to
+            # analyse, so this is an artifact rather than merely poor quality.
             span = max(self.thresholds.analog_pulse_max - self.thresholds.analog_pulse_min, 1)
-            normalized = (float(value) - self.thresholds.analog_pulse_min) / span
+            v = float(value)
+            normalized = (v - self.thresholds.analog_pulse_min) / span
+            at_low = v <= self.thresholds.analog_pulse_min
+            at_high = v >= self.thresholds.analog_pulse_max
+            if at_low or at_high:
+                return SensorQuality(
+                    value=v, quality=0.0, source=source, timestamp=ts, artifact=True,
+                    artifact_type="disconnected" if at_low else "saturated",
+                    reason=("analog pulse input at ground - sensor unplugged or shorted"
+                            if at_low else "analog pulse input railed - amplifier saturated"),
+                )
             if normalized <= 0.002 or normalized >= 0.998:
                 quality = min(quality, 0.25)
 
@@ -206,10 +219,18 @@ class SensorQualityControl:
             reason=reason
         )
 
-    def evaluate_sample(self, sample: dict, source: str = "wearable") -> Dict[str, SensorQuality]:
-        """Evaluate a dict of channel->value."""
+    def evaluate_sample(self, sample: dict, source: str = "wearable",
+                        timestamp_s: Optional[float] = None) -> Dict[str, SensorQuality]:
+        """Evaluate a dict of channel->value.
+
+        The sample time may be supplied either as a ``timestamp_s`` key inside
+        ``sample`` or as the keyword argument; the argument wins so callers
+        that hold the real acquisition time do not have to mutate the dict.
+        """
         results = {}
-        ts = sample.get("timestamp_s", time.time())
+        if timestamp_s is None:
+            timestamp_s = sample.get("timestamp_s", time.time())
+        ts = timestamp_s
         for ch, val in sample.items():
             if ch == "timestamp_s":
                 continue
