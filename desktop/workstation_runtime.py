@@ -185,12 +185,25 @@ class StreamingFeatureProcessor:
 
         gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>4090 else 1.0
         motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45))
-        quality=max(0.0,min(1.0,0.72*ppg_q+0.14*gsr_q+0.14*motion_q))
-        usable=quality>=0.45 and not ppg_low and not ppg_sat
+        temp_value=getattr(sample,"room_temp_c",None)
+        temp_q=1.0 if temp_value is not None and math.isfinite(float(temp_value)) else 0.0
+        components=[]
+        if ppg_q>0.0:
+            components.append((ppg_q,0.55))
+        if gsr_q>0.0:
+            components.append((gsr_q,0.20))
+        if motion_q>0.0:
+            components.append((motion_q,0.15))
+        if temp_q>0.0:
+            components.append((temp_q,0.10))
+        weight_sum=sum(w for _,w in components)
+        quality=max(0.0,min(1.0,sum(v*w for v,w in components)/weight_sum)) if weight_sum else 0.0
+        ppg_usable=ppg_q>=0.45 and not ppg_low and not ppg_sat
+        usable=quality>=0.45
 
-        hr=ppg.get("hr_bpm") if usable else None
-        rmssd=ppg.get("rmssd_ms") if usable else None
-        sdnn=ppg.get("sdnn_ms") if usable else None
+        hr=ppg.get("hr_bpm") if ppg_usable else None
+        rmssd=ppg.get("rmssd_ms") if ppg_usable else None
+        sdnn=ppg.get("sdnn_ms") if ppg_usable else None
         spo2=None if use_analog else (ppg.get("spo2_pct") if quality>=0.55 and not ppg_low and not ppg_sat else None)
 
         rate=None
@@ -206,6 +219,7 @@ class StreamingFeatureProcessor:
             "sdnn_ms":sdnn,
             "spo2_pct":spo2,
             "skin_temp_c":None,
+            "temperature_provenance":"ROOM_SENSOR" if temp_q>0.0 else "UNKNOWN",
             "room_temp_c":getattr(sample,"room_temp_c",None),
             "humidity_pct":getattr(sample,"humidity_pct",None),
             "pressure_hpa":getattr(sample,"pressure_hpa",None),
@@ -216,6 +230,7 @@ class StreamingFeatureProcessor:
             "activity_level":motion.get("activity_level",0.0),
             "signal_quality":quality,
             "ppg_quality":ppg_q,
+            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": True, "temperature": temp_q > 0.0},
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
@@ -253,7 +268,8 @@ class LiveSession(QObject):
         else:
             self.reader=ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample)
-        if hasattr(self.reader, "calibration_received"):\n            self.reader.calibration_received.connect(self.calibration_received)
+        if hasattr(self.reader, "calibration_received"):
+            self.reader.calibration_received.connect(self.calibration_received)
         self.reader.state_changed.connect(self.state_changed)
         self.reader.error_received.connect(self.error_received)
         self.reader.start()
