@@ -30,6 +30,7 @@ from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choo
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_summary
 from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from src.personal_twin.participant_selector import choose_participant
 from desktop.prototype_lab import PrototypeLabWidget
@@ -989,10 +990,14 @@ class DoctorWindow(QMainWindow):
         learning = state.get("learning", {})
         p = state.get("profile", {})
         self.personal_model.set_participant(str(p.get("participant_id") or self.participant_id))
+        baseline = baseline_summary(self.participant_id)
         lines = [
+            f"Patient: {p.get('patient_name') or p.get('alias') or self.participant_id}",
             f"Model: {learning.get('version', 'adaptive-personal-twin-v1')}",
             f"Quality-gated observations: {int(learning.get('samples', 0)):,}",
             f"Quality-weighted observations: {float(learning.get('quality_weighted_samples', 0.0)):.1f}",
+            f"Stored baseline: {'YES' if baseline['available'] else 'NO'}"
+            + (f" • {baseline['samples']} windows • confidence {baseline['confidence']:.2f}" if baseline['available'] else ""),
             "",
             "Learned personal reference:",
         ]
