@@ -5,7 +5,7 @@ from collections import deque
 import math
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from src.serial_io.arduino_reader import ArduinoReader
