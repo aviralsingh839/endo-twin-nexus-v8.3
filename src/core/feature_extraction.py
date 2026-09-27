@@ -196,6 +196,26 @@ class RealtimeFeatureExtractor:
         c = completeness_score(fv.hr_bpm, fv.rmssd_ms, fv.skin_temp_c, fv.gsr_tonic, fv.spo2_pct)
         fv.signal_quality = 0.7 * fv.signal_quality + 0.3 * c
 
+        # Do not turn absent/invalid sensors into plausible-looking physiological
+        # defaults. Derived values become UNKNOWN/neutral when the quality gate fails.
+        if fv.signal_quality < 0.20:
+            fv.hr_bpm = None
+            fv.resting_hr_bpm = None
+            fv.rmssd_ms = None
+            fv.sdnn_ms = None
+            fv.pnn50_pct = None
+            fv.spo2_pct = None
+            fv.skin_temp_c = None
+            fv.gsr_tonic = None
+            fv.sleep_status = "unknown"
+            fv.sleep_probability = 0.0
+            fv.sleep_duration_h = None
+            fv.sleep_regularity = 0.0
+            fv.stress_index = 0.0
+            fv.autonomic_imbalance = 0.0
+            fv.circadian_stability_index = 50.0
+            fv.circadian_disruption = 50.0
+
         # Personal baseline
         if self.baseline_engine.has_baseline:
             fv.baseline_available = True
