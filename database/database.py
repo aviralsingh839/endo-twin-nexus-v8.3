@@ -218,6 +218,29 @@ class LocalDatabase:
         )
         """)
 
+        # Person-specific PPG calibration profiles. This stores calibration
+        # metadata only (not raw PPG waveforms) and is scoped to patient_id.
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ppg_calibrations (
+            calibration_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            profile_id TEXT NOT NULL,
+            baseline_adc REAL,
+            noise_sd REAL,
+            peak_to_peak REAL,
+            quality REAL,
+            calibrated_at REAL NOT NULL,
+            wearable_event_ms INTEGER,
+            source TEXT NOT NULL DEFAULT 'ESP32-S3',
+            label TEXT NOT NULL DEFAULT 'MEASURED',
+            FOREIGN KEY(patient_id) REFERENCES patients(patient_id)
+        )
+        """)
+        cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_ppg_calibrations_patient
+        ON ppg_calibrations(patient_id, calibrated_at DESC)
+        """)
+
         # Sensor quality
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sensor_quality (
@@ -493,6 +516,83 @@ class LocalDatabase:
             """, (s["supply_id"], s["name"], s["category"], s["description"], s["provider_id"], s["price"], s["availability"], time.time()))
 
         self.conn.commit()
+
+    # Person-specific PPG calibration
+    def save_ppg_calibration(
+        self,
+        patient_id: str,
+        profile_id: str,
+        baseline_adc: float,
+        noise_sd: float,
+        peak_to_peak: float,
+        quality: float,
+        wearable_event_ms: int | None = None,
+        source: str = "ESP32-S3",
+        label: str = "MEASURED",
+    ) -> str:
+        calibration_id = str(uuid.uuid4())
+        cur = self.conn.cursor()
+        cur.execute("""
+        INSERT INTO ppg_calibrations
+        (calibration_id, patient_id, profile_id, baseline_adc, noise_sd,
+         peak_to_peak, quality, calibrated_at, wearable_event_ms, source, label)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            calibration_id, patient_id, profile_id, baseline_adc, noise_sd,
+            peak_to_peak, quality, time.time(), wearable_event_ms, source, label
+        ))
+        self.conn.commit()
+        self._log_audit(None, patient_id, "ppg_calibration_saved", {
+            "calibration_id": calibration_id,
+            "profile_id": profile_id,
+            "quality": quality,
+        })
+        return calibration_id
+
+    def get_latest_ppg_calibration(self, patient_id: str) -> Optional[Dict]:
+        cur = self.conn.cursor()
+        cur.execute("""
+        SELECT * FROM ppg_calibrations
+        WHERE patient_id=?
+        ORDER BY calibrated_at DESC
+        LIMIT 1
+        """, (patient_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def list_ppg_calibrations(self, patient_id: str, limit: int = 20) -> List[Dict]:
+        cur = self.conn.cursor()
+        cur.execute("""
+        SELECT * FROM ppg_calibrations
+        WHERE patient_id=?
+        ORDER BY calibrated_at DESC
+        LIMIT ?
+        """, (patient_id, limit))
+        return [dict(row) for row in cur.fetchall()]
+
+    # Parse the machine-readable ESP32 event emitted after PPG_NEW_PERSON.
+    def ingest_ppg_calibration_event(self, patient_id: str, line: str) -> Optional[str]:
+        parts = line.strip().split(",")
+        if len(parts) != 7 or parts[0] != "$PCAL":
+            return None
+        try:
+            profile_id = parts[1]
+            baseline_adc = float(parts[2])
+            noise_sd = float(parts[3])
+            peak_to_peak = float(parts[4])
+            quality = float(parts[5])
+            wearable_event_ms = int(parts[6])
+        except (ValueError, IndexError):
+            return None
+        return self.save_ppg_calibration(
+            patient_id=patient_id,
+            profile_id=profile_id,
+            baseline_adc=baseline_adc,
+            noise_sd=noise_sd,
+            peak_to_peak=peak_to_peak,
+            quality=quality,
+            wearable_event_ms=wearable_event_ms,
+        )
 
     # User management
     def create_user(self, username: str, password: str, role: str) -> str:
