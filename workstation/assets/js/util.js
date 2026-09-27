@@ -19,6 +19,7 @@ const U = (() => {
 
   /** Smooth pseudo-physiological series */
   function series(seed, n, base, amp, drift = 0) {
+    if (base == null || !isFinite(base)) return [];   // nothing measured -> nothing drawn
     const r = rng(seed);
     const out = [];
     let v = base;
@@ -107,6 +108,9 @@ const U = (() => {
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 14a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 18.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4 12.9H4a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 5.6 6.2l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 11 4V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H22a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
     shield: '<path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>',
+    database: '<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/>',
+    eye: '<path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 5v6h-6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     edit: '<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
     trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
@@ -163,10 +167,20 @@ const U = (() => {
   };
 
   function riskTone(score) {
+    if (score == null || isNaN(score)) return { label: 'No signal', cls: 'plain', color: C.gray, none: true };
     if (score >= 70) return { label: 'High', cls: 'bad', color: C.red };
     if (score >= 45) return { label: 'Moderate', cls: 'warn', color: C.orange };
     return { label: 'Low', cls: 'good', color: C.green };
   }
+
+  /** Format a possibly-missing value. Never invents a number. */
+  function num(v, dp, dash = '—') {
+    if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return dash;
+    if (typeof v !== 'number') return String(v);
+    return dp == null ? String(v) : String(+v.toFixed(dp));
+  }
+  const has = v => v != null && v !== '' && !(typeof v === 'number' && isNaN(v));
+  const nz = (v, fallback = 0) => (has(v) ? v : fallback);
 
   /* ---------- misc ---------- */
   function download(filename, text) {
@@ -177,5 +191,5 @@ const U = (() => {
   }
 
   return { rng, series, clamp, rand, pick, round, sum, avg, el, esc, $, $$, MONTHS, DAYS,
-    fmtDate, fmtShort, fmtTime, greeting, daysAgo, initials, uid, icon, P, C, soft, riskTone, download };
+    fmtDate, fmtShort, fmtTime, greeting, daysAgo, initials, uid, icon, P, C, soft, riskTone, num, has, nz, download };
 })();

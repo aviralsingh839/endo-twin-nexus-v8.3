@@ -7,6 +7,14 @@ const Chart = (() => {
   let uidc = 0;
   const nid = () => 'cg' + (++uidc);
 
+  /** Honest placeholder: the platform never draws invented data. */
+  function emptyChart(text, h = 140) {
+    return `<div class="chart-empty" style="height:${Math.max(70, Math.min(h, 220))}px">
+      <svg viewBox="0 0 24 24" class="ce-ico"><path d="M4 20h16" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M4 16l4-3 3 2 4-6 5 4" stroke="currentColor" fill="none" stroke-width="1.6" stroke-dasharray="3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>${text}</span></div>`;
+  }
+
   const norm = (vals, min, max) => vals.map(v => (max === min ? 0.5 : (v - min) / (max - min)));
 
   function path(points, smooth = true) {
@@ -23,6 +31,9 @@ const Chart = (() => {
 
   /* ------------------------------ sparkline ------------------------------ */
   function spark(values, color, w = 66, h = 30, opts = {}) {
+    values = (values || []).filter(v => v != null && !isNaN(v));
+    if (!values.length) return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <line x1="2" y1="${h / 2}" x2="${w - 2}" y2="${h / 2}" stroke="var(--border-2)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>`;
     const min = Math.min(...values), max = Math.max(...values);
     const n = norm(values, min, max);
     const pts = n.map((v, i) => [i * (w / (n.length - 1 || 1)), h - 3 - v * (h - 8)]);
@@ -44,8 +55,8 @@ const Chart = (() => {
     const w = opts.w || 720, h = opts.h || 190;
     const pad = Object.assign({ l: 34, r: 10, t: 10, b: 20 }, opts.pad || {});
     const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
-    const vis = series.filter(s => !s.hidden && s.data && s.data.length);
-    if (!vis.length) return `<div class="empty">No series selected</div>`;
+    const vis = (series || []).filter(s => !s.hidden && s.data && s.data.length);
+    if (!vis.length) return emptyChart(opts.emptyText || 'No data recorded yet', h);
     const all = vis.flatMap(s => s.data);
     let min = opts.min != null ? opts.min : Math.min(...all);
     let max = opts.max != null ? opts.max : Math.max(...all);
@@ -93,6 +104,8 @@ const Chart = (() => {
 
   /* ------------------------------ donut gauge ----------------------------- */
   function donut(pct, opts = {}) {
+    const missing = pct == null || isNaN(pct);
+    if (missing) { opts = Object.assign({}, opts, { text: opts.text != null ? opts.text : '—', gradient: ['#39415e', '#4b5570'] }); pct = 0; }
     const size = opts.size || 150, sw = opts.stroke || 14;
     const r = (size - sw) / 2 - 2, cx = size / 2, cy = size / 2;
     const circ = 2 * Math.PI * r;
@@ -116,6 +129,7 @@ const Chart = (() => {
 
   /* ------------------------------ small ring ------------------------------ */
   function ring(pct, color, size = 74, label = '') {
+    if (pct == null || isNaN(pct)) { label = label || '—'; pct = 0; color = 'var(--border-2)'; }
     const sw = 8, r = (size - sw) / 2 - 1, cx = size / 2, circ = 2 * Math.PI * r;
     const off = circ * (1 - pct / 100);
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -130,7 +144,9 @@ const Chart = (() => {
 
   /* --------------------------------- bars -------------------------------- */
   function bars(data, opts = {}) {
+    data = (data || []).filter(d => d && d.v != null && !isNaN(d.v));
     const w = opts.w || 320, h = opts.h || 140;
+    if (!data.length) return emptyChart(opts.emptyText || 'No data recorded yet', h);
     const pad = { l: 28, r: 8, t: 8, b: 20 };
     const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
     const max = opts.max || Math.max(...data.map(d => d.v)) * 1.15 || 1;
@@ -154,6 +170,8 @@ const Chart = (() => {
 
   /* -------------------------------- radar -------------------------------- */
   function radar(axes, sets, size = 240) {
+    sets = (sets || []).filter(s => s && s.values && s.values.length && s.values.some(v => v != null && !isNaN(v)));
+    if (!axes || !axes.length || !sets.length) return emptyChart('No data recorded yet', size);
     const cx = size / 2, cy = size / 2, R = size / 2 - 32;
     const n = axes.length;
     const pt = (i, v) => {
@@ -180,6 +198,7 @@ const Chart = (() => {
 
   /* ------------------------------- heatmap ------------------------------- */
   function heatmap(rows, cols, values, color = '#7c5cff', cell = 15) {
+    if (!rows || !rows.length || !cols || !cols.length) return emptyChart('No data recorded yet', 120);
     const gap = 3, w = cols.length * (cell + gap) + 46, h = rows.length * (cell + gap) + 20;
     let out = '';
     rows.forEach((r, ri) => {
@@ -198,7 +217,9 @@ const Chart = (() => {
 
   /* ------------------------------- scatter ------------------------------- */
   function scatter(points, opts = {}) {
+    points = (points || []).filter(p => p && p.x != null && p.y != null && !isNaN(p.x) && !isNaN(p.y));
     const w = opts.w || 320, h = opts.h || 200, pad = { l: 30, r: 10, t: 10, b: 22 };
+    if (!points.length) return emptyChart(opts.emptyText || 'No data recorded yet', h);
     const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
     const xs = points.map(p => p.x), ys = points.map(p => p.y);
     const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
@@ -239,6 +260,8 @@ const Chart = (() => {
 
   /* --------------------------- horizontal bars ---------------------------- */
   function hbars(items, opts = {}) {
+    items = (items || []).filter(i => i && i.v != null && !isNaN(i.v));
+    if (!items.length) return emptyChart('No data recorded yet', 90);
     return `<div style="display:flex;flex-direction:column;gap:9px">` + items.map(it => `
       <div>
         <div class="flex between small" style="margin-bottom:4px">
@@ -249,5 +272,5 @@ const Chart = (() => {
       </div>`).join('') + `</div>`;
   }
 
-  return { spark, lines, donut, ring, bars, radar, heatmap, scatter, waveform, hbars, path };
+  return { spark, lines, donut, ring, bars, radar, heatmap, scatter, waveform, hbars, path, emptyChart };
 })();

@@ -5,7 +5,8 @@ Switch between them from the profile control in the **top-right** corner
 (or press <kbd>Ctrl</kbd>+<kbd>D</kbd>).
 
 > Research prototype — not a medical device, not a diagnosis.
-> **Every record in this UI is synthetic demo data.**
+> Records shown in **live mode** come from the platform's own SQLite database;
+> records shown in **demo mode** are synthetic sample data and are labelled as such.
 
 ---
 
@@ -20,6 +21,48 @@ python3 workstation/serve.py --port 8787 --no-browser
 
 No build step, no npm, no external CDN — plain HTML/CSS/JS + Python's stdlib
 HTTP server. Works offline.
+
+---
+
+## Where the data comes from
+
+`workstation/api.py` is a dependency-free data layer over
+`data/chrono_twin_nexus_v8_3_plus.db` — the same SQLite file the PySide6
+applications use. `serve.py` routes `/api/*` to it.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/health` | table counts, file size, whether the DB is empty |
+| `GET /api/bootstrap` | health + every patient (with signals) + every clinician |
+| `GET/POST /api/patients` · `GET/PATCH/DELETE /api/patients/<id>` | registry CRUD |
+| `GET /api/patients/<id>/series` | raw downsampled sensor series |
+| `GET/POST /api/doctors` · `PATCH/DELETE /api/doctors/<id>` | clinician CRUD (`providers` table) |
+| `POST /api/notes` · `/api/symptoms` · `/api/cycles` · `/api/reports` | clinical writes |
+| `POST /api/seed-demo` · `/api/clear-demo` | add / remove rows tagged `SYNTHETIC_DEMO` |
+
+Rules the UI follows:
+
+* **Nothing is invented.** Vitals, trends, risk, cycle day, ultrasound metrics
+  and data quality are computed from rows in the database. A measurement that
+  was never recorded renders as `—`, and its chart shows an explicit
+  *"No data recorded yet"* placeholder.
+* **The source is always visible.** The chip in the top bar reads
+  `LIVE DATABASE`, `LIVE DB · EMPTY` or `DEMO DATA`; click it for the file path
+  and per-table row counts.
+* **Writes are real.** Creating or editing a patient/clinician, logging a
+  symptom or saving a note inserts into SQLite. Check with:
+
+```bash
+./START.sh db-status
+python3 workstation/api.py --seed      # 10 participants + 5 clinicians, tagged
+python3 workstation/api.py --clear     # remove exactly those tagged rows
+```
+
+* **Demo data stays separable.** Everything written by the seeder carries
+  `label = 'SYNTHETIC_DEMO'` (clinicians carry it inside `services_json`), so one
+  click removes it without touching real recordings.
+* **Offline fallback.** With no backend the UI switches to `DemoData` and flags
+  itself as DEMO DATA rather than pretending to be live.
 
 ---
 

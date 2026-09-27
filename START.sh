@@ -5,6 +5,9 @@
 #   ./START.sh              -> Unified Workstation (web UI: Patient + Doctor)
 #   ./START.sh menu         -> full text menu (desktop apps, builds, tests)
 #   ./START.sh ui [port]    -> same as default, optional port
+#   ./START.sh db-status    -> what the workstation database actually contains
+#   ./START.sh seed-demo    -> write a labelled demo cohort into that database
+#   ./START.sh clear-demo   -> delete every SYNTHETIC_DEMO row again
 #   ./START.sh doctor       -> PySide6 doctor desktop app
 #   ./START.sh patient      -> PySide6 patient desktop app
 #   ./START.sh help         -> all commands
@@ -23,6 +26,12 @@ workstation(){
   local port="${1:-${ENDOTWIN_PORT:-8787}}"
   echo "Starting ENDO-TWIN NEXUS Unified Workstation on port ${port} ..."
   exec "$PY" "$ROOT/workstation/serve.py" --port "$port" --host "${ENDOTWIN_HOST:-0.0.0.0}"
+}
+
+# ---- workstation database helpers --------------------------------------
+dbtool(){
+  [[ -n "$PY" ]] || { echo "ERROR: python3 not found in PATH"; exit 1; }
+  "$PY" "$ROOT/workstation/api.py" "$@"
 }
 
 menu(){
@@ -70,6 +79,9 @@ MODE=""; [[ $# -ge 1 ]] && MODE="$1"; [[ -n "$MODE" ]] || MODE=workstation
 case "$MODE" in
  ui|web|workstation|unified-web|dashboard|nexus) shift || true; workstation "${1:-}" ;;
  menu) menu ;;
+ db-status|dbstatus|data-status) dbtool --status ;;
+ seed-demo|seed) dbtool --seed ;;
+ clear-demo|clear) dbtool --clear ;;
  unified|desktop) runpy -m src.ui.main_window ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
  patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
@@ -91,6 +103,9 @@ ENDO-TWIN NEXUS launcher
   ./START.sh                 Unified Workstation web UI (Patient + Doctor) on :8787
   ./START.sh ui 9000         same, on port 9000
   ./START.sh menu            interactive menu (desktop apps, builds, tests)
+  ./START.sh db-status       show what the real SQLite database holds
+  ./START.sh seed-demo       write a labelled demo cohort into the database
+  ./START.sh clear-demo      remove every SYNTHETIC_DEMO row from the database
   ./START.sh unified         PySide6 unified desktop window
   ./START.sh doctor          PySide6 doctor desktop app
   ./START.sh patient         PySide6 patient desktop app

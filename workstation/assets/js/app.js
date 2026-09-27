@@ -21,18 +21,103 @@ const App = (() => {
   /* ------------------------------ top bar ------------------------------- */
   function renderTop() {
     U.$('#brandMark').innerHTML = BRAND_SVG;
-    const p = Store.patient(), d = Store.doctor();
+    const p = Store.patient() || { name: 'No participant', device: '', battery: 0 };
+    const d = Store.doctor() || { name: 'No clinician', specialty: '—' };
     const isDoc = role() === 'doctor';
     U.$('#topAvatar').textContent = U.initials(isDoc ? d.name : p.name);
-    U.$('#topName').textContent = isDoc ? d.name : p.name.split(' ')[0];
+    U.$('#topName').textContent = isDoc ? d.name : String(p.name).split(' ')[0];
     U.$('#topRole').textContent = isDoc ? 'Doctor View' : 'Patient View';
     U.$('#deviceSub').textContent = isDoc
       ? `${DemoData.devices.filter(x => x.state === 'Online').length}/${DemoData.devices.length} devices online`
-      : `${(p.device || '').split('·').pop().trim() || 'ESP32-S3'} • ${p.battery}%`;
-    U.$('#devicePill').classList.toggle('off', !isDoc && p.battery === 0);
+      : `${(p.device || '').split('·').pop().trim() || 'Not paired'} • ${U.num(p.battery)}%`;
+    U.$('#devicePill').classList.toggle('off', !isDoc && !p.battery);
+    renderSourceChip();
     U.$('#notifyBadge').textContent = Store.state.notifications.filter(n => !n.read).length || '';
     U.$('#notifyBadge').style.display = Store.state.notifications.some(n => !n.read) ? 'grid' : 'none';
     renderSwitchMenu();
+  }
+
+  /* --------------------- data source chip (live / demo) ------------------ */
+  function renderSourceChip() {
+    const chip = U.$('#dsChip'); if (!chip) return;
+    const live = Store.isLive(), empty = Store.dbEmpty();
+    chip.classList.toggle('demo', !live);
+    chip.classList.toggle('warn', live && empty);
+    U.$('#dsText').textContent = Store.sourceLabel();
+    const h = Store.health();
+    chip.title = live
+      ? `Reading the real platform database\n${h ? h.db : ''}\n${h ? h.counts.patients + ' patients · ' + h.counts.sensor_sessions + ' sensor sessions' : ''}`
+      : 'Built-in sample dataset (no database reachable or demo mode selected)';
+  }
+
+  function sourceModal() {
+    const h = Store.health(), live = Store.isLive();
+    const rows = h ? [
+      ['Database file', `<span class="mono">${U.esc(h.db)}</span>`],
+      ['File size', (h.size_bytes / 1048576).toFixed(2) + ' MB'],
+      ['Participants', h.counts.patients], ['Providers / clinicians', h.counts.providers],
+      ['Sensor sessions', h.counts.sensor_sessions],
+      ['Sensor rows', (h.counts.hrv_data + h.counts.ppg_data + h.counts.temperature_data + h.counts.gsr_data).toLocaleString()],
+      ['Symptom entries', h.counts.symptoms], ['Cycle entries', h.counts.cycles],
+      ['Ultrasound studies', h.counts.ultrasound_records], ['Model results', h.counts.model_results],
+      ['Clinician notes', h.counts.doctor_notes], ['Reports', h.counts.reports],
+      ['Rows labelled SYNTHETIC_DEMO', h.counts.demo_rows],
+    ] : [['Backend', 'unreachable — ' + (Store.serverError || 'static file mode')]];
+    C.modal({
+      title: 'Data source', sub: live ? 'Live platform database' : 'Built-in demo dataset',
+      icon: 'database', color: live ? U.C.green : U.C.yellow,
+      body: `<p class="muted" style="margin:0 0 12px;font-size:12.6px;line-height:1.6">
+          ${live
+            ? 'Every number on screen is read from the SQLite database this platform writes to. Measurements that were never recorded stay blank (—) instead of being invented.'
+            : 'The backend API is not reachable, so the interface is showing its built-in sample dataset. Nothing here comes from a real participant.'}
+        </p>
+        ${C.table(['Property', 'Value'], rows.map(r => ({ cells: r })))}
+        <div class="dbb-actions" style="margin-top:14px">
+          ${live ? `<button class="btn" data-ds="seed">${U.icon('plus')} Seed demo cohort into database</button>
+                    <button class="btn ghost" data-ds="clear">${U.icon('trash')} Remove seeded demo rows</button>` : ''}
+          <button class="btn ghost" data-ds="${live ? 'demo' : 'live'}">${U.icon('refresh')} ${live ? 'Switch to built-in demo data' : 'Retry live database'}</button>
+        </div>`,
+      footer: `<button class="btn primary" data-close="1">Close</button>`,
+    });
+    U.$$('[data-ds]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.ds;
+      b.disabled = true;
+      try {
+        if (k === 'seed') { C.toast('Seeding cohort into the database…', 'info'); await Store.seedDemoCohort(); C.toast('Demo cohort written to the database'); }
+        if (k === 'clear') { await Store.clearDemoCohort(); C.toast('Seeded demo rows removed', 'info'); }
+        if (k === 'demo') { await Store.useDemo(); C.toast('Showing built-in demo data', 'info'); }
+        if (k === 'live') { await Store.useLive(); C.toast(Store.isLive() ? 'Connected to the platform database' : 'Database still unreachable', Store.isLive() ? 'ok' : 'err'); }
+      } catch (e) { C.toast('Failed: ' + e.message, 'err'); }
+      b.disabled = false;
+      C.closeModal(); renderAll();
+    });
+  }
+
+  function emptyDbPage() {
+    const h = Store.health() || { db: '', counts: {} };
+    return `<div class="db-banner">
+        <div class="dbb-ico">${U.icon('database')}</div>
+        <div style="flex:1">
+          <h3>The platform database has no participants yet</h3>
+          <p>This workstation is connected to the real database
+            (<span class="mono">${U.esc(h.db)}</span>) and it currently contains
+            <b>${h.counts.patients || 0}</b> participant records. Rather than show invented numbers, every
+            panel stays empty until real data exists. Record a session from the PySide6 platform or the ESP32-S3
+            device, or write a clearly-labelled demo cohort into the database to explore the interface.</p>
+          <div class="dbb-actions">
+            <button class="btn" data-act="seedCohort">${U.icon('plus')} Seed demo cohort into database</button>
+            <button class="btn ghost" data-act="useDemoData">${U.icon('eye')} Use built-in demo data instead</button>
+            <button class="btn ghost" data-act="showSource">${U.icon('database')} Data source details</button>
+          </div>
+        </div>
+      </div>
+      ${C.card({ title: 'Why this screen is empty', icon: 'info', color: U.C.sky,
+        body: C.bullets([
+          'Vitals, trends, cycle phase and risk are all derived from rows in the database — none are simulated in live mode.',
+          'Seeding writes rows tagged SYNTHETIC_DEMO into the same database, so they can be removed again in one click.',
+          'Switching to built-in demo data leaves the database untouched and flags the interface as DEMO DATA.',
+        ]) })}
+      ${C.disclaimer()}`;
   }
 
   function renderSwitchMenu() {
@@ -102,6 +187,10 @@ const App = (() => {
   /* -------------------------------- main -------------------------------- */
   function renderMain() {
     const main = U.$('#main');
+    if (Store.dbEmpty()) {
+      main.innerHTML = emptyDbPage();
+      main.scrollTop = 0; bindMain(); return;
+    }
     main.innerHTML = views().render(route);
     main.scrollTop = 0;
     window.scrollTo({ top: 0 });
@@ -118,37 +207,67 @@ const App = (() => {
   }
 
   /* ------------------------------- live tick ----------------------------- */
+  function paintLive(p) {
+    const lc = U.$('#liveChart');
+    if (lc) lc.innerHTML = PatientViews.liveChartHTML(p);
+    U.$$('.vital[data-vital]').forEach(card => {
+      const k = card.dataset.vital;
+      const val = U.$('.v-val', card);
+      const map = {
+        hr: U.num(p.vitals.hr), hrv: U.num(p.vitals.hrv), temp: U.num(p.vitals.temp, 1),
+        gsr: U.num(p.vitals.gsr, 2), steps: U.has(p.vitals.steps) ? p.vitals.steps.toLocaleString() : '—',
+        spo2: U.num(p.vitals.spo2),
+      };
+      if (val && map[k] != null && val.childNodes[0]) val.childNodes[0].nodeValue = map[k];
+      const sp = U.$('.v-spark', card);
+      const col = { hr: U.C.pink, hrv: U.C.sky, temp: U.C.orange, gsr: U.C.violet, steps: U.C.green, spo2: U.C.cyan }[k];
+      if (sp) sp.innerHTML = Chart.spark(p.live[k], col, 62, 34);
+    });
+  }
+
   function startLive() {
     clearInterval(liveTimer);
     if (role() !== 'patient' || route !== 'dashboard' && route !== 'live') return;
     if (!Store.state.settings.liveStream) return;
+
+    /* LIVE MODE: re-read the real series from the database instead of
+       animating invented values. Nothing moves unless new rows were written. */
+    if (Store.isLive()) {
+      const pid = Store.state.activePatient;
+      liveTimer = setInterval(async () => {
+        try {
+          const fresh = await Store.api('/api/patients/' + encodeURIComponent(pid) + '/series');
+          const p = Store.patient(pid);
+          if (!p || !fresh) return;
+          Object.keys(fresh.live || {}).forEach(k => { p.live[k] = fresh.live[k] || []; });
+          Object.assign(p.vitals, fresh.vitals || {});
+          paintLive(p);
+        } catch (e) { /* backend hiccup: keep the last real reading on screen */ }
+      }, 10000);
+      return;
+    }
+
+    /* DEMO MODE: the built-in sample dataset animates so the UI feels live. */
     liveTimer = setInterval(() => {
       const p = Store.patient();
+      if (!p) return;
       ['hr', 'hrv', 'temp', 'gsr', 'steps', 'spo2'].forEach(k => {
         const arr = p.live[k];
+        if (!arr || !arr.length) return;
         const last = arr[arr.length - 1];
         const base = U.avg(arr);
         const amp = { hr: 2.2, hrv: 2.4, temp: 0.08, gsr: 0.02, steps: 6, spo2: 0.3 }[k];
         arr.push(+(last + (Math.random() - 0.5) * amp + (base - last) * 0.15).toFixed(3));
         arr.shift();
       });
-      p.vitals.hr = Math.round(p.live.hr.at(-1));
-      p.vitals.hrv = Math.round(p.live.hrv.at(-1));
-      p.vitals.temp = U.round(p.live.temp.at(-1), 1);
-      p.vitals.gsr = U.round(p.live.gsr.at(-1), 2);
-      p.vitals.spo2 = Math.round(p.live.spo2.at(-1));
-      const lc = U.$('#liveChart');
-      if (lc) lc.innerHTML = PatientViews.liveChartHTML(p);
-      // refresh vital card numbers in place
-      U.$$('.vital[data-vital]').forEach(card => {
-        const k = card.dataset.vital;
-        const val = U.$('.v-val', card);
-        const map = { hr: p.vitals.hr, hrv: p.vitals.hrv, temp: p.vitals.temp, gsr: p.vitals.gsr, steps: p.vitals.steps.toLocaleString(), spo2: p.vitals.spo2 };
-        if (val && map[k] != null) val.childNodes[0].nodeValue = map[k];
-        const sp = U.$('.v-spark', card);
-        const col = { hr: U.C.pink, hrv: U.C.sky, temp: U.C.orange, gsr: U.C.violet, steps: U.C.green, spo2: U.C.cyan }[k];
-        if (sp) sp.innerHTML = Chart.spark(p.live[k], col, 62, 34);
-      });
+      if (p.live.hr.length) {
+        p.vitals.hr = Math.round(p.live.hr.at(-1));
+        p.vitals.hrv = Math.round(p.live.hrv.at(-1));
+        p.vitals.temp = U.round(p.live.temp.at(-1), 1);
+        p.vitals.gsr = U.round(p.live.gsr.at(-1), 2);
+        p.vitals.spo2 = Math.round(p.live.spo2.at(-1));
+      }
+      paintLive(p);
     }, 2200);
   }
 
@@ -183,38 +302,61 @@ const App = (() => {
   ];
 
   const actions = {
+    /* ---- data source ---- */
+    showSource() { sourceModal(); },
+    async seedCohort() {
+      C.toast('Writing labelled demo cohort into the database…', 'info');
+      try { await Store.seedDemoCohort(); renderAll(); C.toast('Demo cohort seeded — every panel now reads real rows'); }
+      catch (e) { C.toast('Seeding failed: ' + e.message, 'err'); }
+    },
+    async clearCohort() {
+      C.confirm('Remove seeded demo rows', 'Deletes every row tagged <span class="mono">SYNTHETIC_DEMO</span> from the database. Real recordings are untouched.',
+        async () => { try { await Store.clearDemoCohort(); renderAll(); C.toast('Seeded demo rows removed', 'info'); } catch (e) { C.toast(e.message, 'err'); } }, 'Remove');
+    },
+    async useDemoData() { await Store.useDemo(); renderAll(); C.toast('Showing built-in demo data', 'info'); },
+    async useLiveData() { await Store.useLive(); renderAll(); C.toast(Store.isLive() ? 'Connected to the platform database' : 'Database unreachable', Store.isLive() ? 'ok' : 'err'); },
+
     /* ---- patients ---- */
     addPatient() {
       C.modal({
         title: 'Add patient', sub: 'Creates a synthetic demo record in local storage', icon: 'plus', color: U.C.pink,
         body: C.form(patientFields({})), okText: 'Create patient',
-        onOk(v) {
+        async onOk(v) {
           if (!v.name) return C.toast('Name is required', 'err');
           if (!v.id) delete v.id;
-          const p = Store.addPatient(v);
-          C.closeModal(); Store.setActivePatient(p.id);
-          if (role() === 'doctor') route = 'registry';
-          renderAll(); C.toast(`${p.name} added (${p.id})`);
+          try {
+            const p = await Store.addPatient(v);
+            C.closeModal(); Store.setActivePatient(p.id);
+            if (role() === 'doctor') route = 'registry';
+            renderAll();
+            C.toast(`${p.name} added (${p.id})` + (Store.isLive() ? ' · saved to database' : ''));
+          } catch (e) { C.toast('Could not save: ' + e.message, 'err'); }
         },
       });
     },
     editPatient(id) {
-      const raw = Store.state.patients.find(p => p.id === id) || Store.state.patients[0];
+      const raw = (Store.isLive() ? Store.patients() : Store.state.patients).find(p => p.id === id)
+        || (Store.isLive() ? Store.patients() : Store.state.patients)[0];
       if (!raw) return;
       C.modal({
         title: 'Edit patient · ' + raw.name, sub: raw.id, icon: 'edit', color: U.C.violet,
         body: C.form(patientFields(raw)), okText: 'Save changes',
-        onOk(v) { delete v.id; Store.updatePatient(raw.id, v); C.closeModal(); renderAll(); C.toast('Record updated'); },
+        async onOk(v) {
+          delete v.id;
+          try { await Store.updatePatient(raw.id, v); C.closeModal(); renderAll(); C.toast('Record updated' + (Store.isLive() ? ' in the database' : '')); }
+          catch (e) { C.toast('Update failed: ' + e.message, 'err'); }
+        },
       });
       const idf = U.$('#f_id'); if (idf) idf.disabled = true;
     },
     deletePatient(id) {
-      const p = Store.state.patients.find(x => x.id === id);
-      C.confirm('Delete patient record', `This removes <b>${U.esc(p.name)}</b> (${id}) from the local demo database. This cannot be undone.`,
-        () => { Store.removePatient(id); renderAll(); C.toast('Record deleted', 'info'); }, 'Delete');
+      const p = (Store.isLive() ? Store.patients() : Store.state.patients).find(x => x.id === id) || { name: id };
+      C.confirm('Delete patient record',
+        `This removes <b>${U.esc(p.name)}</b> (${id})${Store.isLive() ? ' and every linked recording from the platform database' : ' from the local demo dataset'}. This cannot be undone.`,
+        async () => { try { await Store.removePatient(id); renderAll(); C.toast('Record deleted', 'info'); } catch (e) { C.toast(e.message, 'err'); } }, 'Delete');
     },
     openPatient(id) { Store.setActivePatient(id); route = role() === 'doctor' ? 'chart' : 'dashboard'; renderAll(); },
-    markReviewed(id) { Store.updatePatient(id, { status: 'Active' }); renderAll(); C.toast('Marked as reviewed'); },
+    async markReviewed(id) { await Store.updatePatient(id, { status: 'Active' }); renderAll(); C.toast('Marked as reviewed'); },
     switchPatient(id) { Store.setActivePatient(id); renderAll(); },
 
     /* ---- doctors ---- */
@@ -223,12 +365,14 @@ const App = (() => {
         title: 'Add doctor', sub: 'Adds a clinician to this workstation', icon: 'plus', color: U.C.violet,
         body: C.form(doctorFields({ status: 'Available', days: 'Mon–Fri', slot: '09:00 – 17:00', clinic: 'ENDO-TWIN Research Clinic, Delhi' })),
         okText: 'Add doctor',
-        onOk(v) {
+        async onOk(v) {
           if (!v.name) return C.toast('Name is required', 'err');
           if (!/^dr\.?\s/i.test(v.name)) v.name = 'Dr. ' + v.name;
-          const d = Store.addDoctor(v); C.closeModal();
-          if (role() === 'doctor') route = 'doctors';
-          renderAll(); C.toast(`${d.name} added (${d.id})`);
+          try {
+            const d = await Store.addDoctor(v); C.closeModal();
+            if (role() === 'doctor') route = 'doctors';
+            renderAll(); C.toast(`${d.name} added (${d.id})` + (Store.isLive() ? ' · saved to database' : ''));
+          } catch (e) { C.toast('Could not save: ' + e.message, 'err'); }
         },
       });
     },
@@ -237,14 +381,17 @@ const App = (() => {
       C.modal({
         title: 'Edit doctor · ' + d.name, sub: d.id, icon: 'edit', color: U.C.violet,
         body: C.form(doctorFields(d)), okText: 'Save changes',
-        onOk(v) { Store.updateDoctor(d.id, v); C.closeModal(); renderAll(); C.toast('Clinician updated'); },
+        async onOk(v) {
+          try { await Store.updateDoctor(d.id, v); C.closeModal(); renderAll(); C.toast('Clinician updated' + (Store.isLive() ? ' in the database' : '')); }
+          catch (e) { C.toast('Update failed: ' + e.message, 'err'); }
+        },
       });
     },
     deleteDoctor(id) {
       if (Store.doctors().length <= 1) return C.toast('At least one clinician is required', 'err');
       const d = Store.doctors().find(x => x.id === id);
       C.confirm('Remove clinician', `Remove <b>${U.esc(d.name)}</b> from this workstation? Assigned patients keep their record but lose this clinician link.`,
-        () => { Store.removeDoctor(id); renderAll(); C.toast('Clinician removed', 'info'); }, 'Remove');
+        async () => { try { await Store.removeDoctor(id); renderAll(); C.toast('Clinician removed', 'info'); } catch (e) { C.toast(e.message, 'err'); } }, 'Remove');
     },
     signInDoctor(id) { Store.setCurrentDoctor(id); renderAll(); C.toast('Signed in as ' + Store.doctor().name); },
     switchDoctor(id) { Store.setCurrentDoctor(id); renderAll(); },
@@ -259,10 +406,12 @@ const App = (() => {
           { n: 'by', l: 'Author', v: Store.doctor().name },
           { n: 'text', l: 'Note', t: 'textarea', full: true, ph: 'Observation, plan, research caveats…' },
         ]), okText: 'Save note',
-        onOk(v) {
+        async onOk(v) {
           if (!v.text) return C.toast('Note text is required', 'err');
-          Store.addNote(v.patient, v.text, v.by); Store.setActivePatient(v.patient);
-          C.closeModal(); renderAll(); C.toast('Note saved to chart');
+          try {
+            await Store.addNote(v.patient, v.text, v.by); Store.setActivePatient(v.patient);
+            C.closeModal(); renderAll(); C.toast('Note saved to chart' + (Store.isLive() ? ' (database)' : ''));
+          } catch (e) { C.toast('Could not save note: ' + e.message, 'err'); }
         },
       });
     },
@@ -275,12 +424,18 @@ const App = (() => {
           { n: 'severity', l: 'Severity (1–5)', t: 'number', v: 3, min: 1, max: 5 },
           { n: 'note', l: 'Note (optional)', t: 'textarea', full: true },
         ]), okText: 'Log it',
-        onOk(v) { Store.addLog(p.id, 'Symptom', `${v.name} · severity ${v.severity}${v.note ? ' · ' + v.note : ''}`); C.closeModal(); renderMain(); C.toast('Symptom logged'); },
+        async onOk(v) {
+          Store.addLog(p.id, 'Symptom', `${v.name} · severity ${v.severity}${v.note ? ' · ' + v.note : ''}`);
+          try { await Store.addSymptom(p.id, { name: v.name, severity: +v.severity, notes: v.note }); } catch (e) { C.toast(e.message, 'err'); }
+          C.closeModal(); renderAll(); C.toast('Symptom logged' + (Store.isLive() ? ' to the database' : ''));
+        },
       });
     },
-    quickSymptom(name) {
-      Store.addLog(Store.patient().id, 'Symptom', `${name} · severity 3`);
-      C.toast(name + ' logged');
+    async quickSymptom(name) {
+      const pid = Store.patient().id;
+      Store.addLog(pid, 'Symptom', `${name} · severity 3`);
+      try { await Store.addSymptom(pid, { name, severity: 3 }); renderMain(); } catch (e) {}
+      C.toast(name + ' logged' + (Store.isLive() ? ' to the database' : ''));
     },
     addLog() {
       const p = Store.patient();
@@ -319,13 +474,16 @@ const App = (() => {
           { n: 'cycleDay', l: 'Current cycle day', t: 'number', v: p.cycleDay, min: 1, max: 90 },
           { n: 'cycleLen', l: 'Average cycle length', t: 'number', v: p.cycleLen, min: 15, max: 90 },
         ]), okText: 'Save',
-        onOk(v) { Store.updatePatient(p.id, { cycleDay: +v.cycleDay, cycleLen: +v.cycleLen }); C.closeModal(); renderAll(); C.toast('Cycle updated'); },
+        async onOk(v) {
+          try { await Store.updatePatient(p.id, { cycleDay: +v.cycleDay, cycleLen: +v.cycleLen }); C.closeModal(); renderAll(); C.toast('Cycle updated'); }
+          catch (e) { C.toast(e.message, 'err'); }
+        },
       });
     },
-    cycleShift(dir) {
+    async cycleShift(dir) {
       const p = Store.patient();
-      const d = U.clamp(p.cycleDay + (+dir), 1, p.cycleLen);
-      Store.updatePatient(p.id, { cycleDay: d }); renderMain();
+      const d = U.clamp((p.cycleDay || 1) + (+dir), 1, p.cycleLen || 28);
+      await Store.updatePatient(p.id, { cycleDay: d }); renderMain();
     },
     addAppointment() {
       C.modal({
@@ -523,6 +681,9 @@ const App = (() => {
       U.$('#switchMenu').classList.toggle('open');
     };
 
+    const chip = U.$('#dsChip');
+    if (chip) chip.onclick = () => sourceModal();
+
     U.$('#btnTheme').onclick = () => {
       const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.dataset.theme = t; Store.setTheme(t);
@@ -597,14 +758,19 @@ const App = (() => {
   }
 
   /* --------------------------------- init -------------------------------- */
-  function init() {
+  async function init() {
     document.documentElement.dataset.theme = Store.state.theme || 'dark';
     bindShell();
-    renderAll();
     tickClock(); setInterval(tickClock, 1000 * 20);
+    renderAll();                                  // paint immediately…
+    await Store.boot();                           // …then bind to the real database
+    Store.onChange(renderAll);
+    renderAll();
+    if (Store.isLive() && !Store.dbEmpty()) C.toast('Connected to the platform database', 'ok');
+    else if (!Store.isLive()) C.toast('Backend not reachable — showing built-in demo data', 'info');
   }
 
-  return { init, go, actions, renderAll, get route() { return route; } };
+  return { init, go, actions, renderAll, renderSourceChip, sourceModal, get route() { return route; } };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);

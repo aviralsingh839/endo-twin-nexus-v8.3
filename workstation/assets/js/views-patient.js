@@ -116,18 +116,20 @@ const PatientViews = (() => {
     /* vitals */
     const v = p.vitals;
     const vitals = `<div class="row g-6">
-      ${C.vital({ key:'hr',   name: 'Heart Rate',      value: v.hr,    unit: ' bpm',  state: v.hr < 85 ? 'Normal' : 'Elevated', tone: v.hr < 85 ? 'good' : 'warn', color: U.C.pink,   icon: 'heartbeat', series: p.live.hr })}
-      ${C.vital({ key:'hrv',  name: 'HRV (RMSSD)',     value: v.hrv,   unit: ' ms',   state: v.hrv > 40 ? 'Good' : 'Low',       tone: v.hrv > 40 ? 'good' : 'warn', color: U.C.sky,    icon: 'pulse',     series: p.live.hrv })}
-      ${C.vital({ key:'temp', name: 'Skin Temperature',value: v.temp,  unit: ' °C',   state: v.temp < 34.6 ? 'Normal' : 'Raised',tone: v.temp < 34.6 ? 'good' : 'warn', color: U.C.orange, icon: 'temp',   series: p.live.temp })}
-      ${C.vital({ key:'gsr',  name: 'GSR (Stress)',    value: v.gsr,   unit: ' µS',   state: v.gsr < 0.32 ? 'Calm' : 'Aroused', tone: v.gsr < 0.32 ? 'good' : 'warn', color: U.C.violet, icon: 'zap',    series: p.live.gsr })}
-      ${C.vital({ key:'steps',name: 'Activity',        value: v.steps.toLocaleString(), unit: ' steps', state: v.steps > 6000 ? 'Active' : 'Light', tone: v.steps > 6000 ? 'good' : 'info', color: U.C.green, icon: 'run', series: p.live.steps })}
-      ${C.vital({ key:'spo2', name: 'SpO₂',            value: v.spo2,  unit: ' %',    state: v.spo2 >= 95 ? 'Normal' : 'Low',   tone: v.spo2 >= 95 ? 'good' : 'bad',  color: U.C.cyan,   icon: 'drop',   series: p.live.spo2 })}
+      ${C.vital({ key:'hr',   name: 'Heart Rate',      value: U.num(v.hr),   unit: U.has(v.hr) ? ' bpm' : '',  state: !U.has(v.hr) ? 'No data' : v.hr < 85 ? 'Normal' : 'Elevated', tone: !U.has(v.hr) ? 'plain' : v.hr < 85 ? 'good' : 'warn', color: U.C.pink,   icon: 'heartbeat', series: p.live.hr })}
+      ${C.vital({ key:'hrv',  name: 'HRV (RMSSD)',     value: U.num(v.hrv),  unit: U.has(v.hrv) ? ' ms' : '',  state: !U.has(v.hrv) ? 'No data' : v.hrv > 40 ? 'Good' : 'Low', tone: !U.has(v.hrv) ? 'plain' : v.hrv > 40 ? 'good' : 'warn', color: U.C.sky, icon: 'pulse', series: p.live.hrv })}
+      ${C.vital({ key:'temp', name: 'Skin Temperature',value: U.num(v.temp, 1), unit: U.has(v.temp) ? ' °C' : '', state: !U.has(v.temp) ? 'No data' : v.temp < 34.6 ? 'Normal' : 'Raised', tone: !U.has(v.temp) ? 'plain' : v.temp < 34.6 ? 'good' : 'warn', color: U.C.orange, icon: 'temp', series: p.live.temp })}
+      ${C.vital({ key:'gsr',  name: 'GSR (Stress)',    value: U.num(v.gsr, 2), unit: U.has(v.gsr) ? ' µS' : '', state: !U.has(v.gsr) ? 'No data' : v.gsr < 0.32 ? 'Calm' : 'Aroused', tone: !U.has(v.gsr) ? 'plain' : v.gsr < 0.32 ? 'good' : 'warn', color: U.C.violet, icon: 'zap', series: p.live.gsr })}
+      ${C.vital({ key:'steps',name: 'Activity',        value: U.has(v.steps) ? v.steps.toLocaleString() : '—', unit: U.has(v.steps) ? ' steps' : '', state: !U.has(v.steps) ? 'No data' : v.steps > 6000 ? 'Active' : 'Light', tone: !U.has(v.steps) ? 'plain' : v.steps > 6000 ? 'good' : 'info', color: U.C.green, icon: 'run', series: p.live.steps })}
+      ${C.vital({ key:'spo2', name: 'SpO₂',            value: U.num(v.spo2), unit: U.has(v.spo2) ? ' %' : '',  state: !U.has(v.spo2) ? 'No data' : v.spo2 >= 95 ? 'Normal' : 'Low', tone: !U.has(v.spo2) ? 'plain' : v.spo2 >= 95 ? 'good' : 'bad', color: U.C.cyan, icon: 'drop', series: p.live.spo2 })}
     </div>`;
 
     /* live sensor card */
     const liveCard = C.card({
       title: 'Live Sensor Data',
-      right: `<span class="tag good" style="margin:0">● Connected</span>
+      right: `${(p.live.hr && p.live.hr.length)
+          ? `<span class="tag good" style="margin:0">● ${Store.isLive() ? 'Recorded data' : 'Connected'}</span>`
+          : `<span class="tag plain" style="margin:0">● No sensor data</span>`}
         <select class="select" data-act="liveWindow">
           ${['5 min', '10 min', '30 min', '1 hour'].map(w => `<option ${liveState.window === w ? 'selected' : ''}>${w}</option>`).join('')}
         </select>
@@ -139,12 +141,12 @@ const PatientViews = (() => {
         </div>
         <div id="liveChart">${liveChartHTML(p)}</div>
         ${C.statMini([
-          { k: 'HR', v: v.hr + ' bpm', icon: 'heartbeat', color: U.C.pink },
-          { k: 'HRV', v: v.hrv + ' ms', icon: 'pulse', color: U.C.sky },
-          { k: 'Skin Temp', v: v.temp + ' °C', icon: 'temp', color: U.C.orange },
-          { k: 'GSR', v: v.gsr + ' µS', icon: 'zap', color: U.C.violet },
-          { k: 'Steps', v: v.steps.toLocaleString(), icon: 'run', color: U.C.green },
-          { k: 'SpO₂', v: v.spo2 + ' %', icon: 'drop', color: U.C.cyan },
+          { k: 'HR', v: U.has(v.hr) ? v.hr + ' bpm' : '—', icon: 'heartbeat', color: U.C.pink },
+          { k: 'HRV', v: U.has(v.hrv) ? v.hrv + ' ms' : '—', icon: 'pulse', color: U.C.sky },
+          { k: 'Skin Temp', v: U.has(v.temp) ? v.temp + ' °C' : '—', icon: 'temp', color: U.C.orange },
+          { k: 'GSR', v: U.has(v.gsr) ? v.gsr + ' µS' : '—', icon: 'zap', color: U.C.violet },
+          { k: 'Steps', v: U.has(v.steps) ? v.steps.toLocaleString() : '—', icon: 'run', color: U.C.green },
+          { k: 'SpO₂', v: U.has(v.spo2) ? v.spo2 + ' %' : '—', icon: 'drop', color: U.C.cyan },
         ])}`,
     });
 
@@ -331,7 +333,7 @@ const PatientViews = (() => {
         ${C.card({ title: 'PPG waveform', sub: 'MAX30102 · 50 Hz · IR channel', icon: 'wave', iconColor: U.C.pink,
           body: Chart.waveform(p.id + 'w', U.C.pink, 320, 84, 6) + C.statMini([
             { k: 'Perfusion', v: U.round(0.8 + (p.quality * 2), 2) + ' %', icon: 'drop', color: U.C.pink },
-            { k: 'Quality', v: (p.quality * 100).toFixed(0) + ' %', icon: 'check', color: U.C.green },
+            { k: 'Quality', v: U.has(p.quality) ? (p.quality * 100).toFixed(0) + ' %' : '—', icon: 'check', color: U.C.green },
             { k: 'Artifacts', v: Math.round((1 - p.quality) * 40) + ' /min', icon: 'zap', color: U.C.orange }]) })}
         ${C.card({ title: 'Autonomic balance', sub: 'HRV frequency-domain estimate', icon: 'pulse', iconColor: U.C.sky,
           body: Chart.lines([{ name: 'LF', color: U.C.violet, data: p.live.hrv.map(x => x * 1.2) }, { name: 'HF', color: U.C.cyan, data: p.live.hrv.map((x, i) => x * .8 + (i % 5)) }], { h: 108, area: true })
@@ -395,7 +397,7 @@ const PatientViews = (() => {
       { when: '12:41 PM', type: 'Symptom', text: 'Mood swing · severity 3' },
       { when: '11:02 AM', type: 'Meal', text: 'Oats + curd, 320 kcal' },
       { when: '09:30 AM', type: 'Medication', text: 'Inositol 2 g taken' },
-      { when: '07:15 AM', type: 'Sleep', text: `${p.vitals.sleep} h, 2 awakenings` },
+      { when: '07:15 AM', type: 'Sleep', text: `${U.num(p.vitals.sleep, 1)} h` },
     ]).map(l => ({ cells: [l.when, `<span class="tag info" style="margin:0">${l.type}</span>`, l.text, `<button class="btn sm ghost" data-act="deleteLog" data-arg="${l.when}">${U.icon('trash', 'ic', 'width:13px;height:13px')}</button>`] }));
 
     return C.pageHead('Data Logger', 'Manual entries merge with sensor streams — every row keeps its provenance label.',
@@ -408,7 +410,7 @@ const PatientViews = (() => {
       ${C.card({ title: 'Entry log', icon: 'log', body: C.table(
         [{ t: 'Time', w: '110px' }, { t: 'Type', w: '120px' }, { t: 'Detail' }, { t: '', w: '60px' }], rows) })}
       ${C.card({ title: 'Raw stream tail', icon: 'wave', body: `<div class="log-box">${
-        Array.from({ length: 10 }, (_, i) => `<div><span class="dim">${U.fmtTime(new Date(Date.now() - i * 4000))}</span> ppg=${(1800 + i * 13) % 2400} hr=${p.vitals.hr + (i % 3)} temp=${(p.vitals.temp + i * 0.02).toFixed(2)} gsr=${(p.vitals.gsr + i * 0.003).toFixed(3)} ax=${(0.01 * i).toFixed(2)} q=<span class="ok">${(p.quality * 100).toFixed(0)}%</span></div>`).join('')
+        Array.from({ length: 10 }, (_, i) => `<div><span class="dim">${U.fmtTime(new Date(Date.now() - i * 4000))}</span> ppg=${(1800 + i * 13) % 2400} hr=${U.has(p.vitals.hr) ? p.vitals.hr + (i % 3) : '—'} temp=${U.has(p.vitals.temp) ? (p.vitals.temp + i * 0.02).toFixed(2) : '—'} gsr=${U.has(p.vitals.gsr) ? (p.vitals.gsr + i * 0.003).toFixed(3) : '—'} ax=${(0.01 * i).toFixed(2)} q=<span class="ok">${(p.quality * 100).toFixed(0)}%</span></div>`).join('')
       }</div>` })}`;
   }
 
@@ -425,7 +427,7 @@ const PatientViews = (() => {
           + C.statMini([
             { k: 'Mean', v: Math.round(U.avg(hist)) + ' d', icon: 'chart', color: U.C.violet },
             { k: 'Std dev', v: U.round(Math.sqrt(U.avg(hist.map(x => Math.pow(x - U.avg(hist), 2)))), 1) + ' d', icon: 'compare', color: U.C.orange },
-            { k: 'Longest', v: Math.max(...hist) + ' d', icon: 'arrowUp', color: U.C.red }]) })}
+            { k: 'Longest', v: hist.length ? Math.max(...hist) + ' d' : '—', icon: 'arrowUp', color: U.C.red }]) })}
         ${C.card({ title: 'Phase estimate', sub: 'cycle_phase_hmm v0.9.3 · research', icon: 'twin', body:
           Chart.radar(['Menstrual', 'Follicular', 'Ovulatory', 'Luteal', 'Late luteal'],
             [{ color: U.C.pink, values: [0.2, 0.9, 0.7, 0.4, 0.3].map((v, i) => U.clamp(v + (p.cycleDay / len) * (i / 6), 0.05, 1)) }], 220)
@@ -458,9 +460,9 @@ const PatientViews = (() => {
         ${C.card({ title: 'Risk trajectory', sub: '30-day model output', icon: 'trends',
           body: Chart.lines([{ name: 'Risk', color: U.C.pink, data: p.trend30.risk }], { h: 150, area: true, min: 0, max: 100 })
             + C.statMini([
-              { k: '7-day Δ', v: (p.trend30.risk.at(-1) - p.trend30.risk.at(-8) > 0 ? '+' : '') + U.round(p.trend30.risk.at(-1) - p.trend30.risk.at(-8), 1), icon: 'compare', color: U.C.orange },
-              { k: 'Baseline', v: U.round(U.avg(p.trend30.risk), 0), icon: 'chart', color: U.C.sky },
-              { k: 'Quality gate', v: (p.quality * 100).toFixed(0) + '%', icon: 'check', color: U.C.green }]) })}
+              { k: '7-day Δ', v: (p.trend30.risk.length > 8 ? ((p.trend30.risk.at(-1) - p.trend30.risk.at(-8) > 0 ? '+' : '') + U.round(p.trend30.risk.at(-1) - p.trend30.risk.at(-8), 1)) : '—'), icon: 'compare', color: U.C.orange },
+              { k: 'Baseline', v: p.trend30.risk.length ? U.round(U.avg(p.trend30.risk), 0) : '—', icon: 'chart', color: U.C.sky },
+              { k: 'Quality gate', v: U.has(p.quality) ? U.has(p.quality) ? (p.quality * 100).toFixed(0) + '%' : '—' : '—', icon: 'check', color: U.C.green }]) })}
       </div>
       <div class="row g-2">
         ${C.card({ title: 'Plain-language explanation', icon: 'info', body: `
@@ -493,7 +495,7 @@ const PatientViews = (() => {
       + `<div class="row g-dash-b">
         ${C.card({ title: 'Chrono-metabolic fingerprint', icon: 'twin', iconColor: U.C.violet, body:
           Chart.radar(['HRV', 'Temp rhythm', 'Activity', 'Sleep reg.', 'Stress', 'Cycle stab.'],
-            [{ color: U.C.violet, values: [1 - p.risk / 140, 0.5 + p.quality / 3, p.vitals.steps / 9000, p.vitals.sleep / 9, 1 - p.vitals.gsr, 1 - p.risk / 120].map(v => U.clamp(v, .08, 1)) },
+            [{ color: U.C.violet, values: [1 - U.nz(p.risk, NaN) / 140, 0.5 + U.nz(p.quality, NaN) / 3, U.nz(p.vitals.steps, NaN) / 9000, U.nz(p.vitals.sleep, NaN) / 9, 1 - U.nz(p.vitals.gsr, NaN), 1 - U.nz(p.risk, NaN) / 120].map(v => U.clamp(v, .08, 1)).filter(v => !isNaN(v)) },
              { color: U.C.cyan, values: [.72, .68, .7, .75, .66, .74] }], 250)
           + C.legend([{ k: 'You', c: U.C.violet }, { k: 'Cohort median', c: U.C.cyan }]) })}
         ${C.card({ title: '24-hour rhythm model', sub: 'Circadian phase estimate', icon: 'clock', body:
@@ -505,7 +507,7 @@ const PatientViews = (() => {
           + C.legend([{ k: 'Skin temp', c: U.C.orange }, { k: 'HRV', c: U.C.sky }, { k: 'Activity', c: U.C.green }]) })}
         ${C.card({ title: 'Twin state', icon: 'grid', body: C.kvs([
           { k: 'Baseline learned from', v: `${Math.round(p.adherence * 1.6)} days` },
-          { k: 'Baseline confidence', v: `${(p.quality * 100).toFixed(0)} %` },
+          { k: 'Baseline confidence', v: `${U.num(U.has(p.quality) ? +(p.quality * 100).toFixed(0) : null)} %` },
           { k: 'Circadian phase shift', v: `${U.round((p.risk - 50) / 25, 1)} h` },
           { k: 'Regularity index', v: U.round(1 - p.risk / 200, 2) },
           { k: 'Deviation state', v: p.risk > 70 ? 'PERSISTENT MULTIMODAL SIGNAL' : p.risk > 45 ? 'EARLY CHANGE SIGNAL' : 'LOW CHANGE SIGNAL' },
@@ -585,10 +587,11 @@ const PatientViews = (() => {
           + C.legend([{ k: 'You', c: U.C.pink }, { k: 'Cohort', c: U.C.sky }]) })}
         ${C.card({ title: 'Metric comparison', icon: 'chart', body: C.table(
           [{ t: 'Metric' }, { t: 'You' }, { t: 'Cohort median' }, { t: 'Δ' }],
-          [['HR (bpm)', p.vitals.hr, 74], ['HRV (ms)', p.vitals.hrv, 46], ['Sleep (h)', p.vitals.sleep, 7.1],
-           ['Steps', p.vitals.steps, 5800], ['Cycle length (d)', p.cycleLen, 29], ['Risk signal (%)', p.risk, 58]]
+          [['HR (bpm)', U.num(p.vitals.hr), 74], ['HRV (ms)', U.num(p.vitals.hrv), 46], ['Sleep (h)', U.num(p.vitals.sleep, 1), 7.1],
+           ['Steps', U.num(p.vitals.steps), 5800], ['Cycle length (d)', U.num(p.cycleLen), 29], ['Risk signal (%)', U.num(p.risk), 58]]
             .map(r => ({ cells: [r[0], `<b>${typeof r[1] === 'number' ? r[1].toLocaleString() : r[1]}</b>`, r[2].toLocaleString(),
-              `<span class="tag ${(+r[1] - +r[2]) > 0 ? 'warn' : 'good'}" style="margin:0">${(+r[1] - +r[2]) > 0 ? '+' : ''}${U.round(+r[1] - +r[2], 1)}</span>`] }))) })}
+              isNaN(+r[1]) ? '<span class="tag plain" style="margin:0">—</span>'
+                : `<span class="tag ${(+r[1] - +r[2]) > 0 ? 'warn' : 'good'}" style="margin:0">${(+r[1] - +r[2]) > 0 ? '+' : ''}${U.round(+r[1] - +r[2], 1)}</span>`] }))) })}
       </div>
       ${C.card({ title: 'Cohort distribution', icon: 'users', body:
         Chart.bars(Store.patients().map(c => ({ k: c.id.slice(-2), v: c.risk, color: c.id === p.id ? U.C.pink : U.C.indigo })), { h: 180, max: 100 })
@@ -654,18 +657,18 @@ const PatientViews = (() => {
     return C.pageHead('Sleep & Stress', 'Sleep architecture estimates and autonomic stress load from GSR + HRV.')
       + `<div class="row g-dash-b">
         ${C.card({ title: 'Last night', icon: 'moon', iconColor: U.C.violet, body: `
-          <div class="flex center gap-14">${Chart.ring(U.clamp(p.vitals.sleep * 12, 5, 100), U.C.violet, 96, p.vitals.sleep + 'h')}
+          <div class="flex center gap-14">${Chart.ring(U.has(p.vitals.sleep) ? U.clamp(p.vitals.sleep * 12, 5, 100) : null, U.C.violet, 96, U.has(p.vitals.sleep) ? p.vitals.sleep + 'h' : '—')}
             <div style="flex:1">${C.kvs([
-              { k: 'Deep', v: U.round(p.vitals.sleep * .21, 1) + ' h' }, { k: 'REM', v: U.round(p.vitals.sleep * .23, 1) + ' h' },
-              { k: 'Light', v: U.round(p.vitals.sleep * .5, 1) + ' h' }, { k: 'Awake', v: Math.round(p.vitals.sleep * 6) + ' min' },
+              { k: 'Deep', v: U.has(p.vitals.sleep) ? U.round(p.vitals.sleep * .21, 1) + ' h' : '—' }, { k: 'REM', v: U.has(p.vitals.sleep) ? U.round(p.vitals.sleep * .23, 1) + ' h' : '—' },
+              { k: 'Light', v: U.has(p.vitals.sleep) ? U.round(p.vitals.sleep * .5, 1) + ' h' : '—' }, { k: 'Awake', v: U.has(p.vitals.sleep) ? Math.round(p.vitals.sleep * 6) + ' min' : '—' },
               { k: 'Efficiency', v: Math.round(78 + p.quality * 18) + ' %' }])}</div></div>` })}
         ${C.card({ title: 'Sleep stages', sub: 'DERIVED from PPG + IMU', icon: 'wave', body:
           Chart.lines([{ name: 'Stage', color: U.C.violet, data: U.series(p.id + 'sl', 40, 2.4, 1.6) }], { h: 170, area: true, min: 0, max: 4 })
           + C.legend([{ k: 'Awake 4', c: U.C.pink }, { k: 'REM 3', c: U.C.violet }, { k: 'Light 2', c: U.C.sky }, { k: 'Deep 1', c: U.C.indigo }]) })}
         ${C.card({ title: 'Stress load', sub: 'GSR + HRV composite', icon: 'zap', iconColor: U.C.orange, body:
           Chart.lines([{ name: 'Stress', color: U.C.orange, data: p.live.gsr.map(x => x * 100) }], { h: 170, area: true })
-          + C.statMini([{ k: 'Peak', v: U.round(Math.max(...p.live.gsr) * 100, 0), icon: 'arrowUp', color: U.C.red },
-            { k: 'Mean', v: U.round(U.avg(p.live.gsr) * 100, 0), icon: 'chart', color: U.C.orange },
+          + C.statMini([{ k: 'Peak', v: p.live.gsr.length ? U.round(Math.max(...p.live.gsr) * 100, 0) : '—', icon: 'arrowUp', color: U.C.red },
+            { k: 'Mean', v: p.live.gsr.length ? U.round(U.avg(p.live.gsr) * 100, 0) : '—', icon: 'chart', color: U.C.orange },
             { k: 'Recovery', v: Math.round(100 - p.risk) + '%', icon: 'check', color: U.C.green }]) })}
       </div>
       ${C.card({ title: 'Sleep regularity (30 days)', icon: 'clock', body:
@@ -825,9 +828,9 @@ const PatientViews = (() => {
         ${C.card({ title: 'Clinical summary', icon: 'stethoscope', body: C.kvs([
           { k: 'Primary clinician', v: (Store.doctors().find(d => d.id === p.doctorId) || {}).name || '—' },
           { k: 'Cycle length', v: p.cycleLen + ' days' }, { k: 'Current cycle day', v: p.cycleDay },
-          { k: 'Risk signal', v: `<span style="color:${U.riskTone(p.risk).color}">${p.risk}% ${U.riskTone(p.risk).label}</span>` },
-          { k: 'Data quality', v: (p.quality * 100).toFixed(0) + '%' }, { k: 'Adherence', v: p.adherence + '%' },
-          { k: 'Next visit', v: p.nextVisit },
+          { k: 'Risk signal', v: `<span style="color:${U.riskTone(p.risk).color}">${U.num(p.risk)}% ${U.riskTone(p.risk).label}</span>` },
+          { k: 'Data quality', v: U.has(p.quality) ? (p.quality * 100).toFixed(0) + '%' : '—' }, { k: 'Adherence', v: p.adherence + '%' },
+          { k: 'Next visit', v: p.nextVisit || 'Not scheduled' },
         ]) })}
       </div>`;
   }
@@ -868,7 +871,13 @@ const PatientViews = (() => {
           <button class="btn sm" data-act="genReport" data-arg="json">Export my data</button>
           <button class="btn sm danger" data-act="resetDemo">Erase local demo data</button></div>` })}
         ${C.card({ title: 'What we store', icon: 'db', body: C.kvs([
-          { k: 'Database', v: 'SQLite · 18 tables · local' }, { k: 'Cloud upload', v: 'None' },
+          { k: 'Database', v: Store.isLive() && Store.health()
+              ? `<span class="mono">${U.esc(Store.health().db.split('/').pop())}</span> · live`
+              : 'Built-in demo dataset (no backend)' },
+          { k: 'Records on file', v: Store.isLive() && Store.health()
+              ? `${Store.health().counts.patients} participants · ${Store.health().counts.sensor_sessions} sessions`
+              : 'sample data only' },
+          { k: 'Cloud upload', v: 'None' },
           { k: 'Identifiers', v: 'Pseudonymous IDs' }, { k: 'Retention', v: 'Until you erase it' },
           { k: 'Encryption at rest', v: 'OS-level' }, { k: 'Audit trail', v: 'Every access logged' },
         ]) })}
@@ -911,7 +920,7 @@ const PatientViews = (() => {
           { k: 'Follicle count (per ovary)', v: us.follicles }, { k: 'Largest follicle', v: us.largest + ' mm' },
           { k: 'Ovarian volume', v: us.volume + ' cm³' }, { k: 'Stromal echogenicity', v: p.risk > 60 ? 'Increased' : 'Normal' },
           { k: 'Endometrial thickness', v: U.round(6 + p.cycleDay / 4, 1) + ' mm' },
-          { k: 'Image quality gate', v: `${(us.quality * 100).toFixed(0)} %` },
+          { k: 'Image quality gate', v: `${U.num(U.has(us.quality) ? +(us.quality * 100).toFixed(0) : null)} %` },
           { k: 'PCOS morphology pattern', v: `<span style="color:${us.pattern === 'Possible' ? U.C.orange : U.C.green}">${us.pattern}</span>` },
         ]) })}
         ${C.card({ title: 'Model card', icon: 'flask', iconColor: U.C.violet, body: C.kvs([

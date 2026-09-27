@@ -53,9 +53,11 @@ const DoctorViews = (() => {
     const doc = Store.doctor();
     const mine = all.filter(p => p.doctorId === doc.id);
     const review = all.filter(p => p.status === 'Needs review' || p.status === 'Escalated');
-    const avgRisk = Math.round(U.avg(all.map(p => p.risk)));
+    const riskVals = all.map(p => p.risk).filter(v => v != null && !isNaN(v));
+    const avgRisk = riskVals.length ? Math.round(U.avg(riskVals)) : null;
     const good = all.filter(p => p.quality >= 0.85).length;
     const mod = all.filter(p => p.quality >= 0.7 && p.quality < 0.85).length;
+    const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
     const poor = all.length - good - mod;
 
     const hero = `<div class="hero">
@@ -79,7 +81,7 @@ const DoctorViews = (() => {
     const kpis = `<div class="row g-6">
       ${[['Total patients', all.length, 'users', U.C.violet, 'Active cohort'],
          ['Needs review', review.length, 'inbox', U.C.orange, 'Triage queue'],
-         ['Mean risk signal', avgRisk + '%', 'brain', U.C.pink, 'Cohort average'],
+         ['Mean risk signal', avgRisk == null ? '—' : avgRisk + '%', 'brain', U.C.pink, 'Cohort average'],
          ['Good data quality', good + '/' + all.length, 'check', U.C.green, '≥ 0.85 gate'],
          ['Appointments today', Store.state.appointments.filter(a => a.when.startsWith('Today')).length, 'calendar', U.C.sky, 'Confirmed + pending'],
          ['Devices online', DemoData.devices.filter(d => d.state === 'Online').length + '/' + DemoData.devices.length, 'fleet', U.C.cyan, 'Fleet health']]
@@ -96,7 +98,7 @@ const DoctorViews = (() => {
         all.slice().sort((a, b) => b.risk - a.risk).slice(0, 6).map(p => ({
           cells: [
             `<div class="pt-cell">${C.avatar(p.name)}<div><div class="pt-name">${p.name}</div><div class="pt-id">${p.id} · ${p.age}y</div></div></div>`,
-            `<span style="color:${U.riskTone(p.risk).color};font-weight:700">${p.risk}%</span>`,
+            `<span style="color:${U.riskTone(p.risk).color};font-weight:700">${U.has(p.risk) ? p.risk + '%' : '—'}</span>`,
             `<div class="progress" style="width:70px"><span style="width:${p.quality * 100}%;background:${p.quality > .85 ? U.C.green : p.quality > .7 ? U.C.yellow : U.C.red}"></span></div>`,
             C.statusTag(p.status),
             `<button class="btn sm primary" data-act="openPatient" data-arg="${p.id}">Open</button>`,
@@ -105,7 +107,7 @@ const DoctorViews = (() => {
 
     const qualityCard = C.card({
       title: 'Data quality mix', icon: 'check', iconColor: U.C.green,
-      body: `<div class="score-wrap">${Chart.donut(Math.round((good / all.length) * 100), { size: 140, stroke: 14, gradient: [U.C.green, U.C.cyan, U.C.sky] })}
+      body: `<div class="score-wrap">${Chart.donut(pct(good, all.length), { size: 140, stroke: 14, gradient: [U.C.green, U.C.cyan, U.C.sky] })}
         <div class="score-label">${good} good · ${mod} moderate · ${poor} poor</div>
         <div class="score-note">Quality gate blocks model inference below 0.60.</div></div>`,
     });
@@ -160,7 +162,7 @@ const DoctorViews = (() => {
       + `<div class="row" style="grid-template-columns:1.9fr 1fr 1.2fr">${queue}${qualityCard}${cohortCard}</div>`
       + `<div class="row g-dash-b">${apptCard}${actionsCard}${teamCard}</div>`
       + `<div class="row g-2">${auditCard}${C.card({ title: 'Cohort trend (30 d mean risk)', icon: 'trends',
-          body: Chart.lines([{ name: 'Mean risk', color: U.C.pink, data: U.series('cohort', 30, avgRisk, 6) }], { h: 170, area: true, min: 0, max: 100 }) })}</div>`
+          body: Chart.lines([{ name: 'Mean risk', color: U.C.pink, data: avgRisk == null ? [] : U.series('cohort', 30, avgRisk, 6) }], { h: 170, area: true, min: 0, max: 100 }) })}</div>`
       + C.disclaimer();
   }
 
@@ -173,7 +175,7 @@ const DoctorViews = (() => {
         `${p.age} y`, p.city,
         (Store.doctors().find(d => d.id === p.doctorId) || {}).name || '—',
         `<span class="tag plain" style="margin:0">${p.cohort}</span>`,
-        `<span style="color:${U.riskTone(p.risk).color};font-weight:700">${p.risk}%</span>`,
+        `<span style="color:${U.riskTone(p.risk).color};font-weight:700">${U.has(p.risk) ? p.risk + '%' : '—'}</span>`,
         `<div class="progress" style="width:64px"><span style="width:${p.quality * 100}%;background:${p.quality > .85 ? U.C.green : p.quality > .7 ? U.C.yellow : U.C.red}"></span></div>`,
         C.statusTag(p.status),
         p.lastSync,
@@ -213,12 +215,12 @@ const DoctorViews = (() => {
         </div>
         <div class="spacer" style="flex:1"></div>
         ${C.statMini([
-          { k: 'Risk', v: p.risk + '%', icon: 'brain', color: tone.color },
-          { k: 'HR', v: p.vitals.hr, icon: 'heartbeat', color: U.C.pink },
-          { k: 'HRV', v: p.vitals.hrv, icon: 'pulse', color: U.C.sky },
-          { k: 'BMI', v: p.bmi, icon: 'chart', color: U.C.orange },
+          { k: 'Risk', v: U.has(p.risk) ? p.risk + '%' : '—', icon: 'brain', color: tone.color },
+          { k: 'HR', v: U.num(p.vitals.hr), icon: 'heartbeat', color: U.C.pink },
+          { k: 'HRV', v: U.num(p.vitals.hrv), icon: 'pulse', color: U.C.sky },
+          { k: 'BMI', v: U.num(p.bmi), icon: 'chart', color: U.C.orange },
           { k: 'Cycle', v: `${p.cycleDay}/${p.cycleLen}`, icon: 'calendar', color: U.C.violet },
-          { k: 'Quality', v: (p.quality * 100).toFixed(0) + '%', icon: 'check', color: U.C.green },
+          { k: 'Quality', v: U.has(p.quality) ? (p.quality * 100).toFixed(0) + '%' : '—', icon: 'check', color: U.C.green },
         ])}
         <div class="flex gap-6 wrap">
           <button class="btn primary" data-act="editPatient" data-arg="${p.id}">${U.icon('edit')} Edit record</button>
@@ -276,7 +278,7 @@ const DoctorViews = (() => {
           </div>
           <div class="mt-10">${Chart.lines([{ name: 'risk', color: U.riskTone(p.risk).color, data: p.trend30.risk }], { h: 74, area: true, min: 0, max: 100, pad: { l: 4, r: 4, t: 4, b: 4 }, yticks: 1 })}</div>
           ${C.statMini([{ k: 'Risk', v: p.risk + '%', icon: 'brain', color: U.riskTone(p.risk).color },
-            { k: 'Quality', v: (p.quality * 100).toFixed(0) + '%', icon: 'check', color: U.C.green },
+            { k: 'Quality', v: U.has(p.quality) ? (p.quality * 100).toFixed(0) + '%' : '—', icon: 'check', color: U.C.green },
             { k: 'Adherence', v: p.adherence + '%', icon: 'clock', color: U.C.sky }])}
           <div class="flex gap-6 mt-10"><button class="btn sm primary" data-act="openPatient" data-arg="${p.id}">Review chart</button>
             <button class="btn sm" data-act="addNote">Note</button>
@@ -307,10 +309,10 @@ const DoctorViews = (() => {
           Chart.waveform(p.id + 'raw', U.soft(U.C.pink, .5), 320, 70, 6) + Chart.waveform(p.id + 'filt', U.C.pink, 320, 70, 6)
           + C.legend([{ k: 'Raw', c: U.soft(U.C.pink, .5) }, { k: 'Bandpass 0.5–8 Hz', c: U.C.pink }]) })}
         ${C.card({ title: 'HRV tachogram', icon: 'pulse', iconColor: U.C.sky, body:
-          Chart.lines([{ name: 'RR', color: U.C.sky, data: U.series(p.id + 'rr', 50, 60000 / p.vitals.hr, 60) }], { h: 158, dots: true })
-          + C.statMini([{ k: 'RMSSD', v: p.vitals.hrv + ' ms', icon: 'pulse', color: U.C.sky },
-            { k: 'SDNN', v: Math.round(p.vitals.hrv * 1.4) + ' ms', icon: 'chart', color: U.C.violet },
-            { k: 'pNN50', v: Math.round(p.vitals.hrv / 2) + ' %', icon: 'compare', color: U.C.cyan }]) })}
+          Chart.lines([{ name: 'RR', color: U.C.sky, data: U.series(p.id + 'rr', 50, U.has(p.vitals.hr) ? 60000 / p.vitals.hr : null, 60) }], { h: 158, dots: true })
+          + C.statMini([{ k: 'RMSSD', v: U.has(p.vitals.hrv) ? p.vitals.hrv + ' ms' : '—', icon: 'pulse', color: U.C.sky },
+            { k: 'SDNN', v: U.has(p.vitals.hrv) ? Math.round(p.vitals.hrv * 1.4) + ' ms' : '—', icon: 'chart', color: U.C.violet },
+            { k: 'pNN50', v: U.has(p.vitals.hrv) ? Math.round(p.vitals.hrv / 2) + ' %' : '—', icon: 'compare', color: U.C.cyan }]) })}
       </div>
       <div class="row g-3">
         ${[['GSR (tonic/phasic)', 'gsr', U.C.violet], ['Skin temperature', 'temp', U.C.orange], ['Activity counts', 'steps', U.C.green]]
@@ -431,7 +433,7 @@ const DoctorViews = (() => {
       ${C.card({ title: 'Narrative explanation', icon: 'note', body: `<div class="log-box" style="color:var(--text-2)">
         <div><b>Signal:</b> ${U.riskTone(p.risk).label} (${p.risk}%) from pcos_risk_gbm v2.4.1</div>
         <div><b>Top drivers:</b> ${p.drivers.slice(0, 3).map(d => d.k).join(', ')}</div>
-        <div><b>Baseline window:</b> ${Math.round(p.adherence * 1.6)} days, confidence ${(p.quality * 100).toFixed(0)}%</div>
+        <div><b>Baseline window:</b> ${Math.round(p.adherence * 1.6)} days, confidence ${U.num(U.has(p.quality) ? +(p.quality * 100).toFixed(0) : null)}%</div>
         <div><b>Data gaps:</b> ${Math.round((1 - p.adherence / 100) * 30)} days with insufficient wear time</div>
         <div><b>Unknowns:</b> serum androgens, AMH, OGTT — not available to the model</div>
         <div><b>Recommended next step:</b> clinician review + confirm cycle log; repeat imaging next cycle</div>
@@ -442,8 +444,10 @@ const DoctorViews = (() => {
   function provenance() {
     const p = active();
     const rows = [
-      ['Heart rate', '72 bpm', 'MEASURED', 'MAX30102', 0.91], ['HRV RMSSD', p.vitals.hrv + ' ms', 'DERIVED', 'PPG pipeline', 0.85],
-      ['Skin temperature', p.vitals.temp + ' °C', 'MEASURED', 'DS18B20', 0.88], ['Activity level', 'Light', 'DERIVED', 'MPU6050', 0.8],
+      ['Heart rate', U.has(p.vitals.hr) ? p.vitals.hr + ' bpm' : '—', 'MEASURED', 'MAX30102', 0.91],
+      ['HRV RMSSD', U.has(p.vitals.hrv) ? p.vitals.hrv + ' ms' : '—', 'DERIVED', 'PPG pipeline', 0.85],
+      ['Skin temperature', U.has(p.vitals.temp) ? p.vitals.temp + ' °C' : '—', 'MEASURED', 'DS18B20', 0.88],
+      ['Activity level', U.has(p.vitals.steps) ? (p.vitals.steps > 6000 ? 'Active' : 'Light') : '—', 'DERIVED', 'MPU6050', 0.8],
       ['Cycle day', String(p.cycleDay), 'CLINICALLY ENTERED', 'Participant log', 1], ['Follicle count', String(p.ultrasound.follicles), 'IMAGE-DERIVED', 'follicle_seg_unet', p.ultrasound.quality],
       ['Risk signal', p.risk + '%', 'MODEL-INFERRED', 'pcos_risk_gbm', 0.79], ['Serum testosterone', '—', 'UNKNOWN', 'not collected', 0],
     ];
@@ -501,8 +505,8 @@ const DoctorViews = (() => {
           `<div class="pt-cell">${C.avatar(p.name)}<div><div class="pt-name">${p.name}</div><div class="pt-id">${p.id}</div></div></div>`,
           ['Sleep regularity', 'Movement 8k steps', 'Cycle logging', 'Stress practice'][i % 4],
           ['23:00–07:00', '8,000 steps/d', 'daily', '10 min × 5/wk'][i % 4],
-          `<div class="progress" style="width:90px"><span style="width:${p.adherence}%;background:linear-gradient(90deg,#5b4bf0,#7c5cff)"></span></div>`,
-          p.nextVisit,
+          `<div class="progress" style="width:90px"><span style="width:${U.nz(p.adherence)}%;background:linear-gradient(90deg,#5b4bf0,#7c5cff)"></span></div>`,
+          p.nextVisit || '—',
           `<button class="btn sm" data-act="openPatient" data-arg="${p.id}">Open</button>`] }))) });
   }
 
@@ -560,7 +564,8 @@ const DoctorViews = (() => {
           [['Age', 'age'], ['Risk %', 'risk'], ['Cycle length', 'cycleLen'], ['Adherence %', 'adherence'], ['BMI', 'bmi']]
             .map(([label, key]) => {
               const vals = all.map(p => +p[key]);
-              return { cells: [label, U.round(U.avg(vals), 1), Math.min(...vals), Math.max(...vals)] };
+              const ok = vals.filter(v => v != null && !isNaN(v));
+              return { cells: [label, ok.length ? U.round(U.avg(ok), 1) : '—', ok.length ? Math.min(...ok) : '—', ok.length ? Math.max(...ok) : '—'] };
             })) })}
       </div>`;
   }
@@ -650,22 +655,54 @@ const DoctorViews = (() => {
 
   /* =============================== DATABASE ============================== */
   function database() {
-    const tables = [
+    const h = Store.health();
+    const live = Store.isLive() && h;
+    const c = live ? h.counts : null;
+    const tables = live ? [
+      ['patients', c.patients], ['providers (doctors/clinics/labs)', c.providers],
+      ['sensor_sessions', c.sensor_sessions], ['hrv_data', c.hrv_data], ['ppg_data', c.ppg_data],
+      ['temperature_data', c.temperature_data], ['gsr_data', c.gsr_data],
+      ['symptoms', c.symptoms], ['cycles', c.cycles], ['ultrasound_records', c.ultrasound_records],
+      ['model_results', c.model_results], ['doctor_notes', c.doctor_notes], ['reports', c.reports],
+      ['rows tagged SYNTHETIC_DEMO', c.demo_rows],
+    ] : [
       ['patients', Store.state.patients.length], ['doctors', Store.doctors().length], ['sensor_sessions', 412],
       ['sensor_samples', 1842301], ['features', 38210], ['risk_outputs', 1840], ['symptom_logs', 2214],
       ['medication_logs', 981], ['cycle_logs', 604], ['ultrasound_studies', 96], ['reports', 240],
       ['provenance', 51204], ['audit_log', 8830], ['devices', DemoData.devices.length], ['appointments', Store.state.appointments.length],
       ['care_plans', 42], ['messages', 118], ['settings', 1],
     ];
-    return C.pageHead('Database', 'Local-first SQLite · 18 tables · no cloud upload.',
+    const srcCard = C.card({
+      title: live ? 'Connected to the platform database' : 'Built-in demo dataset',
+      icon: 'database', color: live ? U.C.green : U.C.yellow,
+      body: (live
+        ? C.kvs([{ k: 'File', v: `<span class="mono">${U.esc(h.db)}</span>` },
+                 { k: 'Size', v: (h.size_bytes / 1048576).toFixed(2) + ' MB' },
+                 { k: 'Participants', v: c.patients },
+                 { k: 'Sensor rows', v: (c.hrv_data + c.ppg_data + c.temperature_data + c.gsr_data).toLocaleString() },
+                 { k: 'Synthetic demo rows', v: c.demo_rows }])
+        : C.kvs([{ k: 'Backend', v: 'not reachable' }, { k: 'Showing', v: 'built-in sample dataset' }]))
+        + `<div class="flex gap-6 mt-14 wrap">
+            <button class="btn sm" data-act="showSource">${U.icon('info')} Source details</button>
+            ${live ? `<button class="btn sm" data-act="seedCohort">${U.icon('plus')} Seed demo cohort</button>
+                      <button class="btn sm danger" data-act="clearCohort">${U.icon('trash')} Clear demo rows</button>`
+                   : `<button class="btn sm" data-act="useLiveData">${U.icon('refresh')} Retry live database</button>`}
+          </div>`,
+    });
+    return C.pageHead('Database',
+      live ? `Live SQLite · ${h.db.split('/').pop()} · read and written directly by this workstation.`
+           : 'Local-first SQLite · no cloud upload.',
       `<button class="btn" data-act="exportCohort">${U.icon('export')} Backup</button>`)
+      + `<div class="row g-1" style="margin-bottom:14px">${srcCard}</div>`
       + `<div class="row g-3">
         ${C.card({ title: 'Tables', icon: 'db', body: C.table([{ t: 'Table' }, { t: 'Rows' }],
-          tables.map(t => ({ cells: [`<span class="mono">${t[0]}</span>`, t[1].toLocaleString()] }))) })}
+          tables.map(t => ({ cells: [`<span class="mono">${t[0]}</span>`, (t[1] || 0).toLocaleString()] }))) })}
         ${C.card({ title: 'Storage', icon: 'chart', body: Chart.bars([
           { k: 'samples', v: 78, color: U.C.violet }, { k: 'features', v: 12, color: U.C.sky },
           { k: 'images', v: 7, color: U.C.orange }, { k: 'meta', v: 3, color: U.C.green }], { h: 170, max: 100 })
-          + C.kvs([{ k: 'DB file', v: 'chrono_twin_nexus_v8_3_plus.db' }, { k: 'Size', v: '412 MB' }, { k: 'Last vacuum', v: '24 Sep 2026' }]) })}
+          + C.kvs([{ k: 'DB file', v: live ? h.db.split('/').pop() : 'chrono_twin_nexus_v8_3_plus.db' },
+                   { k: 'Size', v: live ? (h.size_bytes / 1048576).toFixed(2) + ' MB' : '412 MB' },
+                   { k: 'Source', v: live ? 'live read' : 'demo' }]) })}
         ${C.card({ title: 'Integrity', icon: 'shield', iconColor: U.C.green, body: `<div class="log-box">
           <div><span class="ok">[ok]</span> PRAGMA integrity_check → ok</div>
           <div><span class="ok">[ok]</span> foreign_key_check → 0 violations</div>

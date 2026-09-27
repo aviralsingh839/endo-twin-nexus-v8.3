@@ -159,10 +159,28 @@ const C = (() => {
     return `<span class="tag ${map[status] || 'plain'}" style="margin-top:0">${status}</span>`;
   }
 
-  const disclaimer = (txt) => `<div class="disclaimer">${txt || 'Research / risk-screening output — not a medical diagnosis. ENDO-TWIN NEXUS is a research prototype and is not a medical device. All data shown in this demo is synthetic.'}</div>`;
+  const disclaimer = (txt) => {
+    const base = 'Research / risk-screening output — not a medical diagnosis. ENDO-TWIN NEXUS is a research prototype and is not a medical device.';
+    const src = (typeof Store !== 'undefined' && Store.isLive && Store.isLive())
+      ? ' Values are read from the local platform database; measurements that were never recorded are shown as “—” rather than estimated.'
+      : ' The backend database is not connected, so every record shown here is synthetic demo data.';
+    return `<div class="disclaimer">${txt || base + src}</div>`;
+  };
 
   const sectionGrid = (cls, cards) => `<div class="row ${cls}">${cards.join('')}</div>`;
 
+  /** Simple explanatory bullet list. */
+  function bullets(items) {
+    return `<ul style="margin:0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.75">
+      ${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+  }
+
+  /** Honest empty state used wherever the database holds nothing yet. */
+  function empty(title, sub, action) {
+    return `<div class="empty-state"><b>${title}</b><span>${sub || ''}</span>
+      ${action ? `<button class="btn ghost" data-act="${action.act}">${U.icon(action.icon || 'plus')} ${action.label}</button>` : ''}</div>`;
+  }
+
   return { card, pageHead, vital, table, kvs, tile, form, readForm, modal, closeModal,
-    confirm, toast, legend, statMini, avatar, statusTag, disclaimer, sectionGrid };
+    confirm, toast, legend, statMini, avatar, statusTag, disclaimer, sectionGrid, bullets, empty };
 })();

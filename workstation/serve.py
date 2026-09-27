@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import http.server
+import json
 import os
 import socket
 import socketserver
@@ -22,11 +23,71 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+try:
+    from api import WorkstationAPI          # real SQLite-backed data layer
+    API = WorkstationAPI()
+    API_ERROR = None
+except Exception as exc:                    # pragma: no cover - UI still works in demo mode
+    API, API_ERROR = None, str(exc)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    # ----------------------------- API routing -------------------------- #
+    def _is_api(self) -> bool:
+        return self.path.split("?")[0].startswith("/api")
+
+    def _read_body(self):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if not length:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+        except Exception:
+            return {}
+
+    def _api(self, method: str):
+        path = self.path.split("?")[0]
+        body = self._read_body() if method in ("POST", "PUT", "PATCH", "DELETE") else {}
+        if API is None:
+            status, payload = 503, {"error": "data layer unavailable", "detail": API_ERROR}
+        else:
+            status, payload = API.handle(method, path, body)
+        raw = json.dumps(payload, default=str).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def do_GET(self):
+        if self._is_api():
+            return self._api("GET")
+        return super().do_GET()
+
+    def do_HEAD(self):
+        if self._is_api():
+            return self._api("GET")
+        return super().do_HEAD()
+
+    def do_POST(self):
+        return self._api("POST") if self._is_api() else self.send_error(405)
+
+    def do_PUT(self):
+        return self._api("PUT") if self._is_api() else self.send_error(405)
+
+    def do_PATCH(self):
+        return self._api("PATCH") if self._is_api() else self.send_error(405)
+
+    def do_DELETE(self):
+        return self._api("DELETE") if self._is_api() else self.send_error(405)
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -72,6 +133,17 @@ def main() -> int:
     print("=" * 62)
     print(f"  Serving : {ROOT}")
     print(f"  URL     : {url}")
+    if API is not None:
+        h = API.health()
+        c = h["counts"]
+        print(f"  Database: {h['db']}")
+        print(f"  Records : {c['patients']} patients · {c['providers']} providers · "
+              f"{c['sensor_sessions']} sessions · {c['hrv_data'] + c['ppg_data']} sensor rows")
+        if h["empty"]:
+            print("  NOTE    : database has no patients yet -> the UI shows empty states.")
+            print("            Seed a labelled demo cohort:  python3 workstation/api.py --seed")
+    else:
+        print(f"  Database: UNAVAILABLE ({API_ERROR}) -> UI falls back to built-in demo data")
     if args.host not in ("127.0.0.1", "localhost"):
         print(f"  LAN     : http://{socket.gethostbyname(socket.gethostname())}:{port}/")
     print("  Stop    : Ctrl+C")
