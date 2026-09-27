@@ -34,6 +34,7 @@ from src.serial_io.network_reader import NetworkReader
 from src.utils.demo_stream import DemoSensorStream
 from desktop.unified_engine import DISCLAIMER, context_ready, compute_research_index
 from desktop.model_lab import ModelLabWidget
+from desktop.workstation_runtime import StreamingFeatureProcessor
 
 APP_QSS = """
 QWidget{background:#07111f;color:#edf5f9;font-family:"Noto Sans","DejaVu Sans",sans-serif;}
