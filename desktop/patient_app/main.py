@@ -569,6 +569,8 @@ class PatientWindow(QMainWindow):
         select_participant(pid)
         self.participant_id = pid
         self.profile = get_profile(pid)
+        self.feature_history = []
+        self.visual_graphs.clear()
         self.personal_model.set_participant(pid)
         self.latest_row = None
         self._refresh_header()
