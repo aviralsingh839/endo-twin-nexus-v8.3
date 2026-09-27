@@ -29,7 +29,7 @@ EOF
   read -r -p "Select [1-10]: " choice || exit 0
   case "$choice" in
    1) runpy -m src.personal_twin.self_learning_app ;;
-   2) runpy -m src.ui.main_window ;;
+   2) runpy "$ROOT/desktop/unified_workstation.py" ;;
    3) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
    4) runpy "$ROOT/desktop/patient_app/main.py" ;;
    5) runpy "$ROOT/apps/main/main_app.py" ;;
@@ -52,7 +52,7 @@ case "$MODE" in
  menu) menu ;;
  self-learning|personal-twin) runpy -m src.personal_twin.self_learning_app ;;
  onboard|profile) runpy -m src.personal_twin.onboarding ;;
- unified|workstation) runpy -m src.ui.main_window ;;
+ unified|workstation) runpy "$ROOT/desktop/unified_workstation.py" ;;
  doctor|doctor-pc) runpy "$ROOT/desktop/doctor_app/main_enhanced.py" ;;
  patient|patient-pc) runpy "$ROOT/desktop/patient_app/main.py" ;;
  endo-twin|endo|general) runpy "$ROOT/apps/main/main_app.py" ;;
