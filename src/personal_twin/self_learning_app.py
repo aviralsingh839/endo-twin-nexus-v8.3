@@ -336,6 +336,7 @@ class SelfLearningWindow(QWidget):
             return
 
         self.baseline_rows = []
+        self.feature_window_count = 0
         self.capture_started_at = time.time()
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
         self.session = LiveSession(mode, self)
@@ -449,6 +450,7 @@ class SelfLearningWindow(QWidget):
         self.live_activity.setText(f"Activity: {self._fmt(feature.activity_level, '')}")
         self.live_quality.setText(f"Quality: {feature.signal_quality*100:.0f}%")
         self.progress.setText(
+            f"LIVE • {self.feature_window_count} feature windows • "
             f"CAPTURING • {len(self.baseline_rows)} usable feature windows • "
             f"latest quality {feature.signal_quality:.2f}"
         )
