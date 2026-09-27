@@ -150,7 +150,7 @@ private fun DoctorDashboard(modifier: Modifier, onOpen: (DemoPatient) -> Unit) {
 @Composable
 private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
     var tab by remember { mutableStateOf("Overview") }
-    val tabs = listOf("Overview", "Physiology", "Signals", "Ultrasound", "Models", "Reports", "Audit")
+    val tabs = listOf("Overview", "Physiology", "Signals", "Ultrasound", "Models", "Complications", "Reports", "Audit")
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Card(shape = RoundedCornerShape(22.dp)) {
@@ -205,6 +205,14 @@ private fun PatientWorkspace(modifier: Modifier, patient: DemoPatient) {
                 item { SectionCard("Model confidence", "Context-dependent", "Confidence is model/data quality context, not clinical certainty.") }
                 item { SectionCard("Inputs", "Measured + derived + entered", "Only supported provenance contributes to the appropriate model layer.") }
                 item { SafetyCard("Explainability", "Show model name, version, dataset, validation strategy, limitations, and uncertainty.") }
+            }
+            "Complications" -> {
+                item { SectionCard("Complication-related signals", "Not established", "The platform does not have a clinically validated complication-probability model.") }
+                item { SectionCard("Metabolic / insulin resistance", "Research-domain signal", "Requires sufficient supported inputs; not an individual probability.") }
+                item { SectionCard("Hypertension", "Research-domain signal", "Clinical BP measurements are required for meaningful assessment.") }
+                item { SectionCard("Sleep-disordered breathing", "Research-domain signal", "Wearable patterns alone do not establish sleep apnea.") }
+                item { SectionCard("Ovulatory / fertility", "Research-domain signal", "Cycle history and clinical assessment are required.") }
+                item { SectionCard("Metabolic-liver domain", "Research-domain signal", "Not a diagnosis; laboratory/clinical assessment is required.") }
             }
             "Reports" -> {
                 item { SectionCard("Report", "Patient-scoped", "Report generation preserves provenance, uncertainty, model version, and limitations.") }
