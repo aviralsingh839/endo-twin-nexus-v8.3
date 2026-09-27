@@ -37,6 +37,8 @@ class PacketParser:
         raw = line.strip()
         if not raw:
             raise PacketParseError("empty line")
+        if raw.startswith("$CP3,"):
+            return self._parse_cp3(raw)
         if raw.startswith("$CP2,"):
             return self._parse_cp2(raw)
         if raw.startswith("$CP,"):
@@ -77,6 +79,48 @@ class PacketParser:
                 lux=float(parts[12]),
                 status=int(float(parts[13])),
                 source="serial",
+            )
+        except (ValueError, IndexError) as exc:
+            raise PacketParseError(f"numeric conversion failed: {exc}") from exc
+
+    def _parse_cp3(self, raw: str) -> SensorSample:
+        """Parse the primary ESP32-S3 analog wearable frame.
+
+        $CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,roomT,hum,press,lux,status,crc
+        """
+        parts = raw.split(",")
+        if len(parts) != 16:
+            raise PacketParseError(f"analog $CP3 expected 16 fields, got {len(parts)}")
+        self._verify_crc(parts)
+        try:
+            return SensorSample(
+                timestamp_s=time.time(),
+                ms=int(parts[1]),
+                ir=-1,
+                red=-1,
+                analog_ppg_raw=float(parts[2]),
+                ppg_mode="analog",
+                gsr_raw=int(float(parts[3])),
+                ax_g=float(parts[4]),
+                ay_g=float(parts[5]),
+                az_g=float(parts[6]),
+                gx_dps=float(parts[7]),
+                gy_dps=float(parts[8]),
+                gz_dps=float(parts[9]),
+                temp_c=float("nan"),
+                temp1_c=float("nan"),
+                room_temp_c=float(parts[10]),
+                humidity_pct=float(parts[11]),
+                pressure_hpa=float(parts[12]),
+                lux=float(parts[13]),
+                ecg_raw=-1,
+                fsr_raw=-1,
+                mic_raw=-1,
+                mic_rms=0.0,
+                mic_pitch_hz=0.0,
+                buttons=0,
+                status=int(float(parts[14])),
+                source="serial-wearable-analog",
             )
         except (ValueError, IndexError) as exc:
             raise PacketParseError(f"numeric conversion failed: {exc}") from exc

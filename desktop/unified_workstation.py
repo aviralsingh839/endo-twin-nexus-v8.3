@@ -7,11 +7,13 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal
+import pyqtgraph as pg
+
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QGridLayout,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
-    QPushButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QProgressBar, QPushButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -22,7 +24,9 @@ if str(ROOT) not in sys.path:
 from database.database import LocalDatabase
 from src.core.feature_extraction import RealtimeFeatureExtractor
 from src.disease_modules.pcos import PCOSModule
+from src.disease_modules.pcos_complications import PCOSComplicationContextEngine
 from src.serial_io.arduino_reader import ArduinoReader
+from src.serial_io.network_reader import NetworkReader
 from src.utils.demo_stream import DemoSensorStream
 from desktop.unified_engine import DISCLAIMER, context_ready, compute_research_index
 from desktop.model_lab import ModelLabWidget
@@ -70,7 +74,8 @@ class StartupDialog(QDialog):
         n.setObjectName("muted"); n.setWordWrap(True); v.addWidget(n)
         row=QHBoxLayout()
         demo=QPushButton("Open DEMO MODE"); demo.setObjectName("primary"); demo.clicked.connect(self._demo); row.addWidget(demo)
-        live=QPushButton("Configure LIVE SENSOR MODE"); live.setObjectName("primary"); live.clicked.connect(self._live); row.addWidget(live)
+        live=QPushButton("Configure USB SENSOR MODE"); live.setObjectName("primary"); live.clicked.connect(self._live); row.addWidget(live)
+        wifi=QPushButton("Connect ESP32 Wi-Fi"); wifi.setObjectName("secondary"); wifi.clicked.connect(self._wifi); row.addWidget(wifi)
         v.addLayout(row)
         self.live_box=QFrame(); self.live_box.setObjectName("card"); f=QFormLayout(self.live_box)
         self.port=QLineEdit(); self.port.setPlaceholderText("Auto-detect /dev/ttyACM0, /dev/ttyUSB0 or COM3")
@@ -99,6 +104,9 @@ class StartupDialog(QDialog):
         self.config=LiveConfig("demo","demo"); self.accept()
     def _live(self):
         self.live_box.setFocus()
+    def _wifi(self):
+        self.config=LiveConfig("wifi","tcp",host="192.168.4.1",tcp_port=7777); self.accept()
+
     def _accept_live(self):
         if not self.port.text().strip():
             self.auto_detect_port()
@@ -114,8 +122,12 @@ class Session(QObject):
         self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
     def start(self):
         self.stop(); self.extractor=RealtimeFeatureExtractor(); self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
-        if self.cfg.mode=="demo": self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
-        else: self.reader=ArduinoReader(self.cfg.port,self.cfg.baud,require_crc=True,parent=self)
+        if self.cfg.mode=="demo":
+            self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
+        elif self.cfg.mode=="wifi":
+            self.reader=NetworkReader(self.cfg.host or "192.168.4.1", int(self.cfg.tcp_port or 7777), require_crc=True, parent=self)
+        else:
+            self.reader=ArduinoReader(self.cfg.port,self.cfg.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample); self.reader.state_changed.connect(self.state_ready); self.reader.error_received.connect(self._on_error); self.reader.start()
     def stop(self):
         if self.reader:
@@ -125,13 +137,9 @@ class Session(QObject):
     def command(self,c):
         if self.reader and hasattr(self.reader,"write_command"): self.reader.write_command(c)
     def _on_sample(self,s):
-        self.samples+=1; self.extractor.add_sample(s); self.sample_ready.emit(s)
-        now=time.monotonic()
-        if now-self._last_feature>=0.5:
-            self._last_feature=now
-            try:
-                f=self.extractor.compute(); setattr(f,"_source",getattr(s,"source",None)); self.feature_ready.emit(f)
-            except Exception as e: self._on_error(f"Feature computation failed: {type(e).__name__}: {e}")
+        self.last_raw_sample=s
+        if self.test_active:
+            self.test_rows.append(s)
     def _on_error(self,msg):
         if "Packet parse error" in msg or "crc" in msg.lower(): self.packet_errors+=1
         self.error_ready.emit(msg)
@@ -153,7 +161,7 @@ class AddPatientDialog(QDialog):
 
 class UnifiedWorkstation(QMainWindow):
     def __init__(self,cfg):
-        super().__init__(); self.cfg=cfg; self.db=LocalDatabase(); self.pcos=PCOSModule(); self.current=None; self.latest=None; self.test_active=False; self.test_rows=[]; self.test_features=[]; self.test_start=0.0
+        super().__init__(); self.cfg=cfg; self.db=LocalDatabase(); self.pcos=PCOSModule(); self.complication_engine=PCOSComplicationContextEngine(); self.current=None; self.latest=None; self.last_raw_sample=None; self.test_active=False; self.test_rows=[]; self.test_features=[]; self.test_start=0.0
         self.setWindowTitle("ENDO-TWIN NEXUS — V8.7 Unified Workstation"); self.resize(1580,940); self.setMinimumSize(1180,760); self.setStyleSheet(APP_QSS)
         self.session=Session(cfg,self); self.session.sample_ready.connect(self._on_sample); self.session.feature_ready.connect(self._on_feature); self.session.state_ready.connect(self._on_state); self.session.error_ready.connect(self._on_error)
         self._build(); self._seed_demo(); self._refresh_roster(); self.session.start(); self._timer=QTimer(self); self._timer.timeout.connect(self._tick); self._timer.start(250)
@@ -163,27 +171,116 @@ class UnifiedWorkstation(QMainWindow):
         side=QFrame(); side.setObjectName("sidebar"); side.setFixedWidth(215); sv=QVBoxLayout(side); sv.setContentsMargins(14,18,10,16)
         b=QLabel("Endo-Twin Nexus"); b.setObjectName("brand"); sv.addWidget(b); x=QLabel("UNIFIED WORKSTATION"); x.setObjectName("eyebrow"); sv.addWidget(x); d=QLabel("Patient + Doctor + Prototype Lab"); d.setObjectName("muted"); sv.addWidget(d); sv.addSpacing(15)
         self.nav={}; 
-        for k,t in [("patient","◉  Patient"),("doctor","♙  Doctor"),("lab","⌁  Prototype Lab"),("model","⌁  Model Lab"),("settings","⚙  Settings")]:
+        for k,t in [("patient","◉  Patient"),("doctor","♙  Doctor"),("complications","⚕  PCOS Complications"),("lab","⌁  Prototype Lab"),("model","⌁  Model Lab"),("settings","⚙  Settings")]:
             q=QPushButton(t); q.setObjectName("nav"); q.setCheckable(True); q.clicked.connect(lambda _,kk=k:self._go(kk)); self.nav[k]=q; sv.addWidget(q)
         sv.addStretch(); m=QFrame(); m.setObjectName("hero"); mv=QVBoxLayout(m); e=QLabel("SESSION"); e.setObjectName("eyebrow"); mv.addWidget(e); self.mode_lbl=QLabel(); self.mode_lbl.setObjectName("value"); mv.addWidget(self.mode_lbl); self.state_lbl=QLabel("starting"); self.state_lbl.setObjectName("muted"); mv.addWidget(self.state_lbl); sv.addWidget(m); shell.addWidget(side,0,0)
         right=QWidget(); rv=QVBoxLayout(right); rv.setContentsMargins(0,0,0,0); rv.setSpacing(0)
         top=QFrame(); top.setObjectName("topbar"); tv=QHBoxLayout(top); tv.setContentsMargins(16,7,16,7); brand=QLabel("ENDO-TWIN"); brand.setStyleSheet("font-size:16px;font-weight:900;color:#fff;"); tv.addWidget(brand); sub=QLabel("Personalized Physiological Modelling Platform"); sub.setStyleSheet("color:#e8eaff;font-size:10px;font-weight:700;"); tv.addWidget(sub); tv.addStretch(); self.patient_lbl=QLabel("No patient"); self.patient_lbl.setStyleSheet("color:#fff;font-weight:850;"); tv.addWidget(self.patient_lbl); self.quality=QLabel("Quality —"); self.quality.setStyleSheet("color:#fff;"); tv.addWidget(self.quality); rv.addWidget(top)
         self.stack=QStackedWidget(); rv.addWidget(self.stack,1); shell.addWidget(right,0,1)
-        self.stack.addWidget(self._patient_page()); self.stack.addWidget(self._doctor_page()); self.stack.addWidget(self._lab_page()); self.stack.addWidget(ModelLabWidget(ROOT)); self.stack.addWidget(self._settings_page()); self._go("patient")
+        self.stack.addWidget(self._patient_page()); self.stack.addWidget(self._doctor_page()); self.stack.addWidget(self._complications_page()); self.stack.addWidget(self._lab_page()); self.stack.addWidget(ModelLabWidget(ROOT)); self.stack.addWidget(self._settings_page()); self._go("patient")
     def _card(self,t,val="—",detail=""):
         f=QFrame(); f.setObjectName("card"); v=QVBoxLayout(f); v.addWidget(QLabel(t)); q=v.itemAt(0).widget(); q.setObjectName("eyebrow"); z=QLabel(str(val)); z.setObjectName("value"); v.addWidget(z); m=QLabel(detail); m.setObjectName("muted"); m.setWordWrap(True); v.addWidget(m); return f
     def _patient_page(self):
         p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Patient Workspace"); t.setObjectName("title"); v.addWidget(t)
         w=QLabel(DISCLAIMER); w.setObjectName("warning"); w.setWordWrap(True); v.addWidget(w)
-        self.risk=QLabel("UNKNOWN"); self.risk.setObjectName("risk"); self.reason=QLabel("Select a patient and satisfy the evidence gate."); self.reason.setObjectName("muted"); self.reason.setWordWrap(True)
-        hero=QFrame(); hero.setObjectName("hero"); hv=QVBoxLayout(hero); hv.addWidget(QLabel("CHRONO-PCOS RESEARCH INDEX")); hv.addWidget(self.risk); hv.addWidget(self.reason); v.addWidget(hero)
+
+        hero=QFrame(); hero.setObjectName("hero"); hv=QVBoxLayout(hero)
+        hrow=QHBoxLayout(); 
+        htitle=QLabel("CHRONO-PCOS RESEARCH INDEX"); htitle.setObjectName("eyebrow"); hrow.addWidget(htitle); hrow.addStretch()
+        self.cal_badge=QLabel("AUTO-CALIBRATION • WARMING UP"); self.cal_badge.setObjectName("muted"); hrow.addWidget(self.cal_badge)
+        hv.addLayout(hrow)
+        self.risk=QLabel("UNKNOWN"); self.risk.setObjectName("risk"); hv.addWidget(self.risk)
+        self.reason=QLabel("Select a patient and establish sufficient clinical context."); self.reason.setObjectName("muted"); self.reason.setWordWrap(True); hv.addWidget(self.reason)
+        v.addWidget(hero)
+
         grid=QGridLayout(); self.metrics={}
-        for i,(k,t,d) in enumerate([("hr_bpm","Heart rate","PPG/ECG derived when valid"),("rmssd_ms","HRV RMSSD","PPG-derived; not ECG-equivalent"),("skin_temp_c","Skin temperature","Measured channel"),("activity_level","Activity","IMU derived"),("gsr_tonic","GSR tonic","Analog channel"),("signal_quality","Signal quality","0–1 engineering quality")]):
-            self.metrics[k]=self._card(t); grid.addWidget(self.metrics[k],i//3,i%3)
-        v.addLayout(grid); c=QFrame(); c.setObjectName("card"); cv=QVBoxLayout(c); h=QHBoxLayout(); h.addWidget(QLabel("Patient context")); h.addStretch(); e=QPushButton("Edit / enter clinical context"); e.setObjectName("secondary"); e.clicked.connect(self._edit_current); h.addWidget(e); cv.addLayout(h); self.context=QLabel("—"); self.context.setObjectName("muted"); self.context.setWordWrap(True); cv.addWidget(self.context); v.addWidget(c); self.timeline=QTextEdit(); self.timeline.setReadOnly(True); self.timeline.setMaximumHeight(135); v.addWidget(self.timeline); return p
+        for i,(k,t,d) in enumerate([
+            ("hr_bpm","Heart rate","Analog PPG / ECG when available"),
+            ("rmssd_ms","HRV RMSSD","Quality-gated pulse variability"),
+            ("skin_temp_c","Skin temperature","Only when a skin-temp channel exists"),
+            ("activity_level","Activity","MPU6050-derived"),
+            ("gsr_tonic","GSR / EDA","ADC-domain tonic context"),
+            ("signal_quality","Signal quality","Composite engineering quality"),
+        ]):
+            self.metrics[k]=self._card(t,detail=d); grid.addWidget(self.metrics[k],i//3,i%3)
+        v.addLayout(grid)
+
+        waveform=QFrame(); waveform.setObjectName("card"); wv=QVBoxLayout(waveform)
+        wh=QHBoxLayout(); wl=QLabel("LIVE ANALOG PPG"); wl.setObjectName("eyebrow"); wh.addWidget(wl); wh.addStretch()
+        self.ppg_mode=QLabel("Waiting for CP3 wearable stream"); self.ppg_mode.setObjectName("muted"); wh.addWidget(self.ppg_mode); wv.addLayout(wh)
+        self.ppg_plot=pg.PlotWidget(); self.ppg_plot.setMinimumHeight(210); self.ppg_plot.setBackground("#091725"); self.ppg_plot.showGrid(x=True,y=True,alpha=0.15); self.ppg_plot.setLabel("left","Amplitude (calibrated)"); self.ppg_plot.setLabel("bottom","Seconds"); self.ppg_curve=self.ppg_plot.plot(pen=pg.mkPen("#45d9ff",width=2)); wv.addWidget(self.ppg_plot)
+        v.addWidget(waveform)
+
+        cal=QFrame(); cal.setObjectName("card"); cv=QVBoxLayout(cal)
+        ch=QHBoxLayout(); ct=QLabel("RAW DATA AUTO-CALIBRATION"); ct.setObjectName("eyebrow"); ch.addWidget(ct); ch.addStretch()
+        self.cal_btn=QPushButton("Recalibrate now"); self.cal_btn.setObjectName("secondary"); self.cal_btn.clicked.connect(self._recalibrate); ch.addWidget(self.cal_btn); cv.addLayout(ch)
+        self.cal_progress=QProgressBar(); self.cal_progress.setRange(0,100); self.cal_progress.setValue(0); self.cal_progress.setTextVisible(True); cv.addWidget(self.cal_progress)
+        self.cal_status=QLabel("Waiting for wearable data…"); self.cal_status.setObjectName("muted"); self.cal_status.setWordWrap(True); cv.addWidget(self.cal_status)
+        self.cal_table=QTableWidget(0,4); self.cal_table.setHorizontalHeaderLabels(["Channel","Mode","State","Baseline / scale"]); self.cal_table.setMaximumHeight(235); cv.addWidget(self.cal_table)
+        v.addWidget(cal)
+
+        c=QFrame(); c.setObjectName("card"); cv=QVBoxLayout(c)
+        h=QHBoxLayout(); h.addWidget(QLabel("Patient context")); h.addStretch()
+        e=QPushButton("Edit / enter clinical context"); e.setObjectName("secondary"); e.clicked.connect(self._edit_current); h.addWidget(e); cv.addLayout(h)
+        self.context=QLabel("—"); self.context.setObjectName("muted"); self.context.setWordWrap(True); cv.addWidget(self.context); v.addWidget(c)
+        self.timeline=QTextEdit(); self.timeline.setReadOnly(True); self.timeline.setMaximumHeight(130); v.addWidget(self.timeline)
+        return p
+
     def _doctor_page(self):
         p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); h=QHBoxLayout(); t=QLabel("Doctor Workspace"); t.setObjectName("title"); h.addWidget(t); h.addStretch(); a=QPushButton("+ Add Patient"); a.setObjectName("primary"); a.clicked.connect(self._add_patient); h.addWidget(a); v.addLayout(h); n=QLabel("Shared local registry. Selecting a row changes the Patient workspace and research context."); n.setObjectName("muted"); n.setWordWrap(True); v.addWidget(n)
         self.roster=QTableWidget(0,7); self.roster.setHorizontalHeaderLabels(["ID","Alias","Age","BMI","Cycle","Gate","Updated"]); self.roster.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows); self.roster.cellClicked.connect(lambda r,_:self._select(r)); v.addWidget(self.roster,1); self.doctor_summary=QTextEdit(); self.doctor_summary.setReadOnly(True); self.doctor_summary.setMaximumHeight(170); v.addWidget(self.doctor_summary); return p
+    def _complications_page(self):
+        p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16)
+        t=QLabel("PCOS / PMOS Complication Context"); t.setObjectName("title"); v.addWidget(t)
+        n=QLabel("Research surveillance only. The wearable can provide longitudinal physiological context, but it does not diagnose complications or replace laboratory, clinical, or validated questionnaire assessment."); n.setObjectName("warning"); n.setWordWrap(True); v.addWidget(n)
+        head=QFrame(); head.setObjectName("hero"); hv=QVBoxLayout(head)
+        self.comp_summary=QLabel("Select a patient to populate this panel."); self.comp_summary.setObjectName("muted"); self.comp_summary.setWordWrap(True); hv.addWidget(self.comp_summary)
+        v.addWidget(head)
+        self.comp_table=QTableWidget(0,4); self.comp_table.setHorizontalHeaderLabels(["Domain","Status","Current context","Data / assessment needed"]); self.comp_table.setWordWrap(True); v.addWidget(self.comp_table,1)
+        foot=QLabel("The terminology on this page follows the current international terminology context while preserving CHRONO-PCOS as the project's model name. All wearable findings are contextual and unvalidated."); foot.setObjectName("muted"); foot.setWordWrap(True); v.addWidget(foot)
+        return p
+
+    def _refresh_calibration_table(self,f):
+        snap=getattr(f,"calibration_meta",{}) or {}
+        chans=snap.get("channels",{}) if isinstance(snap,dict) else {}
+        rows=[k for k in ["analog_ppg_raw","gsr_raw","ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps","room_temp_c","humidity_pct","pressure_hpa","lux"] if k in chans]
+        self.cal_table.setRowCount(len(rows))
+        for r,k in enumerate(rows):
+            item=chans[k]
+            mode=str(item.get("mode","reference"))
+            state="READY" if item.get("ready") else "WARMING"
+            center=item.get("center"); scale=item.get("scale")
+            baseline="—" if center is None else f"{float(center):.3f}"
+            if scale is not None: baseline += f" / {float(scale):.3f}"
+            vals=[k.replace("_"," "),mode,state,baseline]
+            for col,val in enumerate(vals): self.cal_table.setItem(r,col,QTableWidgetItem(str(val)))
+        self.cal_table.resizeColumnsToContents()
+
+    def _recalibrate(self):
+        try:
+            self.session.extractor.calibrator.reset()
+            self.cal_progress.setValue(0)
+            self.cal_status.setText("Calibration reset. Keep the wearable still for the initial IMU offset capture and maintain stable sensor contact while the baseline window fills.")
+            self.cal_badge.setText("AUTO-CALIBRATION • WARMING UP")
+            self.timeline.append(f"{datetime.now().strftime('%H:%M:%S')} • Manual raw-data calibration reset.")
+        except Exception as e:
+            QMessageBox.warning(self,"Calibration",f"Could not reset calibration: {e}")
+
+    def _refresh_complications(self):
+        if not hasattr(self,"comp_table"): return
+        rows=self.complication_engine.evaluate(self.current,self.latest,[])
+        self.comp_table.setRowCount(len(rows))
+        for r,row in enumerate(rows):
+            for c,key in enumerate(["domain","status","finding","data_needed"]):
+                self.comp_table.setItem(r,c,QTableWidgetItem(str(row.get(key,"—"))))
+        self.comp_table.resizeColumnsToContents()
+        if self.current:
+            aid=self.current.get("anonymous_id","—")
+            live="live wearable features available" if self.latest else "waiting for wearable features"
+            self.comp_summary.setText(f"Patient {aid} • {live}. Wearable-derived rows are labelled RESEARCH PHYSIOLOGY; clinical-data rows remain explicitly unresolved.")
+        else:
+            self.comp_summary.setText("Select a patient to populate this panel.")
+
     def _lab_page(self):
         p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Prototype Lab"); t.setObjectName("title"); v.addWidget(t); n=QLabel("Bench engineering only. PASS = software received/processed a plausible channel. It does not prove calibration or medical validity."); n.setObjectName("warning"); n.setWordWrap(True); v.addWidget(n)
         r=QHBoxLayout(); self.lab_packets=self._card("Packets","0","Current session"); self.lab_rate=self._card("Rate","—","Observed packet input"); self.lab_q=self._card("Quality","—","Realtime feature quality"); [r.addWidget(x,1) for x in (self.lab_packets,self.lab_rate,self.lab_q)]; v.addLayout(r)
@@ -191,13 +288,20 @@ class UnifiedWorkstation(QMainWindow):
         for label,cmd in [("PING","PING"),("LED green","LED,G"),("BEEP","BEEP")]:
             b=QPushButton(label); b.setObjectName("secondary"); b.clicked.connect(lambda _,cc=cmd:self.session.command(cc)); c.addWidget(b)
         c.addStretch(); self.test_btn=QPushButton("Run 15 s acceptance test"); self.test_btn.setObjectName("primary"); self.test_btn.clicked.connect(self._start_test); c.addWidget(self.test_btn); ex=QPushButton("Export report"); ex.setObjectName("secondary"); ex.clicked.connect(self._export_test); c.addWidget(ex); v.addLayout(c)
-        self.modules=QTableWidget(8,4); self.modules.setHorizontalHeaderLabels(["Module","Signal","State","Meaning"]); names=[("MAX30102 PPG","—","NOT TESTED","IR/RED waveform"),("MPU6050 IMU","—","NOT TESTED","accel/gyro"),("DS18B20","—","NOT TESTED","temperature"),("GSR/EDA","—","NOT TESTED","analog channel"),("AD8232 ECG","—","OPTIONAL","raw ECG / lead-off"),("FSR","—","OPTIONAL","contact context"),("MAX4466","—","OPTIONAL","RMS/pitch"),("BH1750/BME280","—","OPTIONAL","environment")]
+        self.modules=QTableWidget(8,4); self.modules.setHorizontalHeaderLabels(["Module","Signal","State","Meaning"]); names=[("Analog Pulse PPG • GPIO4","—","NOT TESTED","single-channel pulse waveform / HR"),("MPU6050 • I²C 21/22","—","NOT TESTED","accel/gyro motion"),("GSR/EDA • GPIO34","—","NOT TESTED","12-bit ADC electrodermal context"),("BME280 • I²C 21/22","—","NOT TESTED","room temperature / humidity / pressure"),("BH1750 • I²C 21/22","—","OPTIONAL","ambient light"),("ESP32-S3 transport","—","NOT TESTED","USB Serial + TCP 7777"),("Raw auto-calibrator","—","NOT TESTED","robust offsets / baselines"),("CHRONO-PCOS context","—","RESEARCH","longitudinal physiological context")]
         for r0,row in enumerate(names):
             for c0,val in enumerate(row): self.modules.setItem(r0,c0,QTableWidgetItem(val))
         v.addWidget(self.modules,1); self.lab_log=QTextEdit(); self.lab_log.setReadOnly(True); self.lab_log.setMaximumHeight(155); v.addWidget(self.lab_log); return p
     def _settings_page(self):
-        p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Settings"); t.setObjectName("title"); v.addWidget(t); q=QLabel("Restart to change DEMO/LIVE or the live transport. Research bridge is LAN-only."); q.setObjectName("muted"); q.setWordWrap(True); v.addWidget(q); box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box); bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}")); bv.addWidget(QLabel("Active live hardware: ESP32-S3 wearable or Arduino Mega lab controller over USB. ESP32-S3 is legacy only.")); v.addWidget(box); v.addStretch(); return p
-    def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","lab","model","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
+        p=QWidget(); v=QVBoxLayout(p); v.setContentsMargins(18,16,18,16); t=QLabel("Settings"); t.setObjectName("title"); v.addWidget(t)
+        q=QLabel("Desktop workstation is the primary ENDO-TWIN wearable client. USB and the ESP32-S3 TCP bridge share the same CP3 processing path."); q.setObjectName("muted"); q.setWordWrap(True); v.addWidget(q)
+        box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box)
+        bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}"))
+        bv.addWidget(QLabel("Primary wearable: ESP32-S3 • Analog PPG GPIO4 • GSR GPIO34 • I²C SDA GPIO21 / SCL GPIO22 • Status LED GPIO2"))
+        bv.addWidget(QLabel("Transport: USB Serial 115200 or Wi-Fi TCP 7777 (ESP32 SoftAP default: 192.168.4.1)"))
+        v.addWidget(box); v.addStretch(); return p
+
+    def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","complications","lab","model","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
     def _seed_demo(self):
         if self.cfg.mode=="demo": self.current={"patient_id":"DEMO-021","anonymous_id":"DEMO-021","display_name":"Mira","age_years":23.0,"bmi":24.7,"cycle_irregular":True,"cycle_length":42,"years_post_menarche":10,"hyperandrogenism":True,"pcom_present":False,"exclusions_completed":True,"glucose_mg_dl":98.0,"demo":True}
     def _enrich(self,p):
@@ -251,10 +355,27 @@ class UnifiedWorkstation(QMainWindow):
         self.latest=f
         for k,val in [("hr_bpm",f.hr_bpm),("rmssd_ms",f.rmssd_ms),("skin_temp_c",f.skin_temp_c),("activity_level",f.activity_level),("gsr_tonic",f.gsr_tonic),("signal_quality",f.signal_quality)]:
             if k in self.metrics:self._set_metric(k,val)
-        self.quality.setText(f"Quality {float(f.signal_quality)*100:.0f}%"); self.lab_packets.findChildren(QLabel)[1].setText(str(self.session.samples)); self.lab_q.findChildren(QLabel)[1].setText(f"{float(f.signal_quality)*100:.0f}%")
+        self.quality.setText(f"Quality {float(f.signal_quality)*100:.0f}%")
+        self.lab_packets.findChildren(QLabel)[1].setText(str(self.session.samples))
+        self.lab_q.findChildren(QLabel)[1].setText(f"{float(f.signal_quality)*100:.0f}%")
         self.timeline.append(f"{datetime.now().strftime('%H:%M:%S')} • HR {f.hr_bpm if f.hr_bpm is not None else 'UNKNOWN'} • quality {f.signal_quality:.2f}") if hasattr(self,"timeline") else None
+
+        self.cal_progress.setValue(int(round(float(f.calibration_ready_fraction)*100)))
+        self.cal_badge.setText(f"AUTO-CALIBRATION • {f.calibration_status.replace('_',' ')}")
+        self.cal_status.setText(
+            f"Calibration readiness {float(f.calibration_ready_fraction)*100:.0f}% • "
+            f"status {f.calibration_status}. Raw packets are retained; calibrated values are used for analysis."
+        )
+        self._refresh_calibration_table(f)
+
+        t,y=self.session.extractor.ppg_waveform(last_s=18.0)
+        if len(t):
+            self.ppg_curve.setData(t,y)
+            self.ppg_mode.setText("ANALOG PPG • GPIO4" if getattr(self.last_raw_sample,"analog_ppg_raw",None) is not None else "DIGITAL PPG COMPATIBILITY")
         if self.test_active:self.test_features.append(f)
+        self._refresh_complications()
         self._compute_risk()
+
     def _set_metric(self,k,val):
         label=self.metrics[k].findChildren(QLabel)[1]
         if val is None or (isinstance(val,float) and not math.isfinite(val)): label.setText("UNKNOWN")
@@ -266,12 +387,15 @@ class UnifiedWorkstation(QMainWindow):
     def _compute_risk(self):
         if not self.current or not self.latest:self.risk.setText("UNKNOWN"); self.reason.setText("Waiting for patient context and feature data."); return
         ok,msg=context_ready(self.current)
-        if not ok:self.risk.setText("UNKNOWN"); self.reason.setText(msg); return
+        if not ok:
+            self.risk.setText("UNKNOWN"); self.reason.setText(msg); self._refresh_complications(); return
         try:
             idx,res,why=compute_research_index(self.current,self.latest,self.pcos,self.cfg.mode=="demo" and "demo" or "serial")
             if idx is None:self.risk.setText("UNKNOWN"); self.reason.setText(res.explanation if res else why)
             else:self.risk.setText(f"{float(idx):.1f}%"); self.reason.setText(f"{why}\n\nConfidence: {getattr(res,'confidence',0):.0%} • data quality: {getattr(res,'data_quality',0):.0%}\n{DISCLAIMER}")
-        except Exception as e:self.risk.setText("ERROR"); self.reason.setText(f"Risk computation failed: {e}")
+        except Exception as e:self.risk.setText("ERROR"); self.reason.setText(f"Research-index computation failed: {e}")
+        self._refresh_complications()
+
     def _on_state(self,s): self.state_lbl.setText(s.upper().replace("_"," ")); self.lab_log.append(f"{datetime.now().strftime('%H:%M:%S')} STATE {s}") if hasattr(self,"lab_log") else None
     def _on_error(self,msg): self.lab_log.append(f"{datetime.now().strftime('%H:%M:%S')} ERROR {msg}") if hasattr(self,"lab_log") else None
     def _start_test(self):
@@ -285,7 +409,7 @@ class UnifiedWorkstation(QMainWindow):
     def _finish_test(self):
         rows=self.test_rows; fs=self.test_features; q=[float(f.signal_quality) for f in fs if f.signal_quality is not None]; avg=sum(q)/len(q) if q else None
         def finite_attr(name): return any(getattr(r,name,None) is not None for r in rows)
-        checks=[("PPG raw",finite_attr("ir") or finite_attr("red")),("IMU",finite_attr("az_g")),("TEMP",any(math.isfinite(float(getattr(r,"temp_c",float("nan")))) for r in rows)),("GSR",finite_attr("gsr_raw")),("ECG",finite_attr("ecg_raw")),("FSR",finite_attr("fsr_raw")),("MIC",finite_attr("mic_raw")),("ENV",finite_attr("lux") or finite_attr("room_temp_c"))]
+        checks=[("Analog PPG",any(getattr(r,"analog_ppg_raw",None) is not None for r in rows) or finite_attr("ir") or finite_attr("red")),("IMU",finite_attr("az_g")),("GSR",finite_attr("gsr_raw")),("BME280",any(math.isfinite(float(getattr(r,"room_temp_c",float("nan")))) for r in rows)),("BH1750",any(math.isfinite(float(getattr(r,"lux",float("nan")))) for r in rows)),("CRC / transport",len(rows)>0)]
         self.lab_log.append(f"TEST COMPLETE • {len(rows)} samples • avg quality {avg*100:.0f}%" if avg is not None else f"TEST COMPLETE • {len(rows)} samples")
         for i,(name,seen) in enumerate(checks): self.modules.setItem(i,1,QTableWidgetItem("SIGNAL" if seen else "UNKNOWN")); self.modules.setItem(i,2,QTableWidgetItem("PASS" if seen else "CHECK"))
         self.lab_log.append(" • ".join(f"{n}={'PASS' if s else 'UNKNOWN'}" for n,s in checks)); self.lab_log.append("PASS means software receipt/processing only; it does not prove calibration or clinical validity.")

@@ -36,7 +36,9 @@ class QualityThresholds:
     skin_temp_min: float = 20.0
     skin_temp_max: float = 42.0
     gsr_min: int = 0
-    gsr_max: int = 1023
+    gsr_max: int = 4095
+    analog_ppg_min: int = 0
+    analog_ppg_max: int = 4095
     ir_min: int = 0
     ir_max: int = 262143
     motion_max_g: float = 8.0
@@ -78,6 +80,9 @@ class SensorQualityControl:
         elif channel == "gsr_raw":
             if not (t.gsr_min <= value <= t.gsr_max):
                 return True, f"GSR {value} out of range"
+        elif channel == "analog_ppg_raw":
+            if not (t.analog_ppg_min <= value <= t.analog_ppg_max):
+                return True, f"analog PPG {value} out of range"
         elif channel in ("ir", "red"):
             if not (t.ir_min <= value <= t.ir_max):
                 return True, f"PPG {value} out of range"
@@ -180,7 +185,7 @@ class SensorQualityControl:
         # Adjust quality by channel specifics
         quality = base_quality
         if channel in ("ir", "red"):
-            # PPG quality depends on amplitude
+            # Digital PPG quality depends on amplitude
             if float(value) < 5000:
                 quality = 0.0
                 return SensorQuality(
