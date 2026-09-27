@@ -229,7 +229,7 @@ function load(){try{const raw=localStorage.getItem(KEY);if(raw)db=Object.assign(
 function save(){localStorage.setItem(KEY,JSON.stringify(db));}
 function person(){return db.people[db.activeId]||null}
 function ensurePersonRecord(p){p.logs ||= {symptoms:[],cycles:[],sleep:[],weight:[],notes:[],events:[]};p.twin ||= {samples:0,baselineReady:false,baselineQuality:0,imported:{}};p.reminders ||= [];return p}
-function pid(){return "WEB-"+crypto.randomUUID().slice(0,8).toUpperCase()}
+function pid(){return "WEB-"+(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36)).slice(0,8).toUpperCase()}
 function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2200)}
 function setView(v){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$("view-"+v)?.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===v));$("sidebar").classList.remove("open");renderAll()}
 function daysBetween(a,b){const A=new Date(a+"T12:00:00"),B=new Date(b+"T12:00:00");return Math.round((B-A)/86400000)}
@@ -241,7 +241,7 @@ function pcodState(p){return p?.profile?.hasPcod==="yes"?"yes":p?.profile?.hasPc
 function statusText(s){return s==="yes"?"YES":s==="no"?"NO":"UNKNOWN"}
 function event(p,title,detail,icon="•"){p.logs.events.unshift({date:isoDate(now()),title,detail,icon});p.logs.events=p.logs.events.slice(0,60)}
 function lineChart(svgId, vals, color="#38d9ff"){const svg=$(svgId);if(!svg)return;const w=650,h=230,pad=24;svg.innerHTML="";if(!vals.length){svg.innerHTML='<text x="325" y="115" fill="#6f82a8" text-anchor="middle" font-size="11">No recorded data yet</text>';return}const clean=vals.map(Number).filter(Number.isFinite);if(!clean.length)return;const min=Math.min(...clean),max=Math.max(...clean),span=max-min||1;let pts=clean.map((v,i)=>{const x=pad+(w-pad*2)*(i/Math.max(1,clean.length-1));const y=h-pad-(h-pad*2)*(v-min)/span;return [x,y]});const path=pts.map((q,i)=>(i?"L":"M")+q[0].toFixed(1)+","+q[1].toFixed(1)).join(" ");svg.innerHTML='<defs><linearGradient id="g'+svgId+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".24"/><stop offset="100%" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs><path d="'+path+' L '+pts[pts.length-1][0]+' '+(h-pad)+' L '+pts[0][0]+' '+(h-pad)+' Z" fill="url(#g'+svgId+')"/><path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#1d2e55"/>';pts.forEach((q,i)=>{if(i===pts.length-1)svg.innerHTML+='<circle cx="'+q[0]+'" cy="'+q[1]+'" r="5" fill="'+color+'"/>'})}
-function values(p,type,days=365){const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);const filt=a=>String(a.date)>=isoDate(cutoff);if(type==="sleep")return sorted(p.logs.sleep).filter(filt).map(x=>Number(x.hours));if(type==="weight")return sorted(p.logs.weight).filter(filt).map(x=>Number(x.kg));if(type==="symptoms")return sorted(p.logs.symptoms).filter(filt).map(x=>Number(x.severity)||0);if(type==="cycle")return cycleSeries(p).filter(x=>String(x.date)>=isoDate(cutoff)).map(x=>x.length);return []}
+function values(p,type,days=365){const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);const filt=a=>String(a.date)>=isoDate(cutoff);const asc=a=>[...a].sort((x,y)=>String(x.date).localeCompare(String(y.date)));if(type==="sleep")return asc(p.logs.sleep).filter(filt).map(x=>Number(x.hours));if(type==="weight")return asc(p.logs.weight).filter(filt).map(x=>Number(x.kg));if(type==="symptoms")return asc(p.logs.symptoms).filter(filt).map(x=>Number(x.severity)||0);if(type==="cycle")return cycleSeries(p).filter(x=>String(x.date)>=isoDate(cutoff)).map(x=>x.length);return []}
 function cycleSeries(p){const c=sorted(p.logs.cycles);return c.map((x,i)=>{const prev=c[i+1];return {date:x.date,length:prev?Math.max(1,daysBetween(prev.date,x.date)):Number(p.profile.cycleLength)||28}}).reverse()}
 function avg(a){return a.length?a.reduce((s,x)=>s+Number(x),0)/a.length:0}
 function analysis(p){const sym=values(p,"symptoms",30),sl=values(p,"sleep",30),cy=cycleSeries(p).map(x=>x.length),w=values(p,"weight",90);return {sym,sl,cy,w}}
@@ -266,7 +266,53 @@ function submitEntry(e){e.preventDefault();const p=person();const date=$("eDate"
 function exportPerson(all=false){const payload=all?db:person();if(!payload)return;const data=JSON.stringify(payload,null,2);download(all?"endo-twin-local-backup.json":"endo-twin-"+(person().profile.name||person().id)+".json",data,"application/json");toast("Export created locally")}
 function download(name,data,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name.replace(/[^a-zA-Z0-9._-]+/g,"_");a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function printReport(){window.print()}
-function importJson(file,all=false){const fr=new FileReader();fr.onload=()=>{try{const x=JSON.parse(fr.result);if(all&&x.people)db=x;else{const q=x.profile?x:{id:x.id,profile:x.profile,logs:x.logs,twin:x.twin,reminders:x.reminders};q.id ||= pid();ensurePersonRecord(q);db.people[q.id]=q;db.activeId=q.id}save();renderAll();toast("Imported locally")}catch(e){alert("Invalid JSON backup.")}};fr.readAsText(file)}
+function normalizeDesktopPerson(id,record){
+ const x=record?.profile||record||{};
+ const learning=record?.learning||{};
+ return ensurePersonRecord({
+   id:String(id||x.participant_id||pid()),
+   profile:{
+     name:x.patient_name||x.alias||x.name||id||"Imported Patient",
+     alias:x.alias||"",
+     age:x.age_years??x.age??null,
+     sex:x.sex||"Unknown",
+     height:x.height_cm??x.height??null,
+     weight:x.weight_kg??x.weight??null,
+     hasPcod:x.has_pcod===true?"yes":x.has_pcod===false?"no":x.has_pcos===true?"yes":x.has_pcos===false?"no":"",
+     cycleLength:x.usual_cycle_length_days??x.cycleLength??null,
+     waist:x.waist_cm??x.waist??null,
+     glucose:x.glucose_mg_dl??x.glucose??null,
+     sbp:x.systolic_bp??x.sbp??null,
+     dbp:x.diastolic_bp??x.dbp??null,
+     note:"Imported from ENDO-TWIN Personal Twin state."
+   },
+   logs:{symptoms:[],cycles:[],sleep:[],weight:[],notes:[],events:[]},
+   twin:{samples:Number(learning.samples||0),baselineReady:false,baselineQuality:0,imported:learning}
+ });
+}
+function importJson(file,all=false){
+ const fr=new FileReader();
+ fr.onload=()=>{
+   try{
+     const x=JSON.parse(fr.result);
+     if(x.people){
+       Object.entries(x.people).forEach(([id,record])=>{
+         const imported=record.profile&&record.logs?record:normalizeDesktopPerson(id,record);
+         ensurePersonRecord(imported);db.people[imported.id]=imported;
+       });
+       db.activeId=x.activeId||x.active_participant_id||Object.keys(db.people)[0]||null;
+     }else if(x.profile&&x.people===undefined){
+       const imported=x.logs?x:normalizeDesktopPerson(x.profile.participant_id,x);
+       ensurePersonRecord(imported);db.people[imported.id]=imported;db.activeId=imported.id;
+     }else if(x.participant_id||x.alias||x.patient_name){
+       const imported=normalizeDesktopPerson(x.participant_id,x);
+       db.people[imported.id]=imported;db.activeId=imported.id;
+     }else{throw new Error("Unsupported JSON format");}
+     save();renderAll();toast(all?"Local backup imported":"Patient data imported locally");
+   }catch(e){alert("Invalid or unsupported ENDO-TWIN JSON backup.");}
+ };
+ fr.readAsText(file);
+}
 function openPatients(){const list=$("patientChoices");list.innerHTML=Object.values(db.people).map(q=>'<button class="btn '+(q.id===db.activeId?"primary":"")+'" style="width:100%;text-align:left;margin-bottom:7px" data-pick="'+q.id+'">'+escapeHtml(q.profile.name||q.profile.alias||q.id)+' • '+statusText(pcodState(q))+' PCOD</button>').join("")||'<div class="empty">No patient records.</div>';$("patientModal").classList.add("open")}
 function switchPatient(id){if(!db.people[id])return;db.activeId=id;save();$("patientModal").classList.remove("open");renderAll();toast("Active patient changed")}
 document.addEventListener("click",e=>{const v=e.target.closest("[data-view]");if(v){e.preventDefault();setView(v.dataset.view)}const a=e.target.closest("[data-action]");if(a){e.preventDefault();openEntry(a.dataset.action)}const pick=e.target.closest("[data-pick]");if(pick)switchPatient(pick.dataset.pick)});
