@@ -10,15 +10,15 @@ The V9 wearable now uses the board's labeled SDA/SCL pins. On this Feather these
 
 | Module | Signal | Feather pin |
 |---|---|---|
-| MPU6050 | SDA | **SDA / GPIO3** |
-| MPU6050 | SCL | **SCL / GPIO4** |
-| BME280 | SDA | **SDA / GPIO3** |
-| BME280 | SCL | **SCL / GPIO4** |
-| BH1750 | SDA | **SDA / GPIO3** |
-| BH1750 | SCL | **SCL / GPIO4** |
-| Analog Pulse Sensor | AO | **A5 / GPIO8 / ADC1** |
-| GSR module | AO | **D5 / GPIO5 / ADC1** |
-| DS18B20 | DATA | **D6 / GPIO6** |
+| MPU6050 | SDA | **SDA / GPIO8** |
+| MPU6050 | SCL | **SCL / GPIO9** |
+| BME280 | SDA | **SDA / GPIO8** |
+| BME280 | SCL | **SCL / GPIO9** |
+| BH1750 | SDA | **SDA / GPIO8** |
+| BH1750 | SCL | **SCL / GPIO9** |
+| Analog Pulse Sensor | AO | **GPIO4 / ADC1** |
+| GSR module | AO | **GPIO5 / ADC1** |
+| DS18B20 | DATA | **GPIO6** |
 | Status LED | onboard | `LED_BUILTIN` |
 
 I2C power is supplied through the Feather's I2C power circuit; the V9 firmware explicitly enables `PIN_I2C_POWER` when the board core exposes it.
