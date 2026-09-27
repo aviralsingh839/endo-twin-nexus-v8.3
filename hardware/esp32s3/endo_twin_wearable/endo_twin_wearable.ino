@@ -1,11 +1,11 @@
 /* ENDO-TWIN NEXUS V9.0 — Adafruit Feather ESP32-S3 2MB PSRAM
    Primary analog wearable, CP3 transport, patient-specific PPG calibration.
    VERIFIED BOARD MAP:
-     I2C SDA = GPIO3 (board SDA / STEMMA QT)
-     I2C SCL = GPIO4 (board SCL / STEMMA QT)
-     Analog PPG = GPIO8 (board A5 / ADC1)
-     GSR AO = GPIO5 (board D5 / ADC1)
-     DS18B20 DATA = GPIO6 (board D6)
+     I2C SDA = GPIO8
+     I2C SCL = GPIO9
+     Analog PPG = GPIO4
+     GSR AO = GPIO5
+     DS18B20 DATA = GPIO6
      Status LED = LED_BUILTIN (board LED)
    I2C sensors: MPU6050 0x68/0x69, BME280 0x76/0x77, BH1750 0x23/0x5C.
    Commands: PPG_PERSON=<ID>, PPG_NEW_PERSON, PPG_CAL, PPG_PROFILE, SENSORS,
@@ -24,8 +24,8 @@
 #include <Adafruit_BME280.h>
 #include <math.h>
 
-static constexpr uint8_t I2C_SDA_PIN=3, I2C_SCL_PIN=4;
-static constexpr uint8_t ANALOG_PPG_PIN=8, GSR_PIN=5, ONE_WIRE_BUS=6;
+static constexpr uint8_t I2C_SDA_PIN=8, I2C_SCL_PIN=9;
+static constexpr uint8_t ANALOG_PPG_PIN=4, GSR_PIN=5, ONE_WIRE_BUS=6;
 static constexpr uint8_t STATUS_LED_PIN=LED_BUILTIN;
 static constexpr uint32_t BAUD_RATE=115200, TCP_PORT=7777;
 static constexpr uint32_t PPG_PERIOD_MS=50, IMU_PERIOD_MS=20, GSR_PERIOD_MS=50;
