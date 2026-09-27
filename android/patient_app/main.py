@@ -167,6 +167,34 @@ class ResultsTab(BoxLayout):
         self.add_widget(Button(text='Share with Doctor (Controlled)', size_hint_y=None, height=dp(50)))
 
 
+class ComplicationsTab(BoxLayout):
+    def __init__(self, db, **kwargs):
+        super().__init__(orientation='vertical', **kwargs)
+        self.add_widget(Label(
+            text='Complications - Research Signals',
+            size_hint_y=None, height=dp(40), font_size='18sp', bold=True
+        ))
+        self.add_widget(Label(
+            text='These are research-domain signals, NOT calibrated chances/probabilities. '
+                 'If live data or required clinical inputs are missing, the result is Not established.',
+            size_hint_y=None, height=dp(80)
+        ))
+        for name in [
+            'Insulin-resistance / type-2-diabetes-related domain',
+            'Hypertension-related domain',
+            'Sleep-disordered-breathing domain',
+            'Ovulatory / fertility-related domain',
+            'Metabolic-liver domain'
+        ]:
+            self.add_widget(Label(
+                text=f'{name}: Not established — awaiting sufficient data',
+                size_hint_y=None, height=dp(45)
+            ))
+        self.add_widget(Label(
+            text='Research only. A clinician must assess any actual complication risk.',
+            size_hint_y=None, height=dp(50)
+        ))
+
 class FindCareTab(BoxLayout):
     def __init__(self, db, **kwargs):
         super().__init__(orientation='vertical', **kwargs)
@@ -239,6 +267,11 @@ class PatientApp(App):
         results_tab = TabbedPanelItem(text='Results')
         results_tab.add_widget(ResultsTab(self.db))
         tabs.add_widget(results_tab)
+
+        # Complications
+        complications_tab = TabbedPanelItem(text='Complications')
+        complications_tab.add_widget(ComplicationsTab(self.db))
+        tabs.add_widget(complications_tab)
 
         # Find Care
         care_tab = TabbedPanelItem(text='Find Care')
