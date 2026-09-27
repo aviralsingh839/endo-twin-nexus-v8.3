@@ -74,7 +74,6 @@ class DoctorWindow(QMainWindow):
         self.session.sample_received.connect(self._on_sample)
         self.session.state_changed.connect(self._on_state)
         self.session.error_received.connect(self._on_error)
-        self.session.start()
 
         self.setWindowTitle("Endo-Twin Nexus — Doctor Desktop • V8.6")
         self.resize(1580, 940)
@@ -84,11 +83,15 @@ class DoctorWindow(QMainWindow):
         self._log_event("Workstation opened", "session")
         self._refresh_roster()
         self._refresh_header()
+        self.session.start()
 
     def closeEvent(self, event):
-        self.session.stop()
-        self.bridge.stop()
-        self.db.close()
+        if self.session is not None:
+            self.session.stop()
+        if self.bridge is not None:
+            self.bridge.stop()
+        if self.db is not None:
+            self.db.close()
         event.accept()
 
     # ---------- shell ----------
@@ -1277,7 +1280,14 @@ class DoctorWindow(QMainWindow):
         w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
         o.addWidget(section_header("Sensor Data", "Readable signal cards with provenance and live trends."))
         grid=QGridLayout()
-        specs=[("Heart rate","hr_bpm","bpm","MEASURED","#ff4fa3"),("HRV / RMSSD","rmssd_ms","ms","DERIVED","#39c9ff"),("GSR / EDA","gsr_tonic","rel.","MEASURED","#a86bff"),("Skin temperature","skin_temp_c","°C","MEASURED","#ff9f43"),("Activity","activity_level","%","DERIVED","#31d7a1"),("SpO₂","spo2_pct","%","AVAILABLE ONLY WITH APPROPRIATE SENSOR","MEASURED","#44d9ff")]
+        specs=[
+            ("Heart rate","hr_bpm","bpm","MEASURED","#ff4fa3"),
+            ("HRV / RMSSD","rmssd_ms","ms","DERIVED","#39c9ff"),
+            ("GSR / EDA","gsr_tonic","rel.","MEASURED","#a86bff"),
+            ("Skin temperature","skin_temp_c","°C","MEASURED","#ff9f43"),
+            ("Activity","activity_level","%","DERIVED","#31d7a1"),
+            ("SpO₂","spo2_pct","%","AVAILABLE ONLY WITH APPROPRIATE SENSOR","#44d9ff"),
+        ]
         for i,(name,key,unit,prov,accent) in enumerate(specs):
             current=(self.latest_row or {}).get(key)
             if current is None and self.current_case:
