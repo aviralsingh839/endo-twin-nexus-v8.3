@@ -50,6 +50,7 @@ from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfi
 from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_engine
 from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from src.personal_twin.participant_selector import choose_participant
 
@@ -73,7 +74,8 @@ class MainWindow(QMainWindow):
                     setattr(self.profile, key, value)
                 except Exception:
                     pass
-        self.baseline_engine = PersonalBaselineEngine()
+        self.participant_id = str(saved_profile.get("participant_id") or "LOCAL-PARTICIPANT")
+        self.baseline_engine = baseline_engine(self.participant_id)
         self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
         self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
@@ -97,7 +99,6 @@ class MainWindow(QMainWindow):
         self.public_study.attach_latest()
         self._last_public_study_log = 0.0
 
-        self.participant_id = str(saved_profile.get("participant_id") or "LOCAL-PARTICIPANT")
         self.adaptive_model = PersonalAdaptiveModel(participant_id=self.participant_id)
         self.current_session_id = None
         self._last_feature_compute = 0.0
@@ -661,6 +662,10 @@ class MainWindow(QMainWindow):
 
         select_participant(pid)
         self.participant_id = str(pid)
+        self.baseline_engine = baseline_engine(self.participant_id)
+        self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
+        self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
+        self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
 
         saved = get_profile(self.participant_id)
         for key, value in saved.items():
