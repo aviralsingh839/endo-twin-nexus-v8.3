@@ -30,6 +30,7 @@ from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.onboarding import MULTI_PERSON_DISCLAIMER, PersonalTwinOnboarding
 from src.personal_twin.baseline_store import baseline_engine, baseline_summary
 from src.data_models import FeatureVector
+from src.utils.history_store import HistoryStore
 from desktop.workstation_runtime import LiveSession, ModeConfig, choose_mode
 
 
@@ -77,6 +78,7 @@ class SelfLearningWindow(QWidget):
         self.session_id = None
         self.baseline_rows: list[FeatureVector] = []
         self.capture_started_at = None
+        self.history_store = HistoryStore()
 
         root = QVBoxLayout(self)
 
@@ -285,6 +287,11 @@ class SelfLearningWindow(QWidget):
         self.session.sample_received.connect(self._on_sample)
         self.session.error_received.connect(self._on_error)
         self.session.state_changed.connect(self._on_state)
+        self.session_id = self.history_store.start_session(
+            source=f"self-learning:{mode.mode}",
+            note="Patient baseline capture",
+            participant_id=self.participant_id,
+        )
         self.session.start()
         self.capture.setEnabled(False)
         self.stop.setEnabled(True)
@@ -306,6 +313,12 @@ class SelfLearningWindow(QWidget):
             except Exception:
                 pass
             self.session = None
+        if self.session_id is not None:
+            try:
+                self.history_store.end_session(self.session_id, sample_count=len(self.baseline_rows))
+            except Exception:
+                pass
+            self.session_id = None
         self.stop.setEnabled(False)
         self.capture.setEnabled(True)
 
@@ -337,6 +350,28 @@ class SelfLearningWindow(QWidget):
             return
         feature = row_to_feature(row)
         self.baseline_rows.append(feature)
+        if self.session_id is not None:
+            try:
+                self.history_store.log_feature(
+                    self.session_id,
+                    {
+                        "ts": feature.timestamp_s,
+                        "hr": feature.hr_bpm,
+                        "rmssd": feature.rmssd_ms,
+                        "skin_temp": feature.skin_temp_c,
+                        "gsr": feature.gsr_tonic,
+                        "activity": feature.activity_level,
+                        "stress": feature.stress_index,
+                        "sleep_prob": feature.sleep_probability,
+                        "signal_quality": feature.signal_quality,
+                    },
+                    extra_json=json.dumps({
+                        "participant_id": self.participant_id,
+                        "source": "SELF_LEARNING_BASELINE",
+                    }),
+                )
+            except Exception:
+                pass
         self.personal_model.observe(feature, quality=feature.signal_quality)
         self.progress.setText(
             f"CAPTURING • {len(self.baseline_rows)} feature windows • "
