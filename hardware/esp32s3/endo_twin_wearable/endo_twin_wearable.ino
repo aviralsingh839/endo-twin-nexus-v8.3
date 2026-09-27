@@ -49,14 +49,14 @@ WiFiServer server(TCP_PORT);
 WiFiClient tcpClient;
 Preferences prefs;
 
-bool mpuOK=false,bmeOK=false,lightOK=false,tempOK=false;
+bool mpuOK=false,bmeOK=false,lightOK=false,tempOK=false,tempValid=false;
 bool tempPending=false;
 uint16_t statusBase=0;
 uint16_t ppgRaw=0,gsrRaw=0;
 float ax_g=0,ay_g=0,az_g=1,gx_dps=0,gy_dps=0,gz_dps=0;
 float axBias=0,ayBias=0,azBiasError=0,gxBias=0,gyBias=0,gzBias=0;
 float skinTemp=NAN,roomTemp=NAN,humidity=NAN,pressure=NAN,luxValue=NAN;
-uint32_t lastPPG=0,lastIMU=0,lastGSR=0,lastEnv=0,lastTempRequest=0,lastTempRead=0,lastPacket=0,lastStatus=0;
+uint32_t lastPPG=0,lastIMU=0,lastGSR=0,lastEnv=0,lastTempRequest=0,lastTempRead=0,lastPacket=0,lastStatus=0,lastSensorRetry=0;
 uint32_t tempRequestStarted=0;
 bool i2cInitAttempted=false;
 
@@ -169,12 +169,29 @@ static void setupTemperature(){
   tempSensor.begin();
   tempSensor.setResolution(10);
   tempSensor.setWaitForConversion(false);
-  if(tempSensor.getDeviceCount()>0){
-    tempOK=true;statusBase&=~(1u<<ST_TEMP_ERR);
-    tempSensor.requestTemperatures();tempPending=true;tempRequestStarted=millis();lastTempRequest=millis();
+  tempOK=false;
+  tempValid=false;
+  const uint8_t count=tempSensor.getDeviceCount();
+  Serial.print("[TEMP] devices on GPIO6: ");Serial.println(count);
+  if(count>0){
+    DeviceAddress addr;
+    if(tempSensor.getAddress(addr,0)){
+      Serial.print("[TEMP] DS18B20 ROM=");
+      for(uint8_t i=0;i<8;i++){if(addr[i]<16)Serial.print('0');Serial.print(addr[i],HEX);}
+      Serial.println();
+      tempOK=true;
+      statusBase&=~(1u<<ST_TEMP_ERR);
+      tempSensor.requestTemperatures();
+      tempPending=true;
+      tempRequestStarted=millis();
+      lastTempRequest=millis();
+    }else{
+      Serial.println("[TEMP] device count >0 but ROM address could not be read");
+      statusBase|=(1u<<ST_TEMP_ERR);
+    }
   }else{
-    tempOK=false;statusBase|=(1u<<ST_TEMP_ERR);
-    Serial.println("[TEMP] DS18B20 not found on GPIO6");
+    statusBase|=(1u<<ST_TEMP_ERR);
+    Serial.println("[TEMP] DS18B20 not found on GPIO6; check DATA + 4.7k pull-up to 3V3");
   }
 }
 static void calibrateIMU(){
@@ -193,7 +210,7 @@ static uint16_t makeStatus(){
   if(ppgRaw<30)st|=(1u<<ST_PPG_LOW);if(ppgRaw>4060)st|=(1u<<ST_PPG_SAT);
   if(gsrRaw<5||gsrRaw>4090)st|=(1u<<ST_GSR_SAT);
   if(ppgCalibrated && ppgP2P>0 && ppgRaw>ppgBaseline+fmaxf(8.0f,3.0f*ppgP2P))st|=(1u<<ST_LOW_QUALITY);
-  if(!tempOK)st|=(1u<<ST_TEMP_ERR);
+  if(!tempValid)st|=(1u<<ST_TEMP_ERR);
   return st;
 }
 static void sendPacket(){
@@ -202,6 +219,8 @@ static void sendPacket(){
   dtostrf(gx_dps,1,3,gx);dtostrf(gy_dps,1,3,gy);dtostrf(gz_dps,1,3,gz);
   dtostrf(skinTemp,1,2,st);dtostrf(roomTemp,1,2,rt);dtostrf(humidity,1,1,hu);dtostrf(pressure,1,1,pr);dtostrf(luxValue,1,1,lx);
   char payload[320];uint16_t status=makeStatus();
+  // CP3 is always 17 comma-separated fields including CRC:
+  // $CP3 + 15 data fields + crc.
   snprintf(payload,sizeof(payload),"$CP3,%lu,%u,%u,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%u",
     millis(),(unsigned)ppgRaw,(unsigned)gsrRaw,ax,ay,az,gx,gy,gz,st,rt,hu,pr,lx,(unsigned)status);
   char line[360];uint8_t crc=xorCRC(payload);
@@ -285,6 +304,15 @@ void loop(){
     calibrateIMU();
     printSensorSummary();
   }
+  if(i2cInitAttempted && now-lastSensorRetry>=5000){
+    lastSensorRetry=now;
+    if(!mpuOK || !bmeOK || !lightOK){
+      Serial.println("[SENSORS] Retrying missing I2C devices...");
+      setupMPU();
+      setupEnv();
+    }
+    if(!tempOK) setupTemperature();
+  }
 
   WiFiClient in=server.available();
   if(in){
@@ -315,17 +343,29 @@ void loop(){
     }
   }
 
+  if(!tempOK && now-lastTempRequest>=5000){
+    lastTempRequest=now;
+    setupTemperature();
+  }
   if(!tempPending && tempOK && now-lastTempRequest>=TEMP_PERIOD_MS){
     tempSensor.requestTemperatures();
-    tempPending=true;tempRequestStarted=now;lastTempRequest=now;
+    tempPending=true;
+    tempRequestStarted=now;
+    lastTempRequest=now;
   }
   if(tempPending && now-tempRequestStarted>=TEMP_CONVERSION_MS){
-    float t=tempSensor.getTempCByIndex(0);
+    const float t=tempSensor.getTempCByIndex(0);
     tempPending=false;
     if(t!=DEVICE_DISCONNECTED_C && isfinite(t) && t>-55.0f && t<125.0f){
-      skinTemp=t;tempOK=true;statusBase&=~(1u<<ST_TEMP_ERR);
+      skinTemp=t;
+      tempValid=true;
+      tempOK=true;
+      statusBase&=~(1u<<ST_TEMP_ERR);
     }else{
-      tempOK=false;statusBase|=(1u<<ST_TEMP_ERR);
+      tempValid=false;
+      statusBase|=(1u<<ST_TEMP_ERR);
+      Serial.print("[TEMP] invalid DS18B20 reading: ");
+      Serial.println(t);
     }
   }
 
@@ -336,7 +376,7 @@ void loop(){
     Serial.print("[STATUS] PPG_RAW=");Serial.print(ppgRaw);
     Serial.print(" GSR=");Serial.print(gsrRaw);
     Serial.print(" MPU=");Serial.print(mpuOK?"OK":"ERR");
-    Serial.print(" DS18B20=");Serial.print(tempOK?"OK":"ERR");
+    Serial.print(" DS18B20=");Serial.print(tempValid?"OK":"ERR");
     Serial.print(" BME=");Serial.print(bmeOK?"OK":"ERR");
     Serial.print(" BH1750=");Serial.print(lightOK?"OK":"ERR");
     Serial.print(" skinT=");Serial.print(skinTemp,2);
