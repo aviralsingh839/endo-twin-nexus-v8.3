@@ -1,10 +1,10 @@
-# ENDO-TWIN NEXUS V8.7 — Current Operating Path
+# ENDO-TWIN NEXUS V9.0 — Current Operating Path
 
 ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is one disease-specific research extension inside it.
 
 ## Active hardware
 - **ESP8266 NodeMCU / ESP-12E = low-cost Wi-Fi sensor-pod option**
-- **ESP32-S3 = higher-capability Wi-Fi sensor-pod option**
+- **Adafruit Feather ESP32-S3 2MB PSRAM = V9 primary wearable (analog PPG + GSR + DS18B20 + optional MPU6050/BME280/BH1750)**
 - **Arduino Mega 2560 = bench/lab/expanded test controller**
 - **ESP32 = legacy only**
 - **Arduino Nano = legacy only**
@@ -14,7 +14,7 @@ ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is o
 ./START.sh
 ```
 
-Both workstations support DEMO MODE and LIVE SENSOR MODE. Desktop LIVE mode uses dynamically discovered USB serial ports and CRC-checked `$CP/$CP2/$CP3` packets. The V9 ESP32-S3 wearable uses the CP3 analog-PGG transport.
+Both workstations support DEMO MODE and LIVE SENSOR MODE. Desktop LIVE mode uses dynamically discovered USB serial ports and CRC-checked `$CP/$CP2/$CP3` packets. The V9 ESP32-S3 wearable uses the CP3 analog-PPG transport.
 
 ## Live paths
 ```
@@ -23,7 +23,7 @@ ESP32-S3 V9 pod   ── USB/Wi-Fi TCP ── CP3 ──> V9 desktop workstation
 Mega lab          ───── USB Serial ────────── CP2 ──> compatible clients
 ```
 
-The current Android network path is board-neutral and uses Wi-Fi/TCP. ESP8266 is the low-cost direct sensor-pod option; ESP32-S3 remains the higher-capability option. The desktop USB path remains available for flashing, debugging and live acquisition.
+The V9 desktop path uses the Feather's CP3 protocol. Legacy CP2 devices remain supported for compatibility. The Android network path remains board-neutral for the legacy CP2 transport; V9 desktop is the primary end-to-end live validation path.
 
 ## Android
 ```bash
