@@ -81,6 +81,7 @@ class SelfLearningWindow(QWidget):
         self.capture_started_at = None
         self.visual_graphs = {}
         self.latest_feature = None
+        self.learning_card = None
         self.history_store = HistoryStore()
 
         root = QVBoxLayout(self)
@@ -168,7 +169,8 @@ class SelfLearningWindow(QWidget):
         visual = QGridLayout()
         summary = baseline_summary(self.participant_id) if self.participant_id else {"available": False, "quality": 0.0, "confidence": 0.0}
         snap = self.personal_model.snapshot() if self.personal_model else {"samples": 0}
-        visual.addWidget(metric_card("Learning samples", f"{snap['samples']:,}", "Patient-specific", accent="#39c9ff"), 0, 0)
+        self.learning_card = metric_card("Learning samples", f"{snap['samples']:,}", "Patient-specific", accent="#39c9ff")
+        visual.addWidget(self.learning_card, 0, 0)
         visual.addWidget(metric_card("Baseline status", "READY" if summary["available"] else "BUILDING", "Stored locally", accent="#31d7a1"), 0, 1)
         visual.addWidget(RingGauge("Confidence", summary["confidence"] * 100 if summary["available"] else 0, "%", "#7d62ff"), 0, 2)
         self.baseline_hr_graph = trend_panel("Baseline HR", [], "bpm", "#ff4fa3", 135)
@@ -294,6 +296,9 @@ class SelfLearningWindow(QWidget):
         )
 
         summary = baseline_summary(self.participant_id)
+        snap = self.personal_model.snapshot() if self.personal_model else {"samples": 0}
+        if self.learning_card is not None:
+            self.learning_card.value_label.setText(f"{snap.get('samples', 0):,}")
         if not summary["available"]:
             self.baseline_status.setText("NO BASELINE STORED")
             self.baseline_samples.setText("Samples: 0")
@@ -441,7 +446,11 @@ class SelfLearningWindow(QWidget):
             except Exception:
                 pass
         self.personal_model.observe(feature, quality=feature.signal_quality)
+        self.personal_model.sync_from_disk()
         self.latest_feature = feature
+        snap = self.personal_model.snapshot()
+        if self.learning_card is not None:
+            self.learning_card.value_label.setText(f"{snap['samples']:,}")
         self.live_hr.setText(f"HR: {self._fmt(feature.hr_bpm, ' bpm')}")
         self.live_hrv.setText(f"HRV: {self._fmt(feature.rmssd_ms, ' ms')}")
         temp = feature.skin_temp_c if feature.skin_temp_c is not None else feature.room_temp_c
