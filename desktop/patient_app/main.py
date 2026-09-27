@@ -19,6 +19,8 @@ if str(ROOT) not in sys.path:
 from desktop.demo_data import DEMO_CASES
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
+from src.personal_twin.profile_store import load_state, profile_summary
+from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from services.bridge.server import EndoTwinBridgeServer
 
 DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
@@ -94,6 +96,7 @@ class PatientWindow(QMainWindow):
             ("timeline", "◷  Timeline"),
             ("reports", "▤  Reports"),
             ("connect", "⌁  Connect"),
+            ("complications", "⚕  Complications"),
             ("notes", "✎  Notes"),
         ]:
             b = QPushButton(text)
@@ -153,9 +156,10 @@ class PatientWindow(QMainWindow):
             "timeline": self._timeline(),
             "reports": self._reports(),
             "connect": self._connect(),
+            "complications": self._complications(),
             "notes": self._notes(),
         }
-        order = ["home", "health", "measure", "timeline", "reports", "connect", "notes"]
+        order = ["home", "health", "measure", "timeline", "reports", "connect", "complications", "notes"]
         for key in order:
             self.stack.addWidget(self.pages[key])
         rv.addWidget(self.stack, 1)
@@ -477,6 +481,24 @@ class PatientWindow(QMainWindow):
         o.addStretch()
         return w
 
+    def _complications(self):
+        panel = PCOSComplicationPanel("PCOS / Complication Context")
+        p = load_state().get("profile", {})
+        clinical = {
+            "age_years": p.get("age_years"),
+            "bmi": p.get("bmi"),
+            "systolic_bp": p.get("systolic_bp"),
+            "diastolic_bp": p.get("diastolic_bp"),
+            "glucose_mg_dl": p.get("glucose_mg_dl"),
+            "cycle_irregular": p.get("cycle_irregular"),
+            "usual_cycle_length_days": p.get("usual_cycle_length_days"),
+            "days_since_last_period": p.get("days_since_last_period"),
+            "years_post_menarche": p.get("years_post_menarche"),
+        }
+        panel.set_context(clinical, self.latest_row)
+        self.complication_panel = panel
+        return panel
+
     def _notes(self):
         w = QWidget()
         o = QVBoxLayout(w)
@@ -509,6 +531,10 @@ class PatientWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(
+                {k: v for k, v in load_state().get("profile", {}).items()}, row
+            )
         q = row.get("signal_quality")
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
