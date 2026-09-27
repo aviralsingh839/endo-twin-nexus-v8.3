@@ -26,9 +26,8 @@ if str(ROOT) not in sys.path:
 from database.database import LocalDatabase
 from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
-from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
+from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode, RingGauge, metric_card, trend_panel
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
-from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
