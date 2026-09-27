@@ -12,6 +12,7 @@ No demo data is allowed to become a learned baseline.
 from __future__ import annotations
 
 import json
+import math
 import sys
 import time
 from datetime import datetime
@@ -79,6 +80,7 @@ class SelfLearningWindow(QWidget):
         self.baseline_rows: list[FeatureVector] = []
         self.capture_started_at = None
         self.visual_graphs = {}
+        self.latest_feature = None
         self.history_store = HistoryStore()
 
         root = QVBoxLayout(self)
@@ -127,6 +129,22 @@ class SelfLearningWindow(QWidget):
         self.patient_details = QLabel("Create a patient to begin.")
         self.patient_details.setWordWrap(True)
         rv.addWidget(self.patient_details)
+
+        live_card = QFrame()
+        lv = QVBoxLayout(live_card)
+        lv.addWidget(QLabel("LIVE READINGS"))
+        live_grid = QGridLayout()
+        self.live_hr = QLabel("HR: —")
+        self.live_hrv = QLabel("HRV: —")
+        self.live_temp = QLabel("Temperature: —")
+        self.live_gsr = QLabel("GSR: —")
+        self.live_activity = QLabel("Activity: —")
+        self.live_quality = QLabel("Quality: —")
+        for idx, widget in enumerate([self.live_hr,self.live_hrv,self.live_temp,self.live_gsr,self.live_activity,self.live_quality]):
+            widget.setStyleSheet("font-size:15px;font-weight:750;")
+            live_grid.addWidget(widget, idx//3, idx%3)
+        lv.addLayout(live_grid)
+        rv.addWidget(live_card)
 
         self.baseline_card = QFrame()
         bv = QVBoxLayout(self.baseline_card)
@@ -241,6 +259,18 @@ class SelfLearningWindow(QWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._refresh_people()
 
+    @staticmethod
+    def _fmt(value, suffix=""):
+        if value is None:
+            return "—"
+        try:
+            value = float(value)
+            if not math.isfinite(value):
+                return "—"
+            return f"{value:.1f}{suffix}"
+        except (TypeError, ValueError):
+            return str(value)
+
     def _refresh_patient_view(self):
         if not self.participant_id:
             self.patient_title.setText("No patient selected")
@@ -297,6 +327,7 @@ class SelfLearningWindow(QWidget):
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
         self.session = LiveSession(mode, self)
         self.session.features_updated.connect(self._on_features)
+        self.session.calibration_received.connect(self._on_ppg_calibration)
         self.session.sample_received.connect(self._on_sample)
         self.session.error_received.connect(self._on_error)
         self.session.state_changed.connect(self._on_state)
@@ -335,6 +366,9 @@ class SelfLearningWindow(QWidget):
         self.stop.setEnabled(False)
         self.capture.setEnabled(True)
 
+    def _on_ppg_calibration(self, event):
+        self.progress.setText(f"PPG calibration saved • {event.profile_id} • quality {event.quality:.0f}%")
+
     def _on_state(self, state):
         self.progress.setText(f"Baseline capture • {state.replace('_', ' ').upper()} • {len(self.baseline_rows)} feature windows")
 
@@ -362,7 +396,10 @@ class SelfLearningWindow(QWidget):
         if str(row.get("source", "")).lower() in {"demo", "synthetic"}:
             return
         feature = row_to_feature(row)
-        self.baseline_rows.append(feature)
+        q = float(row.get("signal_quality", 0.0) or 0.0)
+        usable = str(row.get("gating", "")) == "USABLE" and q >= 0.45
+        if usable:
+            self.baseline_rows.append(feature)
         self.baseline_hr_graph.graph.set_values([x.hr_bpm for x in self.baseline_rows if x.hr_bpm is not None][-120:])
         self.baseline_hrv_graph.graph.set_values([x.rmssd_ms for x in self.baseline_rows if x.rmssd_ms is not None][-120:])
         if self.session_id is not None:
@@ -388,9 +425,17 @@ class SelfLearningWindow(QWidget):
             except Exception:
                 pass
         self.personal_model.observe(feature, quality=feature.signal_quality)
+        self.latest_feature = feature
+        self.live_hr.setText(f"HR: {self._fmt(feature.hr_bpm, ' bpm')}")
+        self.live_hrv.setText(f"HRV: {self._fmt(feature.rmssd_ms, ' ms')}")
+        temp = feature.skin_temp_c if feature.skin_temp_c is not None else feature.room_temp_c
+        self.live_temp.setText(f"Temperature: {self._fmt(temp, ' °C')}")
+        self.live_gsr.setText(f"GSR: {self._fmt(feature.gsr_tonic, '')}")
+        self.live_activity.setText(f"Activity: {self._fmt(feature.activity_level, '')}")
+        self.live_quality.setText(f"Quality: {feature.signal_quality*100:.0f}%")
         self.progress.setText(
-            f"CAPTURING • {len(self.baseline_rows)} feature windows • "
-            f"quality {feature.signal_quality:.2f}"
+            f"CAPTURING • {len(self.baseline_rows)} usable feature windows • "
+            f"latest quality {feature.signal_quality:.2f}"
         )
 
     def _capture_tick(self):
@@ -413,10 +458,13 @@ class SelfLearningWindow(QWidget):
         self._stop_capture()
         engine = baseline_engine(self.participant_id)
         try:
+            if len(self.baseline_rows) < 60:
+                self.capture_started_at = None
+                QMessageBox.warning(self, "Baseline", f"Only {len(self.baseline_rows)} quality-gated windows were captured. Need at least 60.")
+                return
             baseline = engine.capture_from_features(
                 self.baseline_rows,
                 min_samples=60,
-                min_duration_s=None,
             )
             self.personal_model.flush()
             append_event({
