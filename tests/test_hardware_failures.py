@@ -116,3 +116,11 @@ if __name__ == "__main__":
     test_excessive_motion()
     test_sensor_reconnection()
     test_missing_data_not_physiological()
+
+def test_stream_readers_expose_pending_sample_api():
+    from src.utils.demo_stream import DemoSensorStream
+    stream = DemoSensorStream(fs_hz=1000)
+    assert stream.has_sample() is False
+    # The actual Qt timer is intentionally not started in this unit test.
+    assert stream.get_sample() is None
+
