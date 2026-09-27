@@ -31,7 +31,7 @@ from desktop.workstation_theme import APP_QSS, card, section_header, pill, statu
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
-from src.ui.pcos_complication_panel import PCOSComplicationPanel
+from src.ui.pcos_progress_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
@@ -58,6 +58,7 @@ class DoctorWindow(QMainWindow):
         self.metric_cards = {}
         self.trend_charts = {}
         self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
+        self.feature_history = []
         self.tab_pages = {}
         shared_profile = load_state().get("profile", {})
         self.participant_id = str(shared_profile.get("participant_id") or "LOCAL-PARTICIPANT")
@@ -122,7 +123,7 @@ class DoctorWindow(QMainWindow):
             ("dashboard", "▦  Dashboard"),
             ("patients", "♙  Patients"),
             ("lab", "⌁  Prototype Lab"),
-            ("complications", "⚕  PCOS Complications"),
+            ("complications", "⚕  PCOD Healing & Complications"),
             ("personal", "◎  Personal Twin"),
         ]:
             b = QPushButton(text)
@@ -605,7 +606,8 @@ class DoctorWindow(QMainWindow):
             ("◉  Open Patient", "patients", "primary"),
             ("＋  Add Patient", "create", "secondary"),
             ("⌁  Research Lab", "lab", "secondary"),
-            ("▤  Reports", "patient", "secondary"),
+            ("⚕  PCOD Healing", "complications", "secondary"),
+            ("▤  Patient Workspace", "patient", "secondary"),
         ]):
             b = QPushButton(label)
             b.setObjectName(obj)
@@ -960,9 +962,41 @@ class DoctorWindow(QMainWindow):
             "years_post_menarche": shared.get("years_post_menarche"),
         }
 
+    def _shared_patient_profile(self):
+        base = self._profile() or {}
+        pid = str(
+            base.get("pid")
+            or base.get("anonymous_id")
+            or base.get("patient_id")
+            or base.get("participant_id")
+            or self.participant_id
+        )
+        shared = get_profile(pid) if pid else {}
+        merged = dict(shared)
+        merged.setdefault("participant_id", pid)
+        merged.setdefault("patient_name", base.get("alias") or pid)
+        merged.setdefault("alias", base.get("alias") or pid)
+        merged.setdefault("age_years", base.get("age"))
+        merged.setdefault("bmi", base.get("bmi"))
+        return merged
+
+    def _save_pcod_status(self, value):
+        if not self.participant_id:
+            return
+        profile = self._shared_patient_profile()
+        profile["participant_id"] = str(profile.get("participant_id") or self.participant_id)
+        profile["has_pcod"] = value
+        profile["updated_at"] = time.time()
+        try:
+            save_profile(profile, set_active=True)
+            self.participant_id = str(profile["participant_id"])
+        except Exception as exc:
+            self._log_event("PCOD status save warning", str(exc))
+
     def _complications_page(self):
-        page = PCOSComplicationPanel("PCOS / Complication Context")
-        page.set_context(self._complication_context(), self.latest_row)
+        page = PCODProgressPanel("PCOD Healing & Complications")
+        page.pcod_status_changed.connect(self._save_pcod_status)
+        page.set_context(self._shared_patient_profile(), self.feature_history, self.latest_row)
         self.complications_page = page
         return page
 
@@ -1447,8 +1481,9 @@ class DoctorWindow(QMainWindow):
         return w
 
     def _patient_complications(self):
-        panel = PCOSComplicationPanel("PCOS / Complication Context • Current Patient")
-        panel.set_context(self._complication_context(), self.latest_row)
+        panel = PCODProgressPanel("PCOD Healing & Complications • Current Patient")
+        panel.pcod_status_changed.connect(self._save_pcod_status)
+        panel.set_context(self._shared_patient_profile(), self.feature_history, self.latest_row)
         return panel
 
     def _patient_reports(self):
@@ -1675,6 +1710,10 @@ class DoctorWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        source = str(row.get("source", "")).lower()
+        if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+            self.feature_history.append(dict(row))
+            self.feature_history = self.feature_history[-1000:]
         try:
             source = str(row.get("source", "")).lower()
             if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
@@ -1683,9 +1722,13 @@ class DoctorWindow(QMainWindow):
         except Exception as exc:
             self._log_event("Personal learning warning", str(exc))
         if hasattr(self, "complications_page"):
-            self.complications_page.set_context(self._complication_context(), row)
+            self.complications_page.set_context(self._shared_patient_profile(), self.feature_history, row)
         if hasattr(self, "personal_text"):
             self._refresh_personal_page()
+        if hasattr(self, "patient_tab_widgets"):
+            for widget in self.patient_tab_widgets.values():
+                if isinstance(widget, PCODProgressPanel):
+                    widget.set_context(self._shared_patient_profile(), self.feature_history, row)
         self.quality_badge.setText("●  " + self._data_quality_text(row.get("signal_quality"))[0])
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
@@ -1767,6 +1810,7 @@ class DoctorWindow(QMainWindow):
                     select_participant(shared_pid)
                 self.participant_id = shared_pid
                 self.personal_model.set_participant(shared_pid)
+        self.feature_history = []
         self._log_event("Patient opened", pid)
         self._rebuild_patient_header()
         self._build_patient_tabs()
