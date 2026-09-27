@@ -380,8 +380,67 @@ class MainWindow(QMainWindow):
         self.participant_edit = QLineEdit(); self.participant_edit.setPlaceholderText("Anonymous ID, e.g. P01")
         row3.addWidget(QLabel("Participant")); row3.addWidget(self.participant_edit)
         row3.addWidget(self.auto_bmi_label, 1)
-        outer.addLayout(row3)
+
+        # Patient-specific PPG calibration controls.
+        cal_row = QHBoxLayout()
+        cal_row.addWidget(QLabel("PPG profile"))
+        self.ppg_profile_edit = QLineEdit()
+        self.ppg_profile_edit.setPlaceholderText("patient ID, e.g. P0001")
+        self.ppg_profile_edit.setText("default")
+        cal_row.addWidget(self.ppg_profile_edit, 1)
+        ppg_select = QPushButton("Set PPG profile")
+        ppg_select.clicked.connect(self._set_ppg_profile)
+        ppg_cal = QPushButton("Calibrate this person (5 s)")
+        ppg_cal.clicked.connect(self._calibrate_ppg_person)
+        self.ppg_cal_status = QLabel("PPG personal calibration: not loaded")
+        self.ppg_cal_status.setObjectName("SmallMuted")
+        cal_row.addWidget(ppg_select)
+        cal_row.addWidget(ppg_cal)
+        cal_row.addWidget(self.ppg_cal_status, 2)
+        outer.addLayout(cal_row)
         return box
+
+    def _set_ppg_profile(self):
+        profile = self.ppg_profile_edit.text().strip() or "default"
+        if self.stream is None:
+            self.ppg_cal_status.setText("Connect the wearable first")
+            return
+        self.stream.write_command(f"PPG_PERSON={profile}")
+        self.ppg_cal_status.setText(f"PPG profile selected: {profile}")
+
+    def _calibrate_ppg_person(self):
+        profile = self.ppg_profile_edit.text().strip() or "default"
+        if self.stream is None:
+            self.ppg_cal_status.setText("Connect the wearable first")
+            return
+        self.stream.write_command(f"PPG_PERSON={profile}")
+        self.stream.write_command("PPG_NEW_PERSON")
+        self.ppg_cal_status.setText(f"Calibrating {profile}: keep finger still for ~5 s")
+
+    def _on_ppg_calibration(self, event):
+        self.ppg_cal_status.setText(
+            f"PPG calibrated: {event.profile_id} • baseline {event.baseline_adc:.1f} • "
+            f"P2P {event.peak_to_peak:.1f} • quality {event.quality:.0f}%"
+        )
+        # Keep the event in the existing local HistoryStore as patient-scoped metadata.
+        try:
+            self.db.log_calibration(
+                duration_s=5.0,
+                quality=event.quality / 100.0,
+                stats_json=json.dumps({
+                    "profile_id": event.profile_id,
+                    "baseline_adc": event.baseline_adc,
+                    "noise_sd": event.noise_sd,
+                    "peak_to_peak": event.peak_to_peak,
+                    "wearable_event_ms": event.wearable_event_ms,
+                    "kind": "PPG_PERSONAL_CALIBRATION",
+                    "participant_id": self.participant_edit.text().strip() or "default",
+                }),
+                participant_id=self.participant_edit.text().strip() or "default",
+                calibration_kind="PPG_PERSONAL",
+            )
+        except Exception as exc:
+            self.ppg_cal_status.setText(f"PPG calibrated, local save warning: {exc}")
 
     # -------------------------------------------------------- 01 OVERVIEW
     def _build_overview_tab(self):
@@ -918,6 +977,7 @@ class MainWindow(QMainWindow):
         self._start_session(source=f"serial:{port}")
         self.stream = ArduinoReader(port=port, baud=SERIAL_BAUD, require_crc=True)
         self.stream.sample_received.connect(self._on_sample)
+        self.stream.calibration_received.connect(self._on_ppg_calibration)
         self.stream.error_received.connect(self._on_error)
         self.stream.state_changed.connect(self._on_state_changed)
         self.led.set_writer(self.stream.write_command)
