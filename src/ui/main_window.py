@@ -48,9 +48,9 @@ from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
 from src.utils.public_study import PublicStudyManager
-from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary
+from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
-from src.ui.pcos_complication_panel import PCOSComplicationPanel
+from src.ui.pcos_complication_panel import PCOSComplicationPanel\nfrom src.personal_twin.participant_selector import choose_participant
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
 
@@ -986,7 +986,7 @@ class MainWindow(QMainWindow):
         self.stop_stream()
         self.demo_stream = DemoSensorStream(fs_hz=20.0, parent=self)
         self.demo_stream.sample_received.connect(self._on_sample_received)
-        self.demo_stream.state_changed.connect(self._on_read    def stop_stream(self):
+        self.demo_stream.state_changed.connect(self._on_reader_state)\n        self.demo_stream.error_received.connect(self._on_reader_error)\n        self.demo_stream.start()\n        self.current_session_id = self.history_store.start_session(source="demo", note="Synthetic showcase stream", participant_id=self.participant_id)\n        self.mode_label.setText("Mode: DEMO DATA • synthetic")\n        self.mode_label.setStyleSheet("font-weight:bold;color:#60a5fa;")\n\n    def stop_stream(self):
         for reader_name in ("arduino_reader", "network_reader", "demo_stream"):
             reader = getattr(self, reader_name, None)
             if reader is not None:
@@ -1536,7 +1536,7 @@ class MainWindow(QMainWindow):
 
 
 
-def run(start_demo: bool = True, port: str | None = None, net: str | None = None, db_path=None):
+def run(start_demo: bool = False, port: str | None = None, net: str | None = None, db_path=None):
     """Launch the unified ENDO-TWIN scientific workstation."""
     from PySide6.QtWidgets import QApplication
     import sys
