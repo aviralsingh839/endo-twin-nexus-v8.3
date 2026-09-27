@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from datetime import datetime
 
 from PySide6.QtCore import Qt
@@ -19,7 +20,9 @@ if str(ROOT) not in sys.path:
 from desktop.demo_data import DEMO_CASES
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
-from src.personal_twin.profile_store import load_state, profile_summary
+from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.participant_selector import choose_participant
 from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from services.bridge.server import EndoTwinBridgeServer
 
@@ -29,14 +32,17 @@ DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
 class PatientWindow(QMainWindow):
     """Single-patient local-first workstation inspired by the uploaded patient UI."""
 
-    def __init__(self, mode: ModeConfig):
+    def __init__(self, mode: ModeConfig, participant_id: str):
         super().__init__()
         self.mode = mode
+        self.participant_id = str(participant_id)
+        self.profile = get_profile(self.participant_id)
         self.case = DEMO_CASES[0]
         self.latest_row = None
         self.note_text = ""
         self.metric_labels = {}
         self.charts = {}
+        self.personal_model = PersonalAdaptiveModel(self.participant_id)
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7778)
         self.bridge.start()
@@ -96,6 +102,7 @@ class PatientWindow(QMainWindow):
             ("timeline", "◷  Timeline"),
             ("reports", "▤  Reports"),
             ("connect", "⌁  Connect"),
+            ("personal", "◫  Personal Twin"),
             ("complications", "⚕  Complications"),
             ("notes", "✎  Notes"),
         ]:
@@ -156,10 +163,11 @@ class PatientWindow(QMainWindow):
             "timeline": self._timeline(),
             "reports": self._reports(),
             "connect": self._connect(),
+            "personal": self._personal_twin(),
             "complications": self._complications(),
             "notes": self._notes(),
         }
-        order = ["home", "health", "measure", "timeline", "reports", "connect", "complications", "notes"]
+        order = ["home", "health", "measure", "timeline", "reports", "connect", "personal", "complications", "notes"]
         for key in order:
             self.stack.addWidget(self.pages[key])
         rv.addWidget(self.stack, 1)
@@ -177,13 +185,14 @@ class PatientWindow(QMainWindow):
             b.setChecked(k == key)
 
     def _refresh_header(self):
+        alias = str(self.profile.get("alias") or self.participant_id)
         if self.mode.mode == "demo":
-            self.side_mode.setText("DEMO DATA")
-            self.side_state.setText("Synthetic showcase stream")
+            self.side_mode.setText(f"PATIENT • {alias}")
+            self.side_state.setText(f"Synthetic showcase stream • {self.participant_id}")
             self.mode_badge.setText("●  Demo data • synthetic")
         else:
-            self.side_mode.setText("LIVE SENSOR")
-            self.side_state.setText(self.mode.port)
+            self.side_mode.setText(f"PATIENT • {alias}")
+            self.side_state.setText(f"{self.participant_id} • {self.mode.port or self.mode.host}")
             self.mode_badge.setText("●  Live sensor")
 
     def _current_values(self):
@@ -412,6 +421,60 @@ class PatientWindow(QMainWindow):
         o.addStretch()
         return w
 
+    def _personal_twin(self):
+        w = QWidget()
+        o = QVBoxLayout(w)
+        o.setContentsMargins(24, 16, 20, 14)
+        o.addWidget(section_header("My Personal Adaptive Twin", "Patient-scoped learning shared with the Doctor and Unified Workstations."))
+        self.personal_text = QTextEdit()
+        self.personal_text.setReadOnly(True)
+        o.addWidget(self.personal_text, 1)
+        row = QHBoxLayout()
+        refresh = QPushButton("Refresh learned data")
+        refresh.clicked.connect(self._refresh_personal)
+        row.addWidget(refresh)
+        switch = QPushButton("Switch Patient")
+        switch.clicked.connect(self._switch_patient)
+        row.addWidget(switch)
+        row.addStretch()
+        o.addLayout(row)
+        self._refresh_personal()
+        return w
+
+    def _refresh_personal(self):
+        self.personal_model.sync_from_disk()
+        self.profile = get_profile(self.participant_id)
+        snap = self.personal_model.snapshot()
+        lines = [
+            f"Participant: {self.participant_id}",
+            f"Profile: {profile_summary(self.profile)}",
+            f"Learning samples: {snap['samples']:,}",
+            f"Quality-weighted samples: {snap['quality_weighted_samples']:.2f}",
+            "",
+            "Learned reference ranges:",
+        ]
+        for name, item in snap.get("metrics", {}).items():
+            lines.append(f"{name}: mean={item['mean']:.3f} • std={item['std']:.3f} • samples={item['samples']:.1f} • latest={item['last']}")
+        self.personal_text.setText("\n".join(lines))
+
+    def _switch_patient(self):
+        pid = choose_participant("ENDO-TWIN • Patient Workstation — Select Patient")
+        if not pid or pid == self.participant_id:
+            return
+        self.session.stop()
+        select_participant(pid)
+        self.participant_id = pid
+        self.profile = get_profile(pid)
+        self.personal_model.set_participant(pid)
+        self.latest_row = None
+        self._refresh_header()
+        self._refresh_personal()
+        self.session = LiveSession(self.mode, self)
+        self.session.features_updated.connect(self._on_features)
+        self.session.state_changed.connect(self._on_state)
+        self.session.error_received.connect(self._on_error)
+        self.session.start()
+
     def _reports(self):
         w = QWidget()
         o = QVBoxLayout(w)
@@ -531,6 +594,16 @@ class PatientWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        try:
+            source = str(row.get("source", "")).lower()
+            if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+                self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+            self.personal_model.sync_from_disk()
+            self.profile = get_profile(self.participant_id)
+            if hasattr(self, "personal_text"):
+                self._refresh_personal()
+        except Exception as exc:
+            self.side_state.setText(f"Learning warning • {exc}")
         if hasattr(self, "complication_panel"):
             self.complication_panel.set_context(
                 {k: v for k, v in load_state().get("profile", {}).items()}, row
@@ -554,12 +627,16 @@ class PatientWindow(QMainWindow):
 
 
 def run():
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setStyle("Fusion")
+    participant_id = choose_participant("ENDO-TWIN • Patient Workstation — Select Patient")
+    if not participant_id:
+        return 0
     mode = choose_mode("ENDO-TWIN • Patient Workstation")
     if mode is None:
         return 0
-    w = PatientWindow(mode)
+    select_participant(participant_id)
+    w = PatientWindow(mode, participant_id)
     w.show()
     return app.exec()
 
