@@ -7,50 +7,6 @@
 
 ---
 
-## Quick start — Unified Workstation (Patient + Doctor in one UI)
-
-```bash
-./START.sh            # opens the unified web workstation on http://localhost:8787
-./START.sh ui 9000    # custom port
-./START.sh menu       # classic launcher menu (desktop apps, APK builds, tests)
-```
-
-The Patient Workstation and the Doctor Workstation are joined into a single
-console. Use the **profile control in the top-right corner** (or `Ctrl+D`) to
-switch between **Patient View** and **Doctor View** — same palette, same shell,
-same navigation model.
-
-### It reads the real database
-
-The workstation is served by `workstation/serve.py`, which exposes a stdlib
-JSON API (`/api/*`) over the **same SQLite database the PySide6 platform uses**
-(`data/chrono_twin_nexus_v8_3_plus.db`). Participants, sensor sessions, HRV /
-PPG / temperature / GSR samples, symptoms, cycles, ultrasound studies, model
-results, notes and reports are read from — and written back to — that file.
-
-* The chip next to the search bar shows **LIVE DATABASE**, **LIVE DB · EMPTY**
-  or **DEMO DATA**, so you always know what you are looking at.
-* If the database holds no recordings, panels stay **blank (`—`)**; nothing is
-  invented to fill a chart.
-* Adding/editing a patient, adding a clinician, logging a symptom or saving a
-  note **writes rows to the database** (verify with `./START.sh db-status`).
-* If the API is unreachable (opening `index.html` as a plain file), the UI falls
-  back to its built-in sample dataset and clearly says **DEMO DATA**.
-
-```bash
-./START.sh db-status    # counts per table, straight from SQLite
-./START.sh seed-demo    # write 10 participants + 5 clinicians tagged SYNTHETIC_DEMO
-./START.sh clear-demo   # delete every SYNTHETIC_DEMO row again
-```
-
-* Doctor View → *Patient Registry* to **add / edit / delete patients**
-* Doctor View → *Doctors & Staff* to **add / edit / remove clinicians**
-* Everything is local: no build step, no npm, no CDN, no cloud
-
-Details: [`workstation/README.md`](workstation/README.md)
-
----
-
 ## What is ENDO-TWIN?
 
 **ENDO-TWIN is a general personalized physiological modelling platform.**
