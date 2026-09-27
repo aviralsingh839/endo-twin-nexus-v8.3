@@ -868,6 +868,15 @@ class MainWindow(QMainWindow):
             sample = self.demo_stream.get_sample()
 
         if sample:
+            # A live connection becomes LIVE only after an actual parsed packet.
+            self.last_packet_time = time.time()
+            if self.demo_stream:
+                self.mode_label.setText("Mode: DEMO SYNTHETIC")
+                self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
+            else:
+                self.mode_label.setText("Mode: LIVE SENSOR DATA")
+                self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+
             # Convert to SensorSample if needed
             if isinstance(sample, dict):
                 # demo stream dict
@@ -933,9 +942,19 @@ class MainWindow(QMainWindow):
         set_card("recovery", fv.shared_features.get("recovery_score", 50) if isinstance(fv.shared_features, dict) else 50)
 
     def _update_risk(self):
-        if not self.feature_history:
-            return
-        if not self.current_shared:
+        # Never run disease/complication analysis while a physical wearable is
+        # connected but has stopped delivering packets.
+        if self.arduino_reader or self.network_reader:
+            if self.last_packet_time is None or time.time() - self.last_packet_time > 6.0:
+                self.current_shared = None
+                self.risk_gauge.set_value(0)
+                self.confidence_label.setText("Model Confidence: —")
+                self.quality_label.setText("Data Quality: NO LIVE DATA")
+                self.coverage_label.setText("Coverage: —")
+                if hasattr(self, "complication_text"):
+                    self.complication_text.setPlainText("No live sensor data. Research complication signals are withheld.")
+                return
+        if not self.feature_history or not self.current_shared:
             return
 
         # Longitudinal
@@ -969,6 +988,23 @@ class MainWindow(QMainWindow):
                 print(f"Module {mod_name} error: {e}")
 
         self.module_results = module_results
+
+        # Complication-related domains: transparent research signals, never
+        # presented as calibrated individual probabilities.
+        try:
+            self.complication_signals = compute_complication_signals(self.current_shared, clinical)
+            lines = [
+                "Research-domain signal view — NOT a calibrated probability.",
+                "Insufficient inputs or sensor quality -> Not established.",
+                ""
+            ]
+            for sig in self.complication_signals:
+                lines.append(f"{sig.name}: {sig.display_percent()} | {sig.status} | confidence {sig.confidence:.2f}")
+                lines.append("  Drivers: " + "; ".join(sig.drivers))
+            self.complication_text.setPlainText("\\n".join(lines))
+        except Exception as exc:
+            self.complication_signals = []
+            self.complication_text.setPlainText(f"Complication signal unavailable: {exc}")
 
         # Update health signals tab
         for name, result in module_results.items():
