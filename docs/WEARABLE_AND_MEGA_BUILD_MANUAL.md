@@ -192,7 +192,7 @@ For body-contact testing:
 - never connect body electrodes to mains-powered circuitry;
 - never connect the ESP32 GPIO directly to the electrodes;
 - the electrodes connect to the GSR module's electrode inputs;
-- only the GSR module's analog output goes to ESP32 GPIO4.
+- only the GSR module's analog output goes to ESP32 GPIO9.
 
 If the GSR module exposes its own excitation/electrode circuitry, follow that module's electrical limits and documentation.
 
@@ -204,15 +204,15 @@ If the GSR module exposes its own excitation/electrode circuitry, follow that mo
 
 | Device | Signal | Feather ESP32-S3 |
 |---|---|---|
-| MPU6050 | SDA | **SDA / GPIO3** |
-| MPU6050 | SCL | **SCL / GPIO4** |
-| BME280 | SDA | **SDA / GPIO3** |
-| BME280 | SCL | **SCL / GPIO4** |
-| BH1750 | SDA | **SDA / GPIO3** |
-| BH1750 | SCL | **SCL / GPIO4** |
+| MPU6050 | SDA | **SDA / GPIO8** |
+| MPU6050 | SCL | **SCL / GPIO9** |
+| BME280 | SDA | **SDA / GPIO8** |
+| BME280 | SCL | **SCL / GPIO9** |
+| BH1750 | SDA | **SDA / GPIO8** |
+| BH1750 | SCL | **SCL / GPIO9** |
 | Analog Pulse Sensor | AO | **A5 / GPIO8 / ADC1** |
-| GSR module | AO | **D5 / GPIO5 / ADC1** |
-| DS18B20 | DATA | **D6 / GPIO6 + 4.7k pull-up to 3.3V** |
+| GSR module | AO | **GPIO5 / ADC1** |
+| DS18B20 | DATA | **GPIO6 + 4.7k pull-up to 3.3V** |
 | Status LED | onboard | **LED_BUILTIN** |
 
 Expected I2C addresses: MPU6050 0x68/0x69; BME280 0x76/0x77; BH1750 0x23/0x5C.
@@ -221,11 +221,11 @@ Expected I2C addresses: MPU6050 0x68/0x69; BME280 0x76/0x77; BH1750 0x23/0x5C.
 All four digital sensors share the same two lines:
 
 ```
-ESP32-S3 SDA / GPIO3 ─── MPU6050 SDA
+ESP32-S3 SDA / GPIO8 ─── MPU6050 SDA
                     ├── BME280 SDA
                     └── BH1750 SDA
 
-ESP32-S3 SCL / GPIO4 ─── MPU6050 SCL
+ESP32-S3 SCL / GPIO9 ─── MPU6050 SCL
                     ├── BME280 SCL
                     └── BH1750 SCL
 
@@ -245,14 +245,14 @@ There is no address collision between these defaults.
 ## 5.3 GSR
 
 ```
-GSR module AO ───────── ESP32-S3 D5 / GPIO5
+GSR module AO ───────── ESP32-S3 GPIO5
 GSR module GND ──────── ESP32-S3 GND
 GSR module VCC ──────── compatible supply
 GSR electrode 1 ─────── finger electrode A
 GSR electrode 2 ─────── finger electrode B
 ```
 
-Verify the GSR module's analog-output voltage range before connecting AO to GPIO4.
+Verify the GSR module's analog-output voltage range before connecting AO to GPIO9.
 
 ---
 
@@ -835,7 +835,7 @@ The two controllers can be tested independently.
 
 1. Do not mix the old ESP8266 pin map with this ESP32-S3 design.
 2. Do not use GPIO numbers from an ordinary ESP32 DevKit for the ESP32-S3.
-3. Do not use GPIO33–37 on variants where Espressif reserves them for internal flash/PSRAM. 
+3. Do not use GPIO83–37 on variants where Espressif reserves them for internal flash/PSRAM. 
 4. Keep BME280 thermally isolated from the ESP32 and battery.
 5. Keep BH1750 optically exposed.
 6. Keep GSR electrode wires strain relieved.
