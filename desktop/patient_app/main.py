@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from datetime import datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPushButton, QStackedWidget, QTextEdit, QVBoxLayout, QWidget
+    QMessageBox, QPushButton, QStackedWidget, QTextEdit, QVBoxLayout, QWidget,
+    QProgressBar
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +24,7 @@ from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choo
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_capture import BaselineCapture
 from src.personal_twin.baseline_store import baseline_summary
 from src.personal_twin.participant_selector import choose_participant
 from src.ui.pcos_complication_panel import PCODProgressPanel
@@ -46,6 +49,10 @@ class PatientWindow(QMainWindow):
         self.visual_graphs = {}
         self.charts = {}
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
+        self.baseline_capture = BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
+        self._baseline_ui_timer = QTimer(self)
+        self._baseline_ui_timer.timeout.connect(self._update_baseline_capture_ui)
+        self._baseline_ui_timer.start(500)
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7778)
         self.bridge.start()
@@ -61,6 +68,7 @@ class PatientWindow(QMainWindow):
 
         self.session = LiveSession(mode, self)
         self.session.features_updated.connect(self._on_features)
+        self.session.calibration_received.connect(self._on_ppg_calibration)
         self.session.state_changed.connect(self._on_state)
         self.session.error_received.connect(self._on_error)
         self.session.start()
@@ -214,7 +222,7 @@ class PatientWindow(QMainWindow):
         return {
             "hr": row.get("hr_bpm"),
             "hrv": row.get("rmssd_ms"),
-            "temp": row.get("skin_temp_c"),
+            "temp": row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"),
             "activity": row.get("activity_level"),
             "quality": row.get("signal_quality"),
             "sleep": None,
@@ -525,6 +533,31 @@ class PatientWindow(QMainWindow):
         kpi.addWidget(metric_card("Baseline quality", f"{q:.0f}%", "Capture quality", accent="#ff9f43"),0,3)
         o.addLayout(kpi)
 
+        capture = QFrame()
+        capture.setObjectName("card")
+        cv = QVBoxLayout(capture)
+        cv.addWidget(section_header("Personal Baseline Capture", "60 seconds of real, quality-gated live windows. Demo/synthetic data is excluded."))
+        self.baseline_capture_status = QLabel("Ready. Connect the wearable and start a baseline capture.")
+        self.baseline_capture_status.setObjectName("muted")
+        self.baseline_capture_status.setWordWrap(True)
+        cv.addWidget(self.baseline_capture_status)
+        self.baseline_progress = QProgressBar()
+        self.baseline_progress.setRange(0, 100)
+        self.baseline_progress.setValue(0)
+        cv.addWidget(self.baseline_progress)
+        br = QHBoxLayout()
+        start_btn = QPushButton("Start / Restart 60 s Baseline")
+        start_btn.setObjectName("primary")
+        start_btn.clicked.connect(self._start_baseline_capture)
+        br.addWidget(start_btn)
+        stop_btn = QPushButton("Stop & Save")
+        stop_btn.setObjectName("secondary")
+        stop_btn.clicked.connect(self._stop_baseline_capture)
+        br.addWidget(stop_btn)
+        br.addStretch()
+        cv.addLayout(br)
+        o.addWidget(capture)
+
         graphs = QGridLayout()
         for i,(key,title,unit,accent) in enumerate([
             ("hr_bpm","Heart rate","bpm","#ff4fa3"),
@@ -541,6 +574,65 @@ class PatientWindow(QMainWindow):
         switch = QPushButton("Switch Patient"); switch.setObjectName("primary"); switch.clicked.connect(self._switch_patient); row.addWidget(switch)
         row.addStretch(); o.addLayout(row)
         return w
+
+    def _start_baseline_capture(self):
+        if self.mode.mode == "demo":
+            self.baseline_capture_status.setText("Live sensor mode is required for a real personal baseline. Demo data is never used.")
+            return
+        self.baseline_capture = BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
+        self.baseline_capture.start()
+        self.baseline_progress.setValue(0)
+        self.baseline_capture_status.setText("Capturing… sit still, keep the pulse sensor positioned consistently, and avoid unnecessary movement.")
+
+    def _stop_baseline_capture(self):
+        result = self.baseline_capture.stop()
+        self._show_baseline_result(result)
+
+    def _update_baseline_capture_ui(self):
+        if not hasattr(self, "baseline_capture_status"):
+            return
+        if self.baseline_capture.active:
+            self.baseline_progress.setValue(int(self.baseline_capture.progress * 100))
+            self.baseline_capture_status.setText(
+                f"Capturing… {self.baseline_capture.accepted} quality-gated windows • "
+                f"{self.baseline_capture.progress*100:.0f}% complete"
+            )
+
+    def _show_baseline_result(self, result):
+        if result.get("ready"):
+            self.baseline_progress.setValue(100)
+            self.baseline_capture_status.setText(
+                f"Baseline saved for {self.participant_id} • {result['samples']} windows • "
+                f"quality {result['quality']*100:.0f}% • confidence {result['confidence']:.2f} • local storage"
+            )
+            self._refresh_personal()
+        else:
+            self.baseline_capture_status.setText(
+                "Baseline not saved • " + str(result.get("error", "Need more valid live windows."))
+            )
+
+    def _auto_sync_baseline(self):
+        if self.mode.mode == "demo" or len(self.feature_history) < 60:
+            return
+        try:
+            rows = [
+                r for r in self.feature_history[-160:]
+                if str(r.get("gating", "")) == "USABLE"
+                and not str(r.get("source", "")).lower().startswith("demo")
+            ]
+            if len(rows) >= 60:
+                cap = BaselineCapture(self.participant_id, duration_s=0, min_samples=60, min_quality=0.45)
+                cap.accepted_rows = rows[-120:]
+                cap.started_at = time.time() - 60.0
+                cap.active = True
+                cap.finalize(force=True)
+        except Exception:
+            pass
+
+    def _on_ppg_calibration(self, event):
+        self.side_state.setText(
+            f"PPG calibration saved • profile {event.profile_id} • quality {event.quality:.0f}%"
+        )
 
     def _refresh_personal(self):
         self.personal_model.sync_from_disk()
@@ -573,6 +665,7 @@ class PatientWindow(QMainWindow):
         self.feature_history = []
         self.visual_graphs.clear()
         self.personal_model.set_participant(pid)
+        self.baseline_capture = BaselineCapture(pid, duration_s=60.0, min_samples=60, min_quality=0.45)
         self.latest_row = None
         self._refresh_header()
         self._refresh_personal()
@@ -710,10 +803,16 @@ class PatientWindow(QMainWindow):
         if source not in {"demo", "synthetic"} and not source.startswith("demo"):
             self.feature_history.append(dict(row))
             self.feature_history = self.feature_history[-1000:]
+            result = self.baseline_capture.add_row(row)
+            if result is not None:
+                self._show_baseline_result(result)
         try:
             source = str(row.get("source", "")).lower()
             if source not in {"demo", "synthetic"} and not source.startswith("demo"):
                 self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+                snap = self.personal_model.snapshot()
+                if snap["samples"] >= 60 and snap["samples"] % 20 == 0:
+                    self._auto_sync_baseline()
             self.personal_model.sync_from_disk()
             self.profile = get_profile(self.participant_id)
             if hasattr(self, "personal_text"):
