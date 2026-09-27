@@ -119,6 +119,9 @@ class NetworkReader(QObject):
                     if not line:
                         continue
                     try:
+                        # Ignore firmware diagnostics/ACKs; only CP/CP2/CP3 and PCAL are data.
+                        if line.startswith("[") or line.startswith("$ACK,"):
+                            continue
                         if line.startswith("$PCAL,"):
                             self.calibration_received.emit(self.parser.parse_calibration_event(line))
                             continue
