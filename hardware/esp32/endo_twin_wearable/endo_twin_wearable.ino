@@ -110,6 +110,23 @@ uint32_t lastPACKET = 0;
 uint32_t lastStatus = 0;
 uint32_t lastENV = 0;
 
+// Analog PPG calibration / signal-processing state.
+float ppgBaseline = 0.0f;
+float ppgFiltered = 0.0f;
+float ppgAC = 0.0f;
+float ppgNoise = 0.0f;
+float ppgCalPeakToPeak = 0.0f;
+float ppgWindowMin = 4095.0f;
+float ppgWindowMax = 0.0f;
+float ppgQuality = 0.0f;
+float ppgBPM = 0.0f;
+bool ppgCalibrated = false;
+bool ppgFingerDetected = false;
+bool ppgPeakArmed = false;
+uint32_t ppgLastPeakMs = 0;
+uint32_t ppgWindowStartMs = 0;
+float ppgLastFiltered = 0.0f;
+
 String commandBuffer;
 
 static void flushSerial() {
@@ -148,6 +165,159 @@ static bool setupAnalogPPG() {
   Serial.println(sample);
 
   return analogPpgOK;
+}
+
+static void scanI2C() {
+  Serial.println("[I2C] Scanning SDA=GPIO8 SCL=GPIO9...");
+  uint8_t found = 0;
+
+  for (uint8_t address = 1; address < 127; ++address) {
+    Wire.beginTransmission(address);
+    const uint8_t error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("[I2C] FOUND 0x");
+      if (address < 16) Serial.print('0');
+      Serial.println(address, HEX);
+      found++;
+    }
+  }
+
+  Serial.print("[I2C] Devices found: ");
+  Serial.println(found);
+}
+
+static void calibrateAnalogPPG() {
+  if (!analogPpgOK) {
+    Serial.println("[PPG] Calibration skipped: GPIO4 ADC unavailable");
+    return;
+  }
+
+  Serial.println();
+  Serial.println("[PPG] ANALOG PPG CALIBRATION");
+  Serial.println("[PPG] Place one finger gently on the optical sensor.");
+  Serial.println("[PPG] Keep the finger still for 5 seconds...");
+
+  const uint32_t start = millis();
+  uint32_t count = 0;
+  double sum = 0.0;
+  double sumSq = 0.0;
+  float minValue = 4095.0f;
+  float maxValue = 0.0f;
+
+  while (millis() - start < 5000) {
+    const int raw = analogRead(ANALOG_PPG_PIN);
+    sum += raw;
+    sumSq += static_cast<double>(raw) * raw;
+
+    if (raw < minValue) minValue = raw;
+    if (raw > maxValue) maxValue = raw;
+
+    count++;
+    delay(PPG_PERIOD_MS);
+  }
+
+  if (count == 0) {
+    Serial.println("[PPG] Calibration FAILED: no samples");
+    return;
+  }
+
+  const float mean = static_cast<float>(sum / count);
+  const float variance = max(0.0, static_cast<float>((sumSq / count) - (mean * mean)));
+  const float stddev = sqrtf(variance);
+  const float peakToPeak = maxValue - minValue;
+
+  ppgBaseline = mean;
+  ppgNoise = stddev;
+  ppgCalPeakToPeak = peakToPeak;
+  ppgFiltered = 0.0f;
+  ppgAC = 0.0f;
+  ppgWindowMin = mean;
+  ppgWindowMax = mean;
+  ppgWindowStartMs = millis();
+  ppgCalibrated = true;
+
+  Serial.print("[PPG] Baseline ADC = ");
+  Serial.println(ppgBaseline, 2);
+  Serial.print("[PPG] Noise SD     = ");
+  Serial.println(ppgNoise, 2);
+  Serial.print("[PPG] Cal P2P      = ");
+  Serial.println(ppgCalPeakToPeak, 2);
+
+  if (ppgCalPeakToPeak < 8.0f) {
+    Serial.println("[PPG] WARNING: almost no optical waveform detected.");
+    Serial.println("[PPG] Check finger contact, sensor LED, VCC, GND and GPIO4.");
+  } else {
+    Serial.println("[PPG] Calibration accepted.");
+  }
+}
+
+static void updateAnalogPPG() {
+  const float raw = static_cast<float>(analogRead(ANALOG_PPG_PIN));
+  ir = static_cast<uint32_t>(raw);
+  red = 0;
+
+  // Slowly track the DC component to remove baseline drift.
+  if (ppgBaseline <= 0.0f) ppgBaseline = raw;
+  ppgBaseline += 0.01f * (raw - ppgBaseline);
+
+  ppgAC = raw - ppgBaseline;
+
+  // Lightweight low-pass smoothing of the pulsatile component.
+  ppgFiltered += 0.20f * (ppgAC - ppgFiltered);
+
+  if (raw < ppgWindowMin) ppgWindowMin = raw;
+  if (raw > ppgWindowMax) ppgWindowMax = raw;
+
+  // Adaptive contact/activity estimate.
+  const float dynamicThreshold = max(8.0f, ppgNoise * 3.0f);
+  ppgFingerDetected = fabsf(ppgFiltered) > dynamicThreshold;
+
+  // Simple rising-edge peak detector with a 300 ms refractory period.
+  const uint32_t now = millis();
+  const bool risingThenFalling =
+    (ppgLastFiltered > 0.0f) &&
+    (ppgFiltered < ppgLastFiltered) &&
+    (ppgLastFiltered > max(8.0f, ppgNoise * 3.0f));
+
+  if (risingThenFalling && (now - ppgLastPeakMs >= 300)) {
+    if (ppgLastPeakMs != 0) {
+      const uint32_t ibi = now - ppgLastPeakMs;
+      if (ibi >= 300 && ibi <= 2000) {
+        const float instantBPM = 60000.0f / ibi;
+        if (ppgBPM <= 0.0f) ppgBPM = instantBPM;
+        else ppgBPM = 0.75f * ppgBPM + 0.25f * instantBPM;
+      }
+    }
+    ppgLastPeakMs = now;
+    ppgPeakArmed = true;
+  }
+
+  ppgLastFiltered = ppgFiltered;
+
+  // Recompute quality once per second from waveform amplitude vs noise.
+  if (now - ppgWindowStartMs >= 1000) {
+    const float p2p = ppgWindowMax - ppgWindowMin;
+    const float referenceNoise = max(1.0f, ppgNoise);
+    const float snrLike = p2p / referenceNoise;
+
+    float q = 0.0f;
+    if (p2p >= 8.0f) q += 20.0f;
+    if (p2p >= 20.0f) q += 20.0f;
+    if (p2p >= 50.0f) q += 20.0f;
+    if (snrLike >= 3.0f) q += 20.0f;
+    if (ppgBPM >= 40.0f && ppgBPM <= 180.0f) q += 20.0f;
+
+    ppgQuality = min(100.0f, q);
+    ppgWindowMin = raw;
+    ppgWindowMax = raw;
+    ppgWindowStartMs = now;
+
+    // If no beat has appeared for 5 seconds, don't display a stale BPM.
+    if (ppgLastPeakMs == 0 || now - ppgLastPeakMs > 5000) {
+      ppgBPM = 0.0f;
+    }
+  }
 }
 
 static void setupSensors() {
@@ -264,8 +434,12 @@ static uint16_t getStatus() {
   uint16_t s = statusBase;
 
   const uint32_t ppgValue = ppgOK ? ir : ir;
-  if ((ppgOK || analogPpgOK) && ppgValue < 5) {
+  if (ppgOK && ppgValue < 5) {
     s |= (1u << ST_PPG_ABSENT);
+  }
+
+  if (analogPpgOK && ppgCalibrated && ppgQuality < 20.0f) {
+    s |= (1u << ST_LOW_QUALITY);
   }
 
   if (ppgOK && (ir > 250000UL || red > 250000UL)) {
@@ -675,6 +849,8 @@ static void handleCommand(String c) {
   } else if (c == "STATUS") {
     Serial.print("STATUS=");
     Serial.println(getStatus());
+  } else if (c == "PPG_CAL") {
+    calibrateAnalogPPG();
   } else {
     Serial.println("$ACK,UNKNOWN_CMD,00");
   }
@@ -771,6 +947,7 @@ void setup() {
   printStage("Starting I2C");
   Wire.begin(SDA_PIN, SCL_PIN);
   Wire.setClock(400000);
+  scanI2C();
 
   printStage("Starting ADC");
   analogReadResolution(12);
@@ -792,6 +969,7 @@ void setup() {
   Serial.println("[READY] ENDO-TWIN-WEARABLE READY");
   Serial.println("[READY] USB Serial + BLE active");
   Serial.println("[READY] Streaming $CP2 packets every 50 ms");
+  Serial.println("[READY] PPG diagnostics are printed every 2 seconds.");
   Serial.println();
 
   flushSerial();
@@ -807,8 +985,7 @@ void loop() {
       ir = ppg.getIR();
       red = ppg.getRed();
     } else if (analogPpgOK) {
-      ir = static_cast<uint32_t>(analogRead(ANALOG_PPG_PIN));
-      red = 0;
+      updateAnalogPPG();
     } else {
       ir = 0;
       red = 0;
