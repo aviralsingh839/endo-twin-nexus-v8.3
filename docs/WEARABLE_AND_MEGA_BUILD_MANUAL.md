@@ -1,5 +1,5 @@
 # ENDO-TWIN NEXUS — Wearable + Mega Hub Construction Manual
-## ESP32-S3 DevKitC-1 wearable / BME280 / BH1750 / GSR finger electrodes / MAX30102 / MPU6050
+## Adafruit Feather ESP32-S3 2MB PSRAM wearable / BME280 / BH1750 / GSR finger electrodes / analog PPG / MPU6050 / DS18B20
 
 **Document purpose:** This is the single physical-build reference for the current prototype. It covers the wearable enclosure, sensor placement, wiring, cable routing, GSR finger electrodes, assembly measurements, ESP32-S3 firmware, the Arduino Mega hub, testing, and final acceptance.
 
@@ -12,7 +12,7 @@
 The active hardware is split into two units:
 
 1. **Wearable Pod**
-   - ESP32-S3-DevKitC-1
+   - Adafruit Feather ESP32-S3 2MB PSRAM
    - MAX30102 PPG
    - MPU6050 IMU
    - BME280 environmental sensor
@@ -202,35 +202,30 @@ If the GSR module exposes its own excitation/electrode circuitry, follow that mo
 
 ## 5.1 Main pin assignment
 
-| Device | Signal | ESP32-S3 |
+| Device | Signal | Feather ESP32-S3 |
 |---|---|---|
-| MAX30102 | SDA | GPIO8 |
-| MAX30102 | SCL | GPIO9 |
-| MPU6050 | SDA | GPIO8 |
-| MPU6050 | SCL | GPIO9 |
-| BME280 | SDA | GPIO8 |
-| BME280 | SCL | GPIO9 |
-| BH1750 | SDA | GPIO8 |
-| BH1750 | SCL | GPIO9 |
-| GSR module | AO | GPIO4 / ADC |
-| Status LED | control | GPIO2 |
-| All sensors | GND | ESP32 GND |
-| I2C sensors | VCC | 3.3 V-compatible supply |
+| MPU6050 | SDA | **SDA / GPIO3** |
+| MPU6050 | SCL | **SCL / GPIO4** |
+| BME280 | SDA | **SDA / GPIO3** |
+| BME280 | SCL | **SCL / GPIO4** |
+| BH1750 | SDA | **SDA / GPIO3** |
+| BH1750 | SCL | **SCL / GPIO4** |
+| Analog Pulse Sensor | AO | **A5 / GPIO8 / ADC1** |
+| GSR module | AO | **D5 / GPIO5 / ADC1** |
+| DS18B20 | DATA | **D6 / GPIO6 + 4.7k pull-up to 3.3V** |
+| Status LED | onboard | **LED_BUILTIN** |
 
-GPIO8/GPIO9 are used as the dedicated I2C bus in the current firmware. The ESP32-S3-DevKitC-1 exposes GPIOs for peripheral connections; consult the exact board revision's official pin layout before final enclosure drilling. 
-
+Expected I2C addresses: MPU6050 0x68/0x69; BME280 0x76/0x77; BH1750 0x23/0x5C.
 ## 5.2 I2C topology
 
 All four digital sensors share the same two lines:
 
 ```
-ESP32-S3 GPIO8 SDA ───── MAX30102 SDA
-                    ├── MPU6050 SDA
+ESP32-S3 SDA / GPIO3 ─── MPU6050 SDA
                     ├── BME280 SDA
                     └── BH1750 SDA
 
-ESP32-S3 GPIO9 SCL ───── MAX30102 SCL
-                    ├── MPU6050 SCL
+ESP32-S3 SCL / GPIO4 ─── MPU6050 SCL
                     ├── BME280 SCL
                     └── BH1750 SCL
 
@@ -250,7 +245,7 @@ There is no address collision between these defaults.
 ## 5.3 GSR
 
 ```
-GSR module AO ───────── ESP32-S3 GPIO4
+GSR module AO ───────── ESP32-S3 D5 / GPIO5
 GSR module GND ──────── ESP32-S3 GND
 GSR module VCC ──────── compatible supply
 GSR electrode 1 ─────── finger electrode A
@@ -495,7 +490,7 @@ Compile:
 
 ```bash
 arduino-cli compile \
-  --fqbn esp32:esp32:esp32s3 \
+  --fqbn esp32:esp32:adafruit_feather_esp32s3 \
   hardware/esp32s3/endo_twin_wearable
 ```
 
@@ -526,10 +521,10 @@ Expected startup information includes the ESP32-S3 AP address and TCP server sta
 
 # 13. CP2 PACKET
 
-The active packet remains:
+The active V9 packet is:
 
 ```
-$CP2,ms,ir,red,ax,ay,az,gx,gy,gz,temp0,temp1,gsr,micRaw,micRms,micPitch,ecg,fsr,lux,roomT,hum,press,buttons,status,crc
+$CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,skinT,roomT,hum,press,lux,status,crc
 ```
 
 Wearable meanings:
