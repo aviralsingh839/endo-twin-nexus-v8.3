@@ -7,6 +7,28 @@
 
 ---
 
+## Quick start — Unified Workstation (Patient + Doctor in one UI)
+
+```bash
+./START.sh            # opens the unified web workstation on http://localhost:8787
+./START.sh ui 9000    # custom port
+./START.sh menu       # classic launcher menu (desktop apps, APK builds, tests)
+```
+
+The Patient Workstation and the Doctor Workstation are joined into a single
+console. Use the **profile control in the top-right corner** (or `Ctrl+D`) to
+switch between **Patient View** and **Doctor View** — same palette, same shell,
+same navigation model.
+
+* 10 synthetic demo patients + 5 clinicians, all editable
+* Doctor View → *Patient Registry* to **add / edit / delete patients**
+* Doctor View → *Doctors & Staff* to **add / edit / remove clinicians**
+* Everything is local: no build step, no npm, no CDN, no cloud
+
+Details: [`workstation/README.md`](workstation/README.md)
+
+---
+
 ## What is ENDO-TWIN?
 
 **ENDO-TWIN is a general personalized physiological modelling platform.**
