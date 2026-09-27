@@ -17,7 +17,9 @@ from src.data_models import FeatureVector, SensorSample
 from src.core.quality_control import SensorQualityControl
 from src.core.personal_baseline import PersonalBaselineEngine
 from src.core.shared_features import SharedFeatureExtractor
+from src.core.raw_calibration import RawAutoCalibrator
 from src.signal_processing.ppg import PPGProcessor
+from src.signal_processing.analog_ppg import AnalogPPGProcessor
 from src.signal_processing.imu import IMUProcessor
 from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.temperature import TemperatureProcessor
@@ -36,7 +38,9 @@ class RealtimeFeatureExtractor:
 
         # Signal processors
         self.ppg = PPGProcessor()
+        self.analog_ppg = AnalogPPGProcessor(fs_hz=20.0)
         self.imu = IMUProcessor()
+        self.calibrator = RawAutoCalibrator()
         self.gsr = GSRProcessor()
         self.temp = TemperatureProcessor(history_s=24 * 3600)
         self.ecg = ECGProcessor()
@@ -75,24 +79,48 @@ class RealtimeFeatureExtractor:
             return False
 
     def add_sample(self, sample: SensorSample) -> None:
+        # Keep the decoded frame unchanged for provenance. Calibration is an
+        # analysis layer and never overwrites raw acquisition values.
         self.last_sample = sample
-        # Quality check per channel
-        qualities = self.quality_control.evaluate_sample({
-            "ir": sample.ir,
-            "red": sample.red,
-            "ax_g": sample.ax_g,
-            "ay_g": sample.ay_g,
-            "az_g": sample.az_g,
-            "temp_c": sample.temp_c,
+        self.calibrator.update(sample)
+        cal = self.calibrator.transform_sample(sample)
+
+        channel_values = {
+            "ax_g": cal.get("ax_g"),
+            "ay_g": cal.get("ay_g"),
+            "az_g": cal.get("az_g"),
+            "gx_dps": cal.get("gx_dps"),
+            "gy_dps": cal.get("gy_dps"),
+            "gz_dps": cal.get("gz_dps"),
             "gsr_raw": sample.gsr_raw,
             "ecg_raw": sample.ecg_raw,
-        }, source=sample.source)
-        self._quality_history.append({k: v.quality for k, v in qualities.items()})
+        }
+        if sample.analog_ppg_raw is not None:
+            channel_values["analog_ppg_raw"] = sample.analog_ppg_raw
+        else:
+            channel_values.update({"ir": sample.ir, "red": sample.red})
+        if sample.temp_c is not None:
+            channel_values["temp_c"] = sample.temp_c
 
-        self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red)
-        self.imu.add_sample(sample.timestamp_s, sample.ax_g, sample.ay_g, sample.az_g,
-                            sample.gx_dps, sample.gy_dps, sample.gz_dps)
-        self.gsr.add_sample(sample.timestamp_s, sample.gsr_raw)
+        qualities = self.quality_control.evaluate_sample(channel_values, source=sample.source)
+        self._quality_history.append({k: v.quality for k, v in qualities.items()})
+        sample.quality_meta.update(qualities)
+
+        imu_vals = [cal.get(k) for k in ("ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps")]
+        if all(v is not None for v in imu_vals):
+            self.imu.add_sample(sample.timestamp_s, *[float(v) for v in imu_vals])
+
+        if sample.analog_ppg_raw is not None:
+            analog = cal.get("analog_ppg_raw")
+            if analog is not None:
+                self.analog_ppg.add_sample(sample.timestamp_s, float(analog))
+        elif sample.ir >= 0 or sample.red >= 0:
+            self.ppg.add_sample(sample.timestamp_s, sample.ir, sample.red)
+
+        # GSRProcessor intentionally retains ADC-domain semantics. The
+        # calibrator records a robust baseline/scale without pretending to
+        # convert arbitrary modules into absolute microsiemens.
+        self.gsr.add_sample(sample.timestamp_s, int(round(float(sample.gsr_raw))))
         self.temp.add_sample(sample.timestamp_s, sample.temp_c)
         self.ecg.add_sample(sample.timestamp_s, sample.ecg_raw)
         self.last_lux = sample.lux if sample.lux is not None and sample.lux >= 0 else self.last_lux
@@ -100,13 +128,22 @@ class RealtimeFeatureExtractor:
     def compute(self) -> FeatureVector:
         now = time.time()
         imu_f = self.imu.features()
-        ppg_f = self.ppg.features(motion_index=imu_f["motion_index"])
+        use_analog = self.last_sample is not None and self.last_sample.analog_ppg_raw is not None
+        analog_f = self.analog_ppg.features(motion_index=imu_f["motion_index"]) if use_analog else {}
+        ppg_f = self.ppg.features(motion_index=imu_f["motion_index"]) if not use_analog else {}
         gsr_f = self.gsr.features()
         temp_f = self.temp.features()
         ecg_f = self.ecg.features()
 
-        hr_best = ecg_f.get("ecg_hr_bpm") if (ecg_f.get("ecg_quality") or 0) > 0.55 else ppg_f.get("hr_bpm")
-        rmssd_best = ecg_f.get("ecg_rmssd_ms") if (ecg_f.get("ecg_quality") or 0) > 0.55 else ppg_f.get("rmssd_ms")
+        if (ecg_f.get("ecg_quality") or 0) > 0.55:
+            hr_best = ecg_f.get("ecg_hr_bpm")
+            rmssd_best = ecg_f.get("ecg_rmssd_ms")
+        elif use_analog:
+            hr_best = analog_f.get("hr_bpm")
+            rmssd_best = analog_f.get("rmssd_ms")
+        else:
+            hr_best = ppg_f.get("hr_bpm")
+            rmssd_best = ppg_f.get("rmssd_ms")
 
         # Resting HR: low activity + stable
         resting_hr = None
@@ -117,11 +154,11 @@ class RealtimeFeatureExtractor:
             timestamp_s=now,
             hr_bpm=hr_best,
             resting_hr_bpm=resting_hr,
-            spo2_pct=ppg_f.get("spo2_pct"),
+            spo2_pct=None if use_analog else ppg_f.get("spo2_pct"),
             rmssd_ms=rmssd_best,
             sdnn_ms=ppg_f.get("sdnn_ms"),
             pnn50_pct=ppg_f.get("pnn50_pct"),
-            ppg_pulse_amplitude=ppg_f.get("ppg_pulse_amplitude"),
+            ppg_pulse_amplitude=(analog_f.get("ppg_pulse_amplitude") if use_analog else ppg_f.get("ppg_pulse_amplitude")),
             lux=self.last_lux,
             fsr_raw=self.last_sample.fsr_raw if self.last_sample else None,
             ecg_raw=self.last_sample.ecg_raw if self.last_sample else None,
@@ -143,7 +180,7 @@ class RealtimeFeatureExtractor:
         )
 
         # Quality: mean over present sensors only
-        quality_parts = [ppg_f.get("ppg_quality") or 0.0]
+        quality_parts = [(analog_f.get("ppg_quality") if use_analog else ppg_f.get("ppg_quality")) or 0.0]
         if fv.ecg_quality > 0:
             quality_parts.append(float(fv.ecg_quality))
         if fv.skin_temp_c is not None:
@@ -152,6 +189,9 @@ class RealtimeFeatureExtractor:
             quality_parts.append(1.0)
         fv.signal_quality = float(np.mean(quality_parts)) if quality_parts else 0.0
         fv.baseline_completeness = min(1.0, (now - self.start_time) / BASELINE_CAPTURE_S)
+        fv.calibration_ready_fraction = self.calibrator.ready_fraction
+        fv.calibration_status = self.calibrator.status
+        fv.calibration_meta = self.calibrator.snapshot()
 
         # Sleep estimate - simple heuristic
         import datetime as _dt
@@ -239,6 +279,8 @@ class RealtimeFeatureExtractor:
         return fv
 
     def ppg_waveform(self, last_s: float = 20.0):
+        if self.last_sample is not None and self.last_sample.analog_ppg_raw is not None:
+            return self.analog_ppg.waveform(last_s=last_s)
         return self.ppg.waveform(last_s=last_s)
 
     def history_arrays(self, attr: str, last_s: float = 180.0):
