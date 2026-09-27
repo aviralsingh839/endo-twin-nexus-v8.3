@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import sys
 import time
+import uuid
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -119,7 +120,11 @@ class PersonalTwinOnboarding(QDialog):
         weight = float(self.weight.value())
         bmi = weight / ((height / 100.0) ** 2) if height > 0 else None
         cyc = self.cycle.currentText()
+        existing = load_state().get("profile", {})
+        if not isinstance(existing, dict):
+            existing = {}
         profile = {
+            "participant_id": str(existing.get("participant_id") or ("PT-" + uuid.uuid4().hex[:10].upper())),
             "alias": self.alias_name.text().strip(),
             "sex": self.sex.currentText(),
             "age_years": float(self.age.value()),
