@@ -46,7 +46,8 @@ private enum class PatientTab(val route: String, val label: String) {
     Health("health", "Health"),
     Measure("measure", "Measure"),
     Timeline("timeline", "Timeline"),
-    Care("care", "Care")
+    Care("care", "Care"),
+    Complications("complications", "Complications")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,6 +105,7 @@ fun PatientApp(currentPatientId: String) {
                                     PatientTab.Measure -> Icons.Outlined.MonitorHeart
                                     PatientTab.Timeline -> Icons.Outlined.Timeline
                                     PatientTab.Care -> Icons.Outlined.LocationOn
+                                    PatientTab.Complications -> Icons.Outlined.Warning
                                 },
                                 contentDescription = tab.label
                             )
@@ -124,6 +126,7 @@ fun PatientApp(currentPatientId: String) {
             composable("measure") { MeasureScreen(currentPatientId) }
             composable("timeline") { TimelineScreen(currentPatientId) }
             composable("care") { CareScreen() }
+            composable("complications") { ComplicationsScreen() }
         }
     }
 }
@@ -377,6 +380,39 @@ private fun TimelineScreen(patientId: String) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ComplicationsScreen() {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { SectionTitle("Complications", "Research-domain signals • not calibrated probabilities") }
+        item {
+            Card(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Important", style = MaterialTheme.typography.titleMedium)
+                    Text("ENDO-TWIN does not have a clinically validated complication-probability model. Missing or low-quality sensor data must remain unknown rather than becoming a guessed percentage.")
+                }
+            }
+        }
+        listOf(
+            "Insulin-resistance / type-2-diabetes-related domain",
+            "Hypertension-related domain",
+            "Sleep-disordered-breathing domain",
+            "Ovulatory / fertility-related domain",
+            "Metabolic-liver domain"
+        ).forEach { name ->
+            item {
+                MetricCard(name, "Not established", "Requires sufficient supported data and clinical assessment.", "UNKNOWN")
+            }
+        }
+        item {
+            Text("Research / risk-screening output — not a medical diagnosis.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
