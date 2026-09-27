@@ -1039,8 +1039,9 @@ class DoctorWindow(QMainWindow):
 
     def _refresh_personal_page(self):
         state = load_state()
-        learning = state.get("learning", {})
-        p = state.get("profile", {})
+        record = state.get("people", {}).get(self.participant_id, {})
+        learning = record.get("learning", {}) if isinstance(record, dict) else {}
+        p = record.get("profile", {}) if isinstance(record, dict) else {}
         self.personal_model.set_participant(str(p.get("participant_id") or self.participant_id))
         baseline = baseline_summary(self.participant_id)
         lines = [
@@ -1577,8 +1578,6 @@ class DoctorWindow(QMainWindow):
             source = str(row.get("source", "")).lower()
             if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
                 self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
-                self.feature_history.append(dict(row))
-                self.feature_history = self.feature_history[-1000:]
                 rows = [r for r in self.feature_history[-160:] if str(r.get("gating","")) == "USABLE"]
                 if len(rows) >= 60 and self.personal_model.snapshot()["samples"] % 20 == 0:
                     cap = BaselineCapture(self.participant_id, duration_s=0, min_samples=60, min_quality=0.45)
