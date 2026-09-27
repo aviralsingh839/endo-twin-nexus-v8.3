@@ -108,11 +108,11 @@ class PacketParser:
     def _parse_cp3(self, raw: str) -> SensorSample:
         """Parse the primary ESP32-S3 analog wearable frame.
 
-        $CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,roomT,hum,press,lux,status,crc
+        $CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,skinT,roomT,hum,press,lux,status,crc
         """
         parts = raw.split(",")
-        if len(parts) != 16:
-            raise PacketParseError(f"analog $CP3 expected 16 fields, got {len(parts)}")
+        if len(parts) != 17:
+            raise PacketParseError(f"analog $CP3 expected 17 fields, got {len(parts)}")
         self._verify_crc(parts)
         try:
             return SensorSample(
@@ -129,19 +129,19 @@ class PacketParser:
                 gx_dps=float(parts[7]),
                 gy_dps=float(parts[8]),
                 gz_dps=float(parts[9]),
-                temp_c=float("nan"),
+                temp_c=float(parts[10]),
                 temp1_c=float("nan"),
-                room_temp_c=float(parts[10]),
-                humidity_pct=float(parts[11]),
-                pressure_hpa=float(parts[12]),
-                lux=float(parts[13]),
+                room_temp_c=float(parts[11]),
+                humidity_pct=float(parts[12]),
+                pressure_hpa=float(parts[13]),
+                lux=float(parts[14]),
                 ecg_raw=-1,
                 fsr_raw=-1,
                 mic_raw=-1,
                 mic_rms=0.0,
                 mic_pitch_hz=0.0,
                 buttons=0,
-                status=int(float(parts[14])),
+                status=int(float(parts[15])),
                 source="serial-wearable-analog",
             )
         except (ValueError, IndexError) as exc:
