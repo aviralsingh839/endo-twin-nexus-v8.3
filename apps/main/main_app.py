@@ -92,6 +92,10 @@ except ImportError:
     CHRONO_PCOS_AVAILABLE = False
     get_chrono_pcos_model = None
 
+from src.personal_twin.profile_store import get_profile, load_state, profile_summary, select_participant
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_summary
+
 DISCLAIMER = "Research prototype - Understand your physiological patterns over time - Not a medical diagnosis"
 
 
@@ -385,7 +389,38 @@ if PYSIDE_AVAILABLE:
                 disease_layout.addWidget(chrono_btn)
             
             tabs.addTab(disease_tab, "Disease Models")
-            
+
+            # Shared Personal Twin data
+            personal_tab = QWidget()
+            personal_layout = QVBoxLayout(personal_tab)
+            personal_label = QLabel()
+            personal_label.setWordWrap(True)
+            personal_layout.addWidget(personal_label)
+            personal_data = QTextEdit()
+            personal_data.setReadOnly(True)
+            personal_layout.addWidget(personal_data, 1)
+            personal_refresh = QPushButton("Refresh shared Personal Twin data")
+            personal_refresh.clicked.connect(
+                lambda: self.refresh_personal_twin_view(personal_label, personal_data)
+            )
+            personal_layout.addWidget(personal_refresh, 0, Qt.AlignmentFlag.AlignLeft)
+            tabs.addTab(personal_tab, "Personal Twin")
+
+            # Shared PCOS complication context
+            from src.ui.pcos_complication_panel import PCOSComplicationPanel
+            complications_tab = PCOSComplicationPanel("PCOS / Complication Context • ENDO-TWIN")
+            profile = get_profile()
+            complications_tab.set_context(
+                {k: profile.get(k) for k in (
+                    "age_years", "bmi", "systolic_bp", "diastolic_bp",
+                    "glucose_mg_dl", "cycle_irregular", "usual_cycle_length_days",
+                    "days_since_last_period", "years_post_menarche"
+                )},
+                None,
+            )
+            tabs.addTab(complications_tab, "PCOS Complications")
+            self.refresh_personal_twin_view(personal_label, personal_data)
+
             # AI & Models - GENERAL
             ai_tab = QWidget()
             ai_layout = QVBoxLayout(ai_tab)
@@ -432,6 +467,37 @@ if PYSIDE_AVAILABLE:
             footer.setStyleSheet("font-size: 10px; color: #64748b; padding: 10px;")
             layout.addWidget(footer)
         
+        def refresh_personal_twin_view(self, label, widget):
+            state = load_state()
+            pid = state.get("active_participant_id")
+            profile = state.get("profile", {})
+            if not pid:
+                label.setText("No participant selected.")
+                widget.setText("Select a participant from the Personal Twin people manager.")
+                return
+            model = PersonalAdaptiveModel(str(pid))
+            snap = model.snapshot()
+            baseline = baseline_summary(str(pid))
+            label.setText(
+                f"Active participant: {pid}\n"
+                f"Patient: {profile.get('patient_name') or profile.get('alias') or pid}\n"
+                f"{profile_summary(profile)}\n"
+                "Shared source: Personal Twin → Unified / Doctor / Patient / ENDO-TWIN"
+            )
+            lines = [
+                f"Learning samples: {snap['samples']:,}",
+                f"Quality-weighted samples: {snap['quality_weighted_samples']:.2f}",
+                f"Stored baseline: {'YES' if baseline['available'] else 'NO'}",
+                "",
+                "Learned references:",
+            ]
+            for name, item in snap.get("metrics", {}).items():
+                lines.append(
+                    f"{name}: mean={item['mean']:.3f} • std={item['std']:.3f} • "
+                    f"samples={item['samples']:.1f} • latest={item['last']}"
+                )
+            widget.setText("\n".join(lines))
+
         def open_chrono_pcos(self):
             """Open CHRONO-PCOS - preserves original functionality"""
             result = self.app_core.analyze_with_chrono_pcos()
@@ -453,6 +519,12 @@ if PYSIDE_AVAILABLE:
 
 def main():
     """Launch ENDO-TWIN general platform"""
+    if PYSIDE_AVAILABLE:
+        from src.personal_twin.participant_selector import choose_participant
+        pid = choose_participant("ENDO-TWIN • Select Patient / Participant")
+        if not pid:
+            return 0
+        select_participant(pid)
     print("="*80)
     print("ENDO-TWIN - Personalized Physiological Modelling Platform")
     print("General platform, CHRONO-PCOS is first disease-specific model")
@@ -512,7 +584,7 @@ def main():
     # Launch GUI if available
     if PYSIDE_AVAILABLE:
         from PySide6.QtWidgets import QApplication
-        app = QApplication(sys.argv)
+        app = QApplication.instance() or QApplication(sys.argv)
         window = EndoTwinMainWindow()
         window.show()
         sys.exit(app.exec())

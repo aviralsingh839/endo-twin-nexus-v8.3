@@ -23,6 +23,7 @@ from src.serial_io.packet_parser import PacketParser
 
 class NetworkReader(QObject):
     sample_received = Signal(object)  # SensorSample
+    calibration_received = Signal(object)  # PPGCalibrationEvent
     error_received = Signal(str)
     state_changed = Signal(str)
 
@@ -35,10 +36,18 @@ class NetworkReader(QObject):
         self._stop = threading.Event()
         self._sock: Optional[socket.socket] = None
         self.parser = PacketParser(require_crc=require_crc)
+        self._latest_sample = None
+        self._sample_seq = 0
+        self._consumed_seq = 0
+        self._sample_lock = threading.Lock()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
+        with self._sample_lock:
+            self._latest_sample = None
+            self._sample_seq = 0
+            self._consumed_seq = 0
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -47,6 +56,16 @@ class NetworkReader(QObject):
         self._stop.set()
         self._close_socket()
         self.state_changed.emit("stopped")
+
+    def has_sample(self) -> bool:
+        with self._sample_lock:
+            return self._sample_seq > self._consumed_seq
+
+    def get_sample(self):
+        with self._sample_lock:
+            sample = self._latest_sample
+            self._consumed_seq = self._sample_seq
+            return sample
 
     def write_command(self, command: str) -> None:
         if self._sock is None:
@@ -100,7 +119,16 @@ class NetworkReader(QObject):
                     if not line:
                         continue
                     try:
+                        # Ignore firmware diagnostics/ACKs; only CP/CP2/CP3 and PCAL are data.
+                        if line.startswith("[") or line.startswith("$ACK,"):
+                            continue
+                        if line.startswith("$PCAL,"):
+                            self.calibration_received.emit(self.parser.parse_calibration_event(line))
+                            continue
                         sample = self.parser.parse(line)
+                        with self._sample_lock:
+                            self._latest_sample = sample
+                            self._sample_seq += 1
                         self.sample_received.emit(sample)
                     except Exception as exc:
                         self.error_received.emit(f"Packet parse error: {exc}")

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from collections import deque
 
 from PySide6.QtCore import Qt
@@ -24,8 +26,14 @@ if str(ROOT) not in sys.path:
 from database.database import LocalDatabase
 from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
-from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
+from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode, RingGauge, metric_card, trend_panel
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
+from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_capture import BaselineCapture
+from src.personal_twin.baseline_store import baseline_summary
+from src.ui.pcos_complication_panel import PCODProgressPanel
+from src.personal_twin.participant_selector import choose_participant
 from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
 
@@ -51,8 +59,15 @@ class DoctorWindow(QMainWindow):
         self.metric_cards = {}
         self.trend_charts = {}
         self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
+        self.feature_history = []
+        self.feature_window_count = 0
         self.tab_pages = {}
-        self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
+        self.visual_graphs = {}
+        shared_profile = load_state().get("profile", {})
+        self.participant_id = str(shared_profile.get("participant_id") or "LOCAL-PARTICIPANT")
+        self.personal_model = PersonalAdaptiveModel(self.participant_id)
+        self.baseline_capture = BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
+        self.page_keys = ["dashboard", "patients", "lab", "complications", "personal", "patient", "mobile", "settings"]
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7777)
         self.bridge.start()
@@ -62,7 +77,6 @@ class DoctorWindow(QMainWindow):
         self.session.sample_received.connect(self._on_sample)
         self.session.state_changed.connect(self._on_state)
         self.session.error_received.connect(self._on_error)
-        self.session.start()
 
         self.setWindowTitle("Endo-Twin Nexus — Doctor Desktop • V8.6")
         self.resize(1580, 940)
@@ -72,11 +86,15 @@ class DoctorWindow(QMainWindow):
         self._log_event("Workstation opened", "session")
         self._refresh_roster()
         self._refresh_header()
+        self.session.start()
 
     def closeEvent(self, event):
-        self.session.stop()
-        self.bridge.stop()
-        self.db.close()
+        if self.session is not None:
+            self.session.stop()
+        if self.bridge is not None:
+            self.bridge.stop()
+        if self.db is not None:
+            self.db.close()
         event.accept()
 
     # ---------- shell ----------
@@ -112,6 +130,8 @@ class DoctorWindow(QMainWindow):
             ("dashboard", "▦  Dashboard"),
             ("patients", "♙  Patients"),
             ("lab", "⌁  Prototype Lab"),
+            ("complications", "⚕  PCOD Healing & Complications"),
+            ("personal", "◎  Personal Twin"),
         ]:
             b = QPushButton(text)
             b.setObjectName("nav")
@@ -201,6 +221,8 @@ class DoctorWindow(QMainWindow):
             "dashboard": self._dashboard_page(),
             "patients": self._patients_page(),
             "lab": PrototypeLabWidget(self.session, self.mode, ROOT),
+            "complications": self._complications_page(),
+            "personal": self._personal_page(),
             "patient": self._patient_page(),
             "mobile": self._mobile_page(),
             "settings": self._settings_page(),
@@ -230,6 +252,8 @@ class DoctorWindow(QMainWindow):
     def _mode_text(self):
         if self.mode.mode == "demo":
             return "DEMO MODE", "Synthetic showcase stream"
+        if self.mode.mode == "wifi":
+            return "LIVE SENSOR MODE", f"ESP32-S3 Wi-Fi • {self.mode.host}:{self.mode.tcp_port}"
         return "LIVE SENSOR MODE", f"USB serial • {self.mode.port}"
 
     def _refresh_header(self):
@@ -244,7 +268,7 @@ class DoctorWindow(QMainWindow):
             self.patient_badge.setText(f"Patient • {self.current_case.patient}")
         elif self.live_patient:
             alias = str(self.live_patient.get("display_name") or self.live_patient.get("anonymous_id") or "Local patient")
-            pid = str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "")
+            pid = str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or self.live_patient.get("participant_id") or "")
             self.current_patient_btn.setText(f"◉  {alias}  ·  {pid}")
             self.current_patient_btn.setVisible(True)
             self.current_group.setVisible(True)
@@ -282,7 +306,7 @@ class DoctorWindow(QMainWindow):
             }
         if self.live_patient:
             return {
-                "pid": str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "LOCAL"),
+                "pid": str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or self.live_patient.get("participant_id") or "LOCAL"),
                 "alias": str(self.live_patient.get("display_name") or "Local patient"),
                 "age": self.live_patient.get("age_years", "—"),
                 "bmi": self.live_patient.get("bmi", "—"),
@@ -589,7 +613,8 @@ class DoctorWindow(QMainWindow):
             ("◉  Open Patient", "patients", "primary"),
             ("＋  Add Patient", "create", "secondary"),
             ("⌁  Research Lab", "lab", "secondary"),
-            ("▤  Reports", "patient", "secondary"),
+            ("⚕  PCOD Healing", "complications", "secondary"),
+            ("▤  Patient Workspace", "patient", "secondary"),
         ]):
             b = QPushButton(label)
             b.setObjectName(obj)
@@ -885,6 +910,25 @@ class DoctorWindow(QMainWindow):
                     it.setData(Qt.ItemDataRole.UserRole, "LOCAL::" + pid)
                 self.table.setItem(r, col, it)
 
+        # People created by Personal Twin are visible here without duplicating rows already in the DB.
+        db_ids = {str(p.get("patient_id")) for p in local}
+        for p in list_profiles():
+            twin_id = str(p.get("participant_id"))
+            if twin_id in db_ids:
+                continue
+            alias = str(p.get("alias") or twin_id)
+            searchable = f"{twin_id} {alias}"
+            if q and q not in searchable.lower():
+                continue
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            vals = [twin_id, alias, "Personal Twin", "Unknown", "—", "LEARNED", p.get("updated_at", "—")]
+            for col, val in enumerate(vals):
+                it = QTableWidgetItem(str(val))
+                if col == 0:
+                    it.setData(Qt.ItemDataRole.UserRole, "TWIN::" + twin_id)
+                self.table.setItem(r, col, it)
+
         self._refresh_dashboard()
 
     def _select_row(self, row, _col):
@@ -908,7 +952,116 @@ class DoctorWindow(QMainWindow):
             if hit:
                 self._open_case(str(hit.get("patient_id") or hit.get("anonymous_id")))
 
+    def _doctor_series(self, key):
+        values = list(self.metric_history.get(key, []))
+        if values:
+            return values[-120:]
+        if self.current_case:
+            p=self.current_case
+            base={"hr_bpm":p.hr,"rmssd_ms":p.hrv,"skin_temp_c":p.temp,"activity_level":p.activity,"gsr_tonic":18.0 + p.activity/3}.get(key)
+            if base is not None:
+                scale=0.05 if key=="skin_temp_c" else max(abs(float(base))*0.04,0.4)
+                return [float(base)+scale*x for x in [0,2,-1,3,1,-2,2,0,-1,2,1,-1,3,0,2,-2,1]]
+        return []
+
     # ---------- patient workspace ----------
+    def _complication_context(self):
+        p = self._profile() or {}
+        pid = p.get("pid")
+        shared = get_profile(pid) if pid else {}
+        return {
+            "age_years": shared.get("age_years", p.get("age")),
+            "bmi": shared.get("bmi", p.get("bmi")),
+            "systolic_bp": shared.get("systolic_bp"),
+            "diastolic_bp": shared.get("diastolic_bp"),
+            "glucose_mg_dl": shared.get("glucose_mg_dl"),
+            "cycle_irregular": shared.get("cycle_irregular"),
+            "usual_cycle_length_days": shared.get("usual_cycle_length_days"),
+            "days_since_last_period": shared.get("days_since_last_period"),
+            "years_post_menarche": shared.get("years_post_menarche"),
+        }
+
+    def _shared_patient_profile(self):
+        base = self._profile() or {}
+        pid = str(
+            base.get("pid")
+            or base.get("anonymous_id")
+            or base.get("patient_id")
+            or base.get("participant_id")
+            or self.participant_id
+        )
+        shared = get_profile(pid) if pid else {}
+        merged = dict(shared)
+        merged.setdefault("participant_id", pid)
+        merged.setdefault("patient_name", base.get("alias") or pid)
+        merged.setdefault("alias", base.get("alias") or pid)
+        merged.setdefault("age_years", base.get("age"))
+        merged.setdefault("bmi", base.get("bmi"))
+        return merged
+
+    def _save_pcod_status(self, value):
+        if not self.participant_id:
+            return
+        profile = self._shared_patient_profile()
+        profile["participant_id"] = str(profile.get("participant_id") or self.participant_id)
+        profile["has_pcod"] = value
+        profile["updated_at"] = time.time()
+        try:
+            save_profile(profile, set_active=True)
+            self.participant_id = str(profile["participant_id"])
+        except Exception as exc:
+            self._log_event("PCOD status save warning", str(exc))
+
+    def _complications_page(self):
+        page = PCODProgressPanel("PCOD Healing & Complications")
+        page.pcod_status_changed.connect(self._save_pcod_status)
+        page.set_context(self._shared_patient_profile(), self.feature_history, self.latest_row)
+        self.complications_page = page
+        return page
+
+    def _personal_page(self):
+        page = QWidget()
+        o = QVBoxLayout(page)
+        o.setContentsMargins(24, 16, 20, 14)
+        o.addWidget(section_header("Personal Adaptive Twin", "Shared local personalization state."))
+        state = load_state()
+        p = state.get("profile", {})
+        info = QLabel(
+            f"Participant: {p.get('participant_id', self.participant_id)}\n"
+            f"{profile_summary(p)}"
+        )
+        info.setWordWrap(True)
+        o.addWidget(info)
+        self.personal_text = QTextEdit()
+        self.personal_text.setReadOnly(True)
+        o.addWidget(self.personal_text, 1)
+        self._refresh_personal_page()
+        return page
+
+    def _refresh_personal_page(self):
+        state = load_state()
+        record = state.get("people", {}).get(self.participant_id, {})
+        learning = record.get("learning", {}) if isinstance(record, dict) else {}
+        p = record.get("profile", {}) if isinstance(record, dict) else {}
+        self.personal_model.set_participant(str(p.get("participant_id") or self.participant_id))
+        baseline = baseline_summary(self.participant_id)
+        lines = [
+            f"Patient: {p.get('patient_name') or p.get('alias') or self.participant_id}",
+            f"Model: {learning.get('version', 'adaptive-personal-twin-v1')}",
+            f"Quality-gated observations: {int(learning.get('samples', 0)):,}",
+            f"Quality-weighted observations: {float(learning.get('quality_weighted_samples', 0.0)):.1f}",
+            f"Stored baseline: {'YES' if baseline['available'] else 'NO'}"
+            + (f" • {baseline['samples']} windows • confidence {baseline['confidence']:.2f}" if baseline['available'] else ""),
+            "",
+            "Learned personal reference:",
+        ]
+        for name, item in (learning.get("metrics", {}) or {}).items():
+            lines.append(
+                f"{name}: mean={float(item.get('mean', 0.0)):.3f}, "
+                f"std={((float(item.get('m2', 0.0)) / max(float(item.get('count', 1.0)), 1.0)) ** 0.5):.3f}, last={item.get('last')}"
+            )
+        self.personal_text.setText("\n".join(lines))
+
     def _patient_page(self):
         page = QWidget()
         outer = QVBoxLayout(page)
@@ -922,7 +1075,8 @@ class DoctorWindow(QMainWindow):
         self.patient_tabs.setObjectName("patientTabs")
         self.patient_tab_names = [
             "Overview", "Timeline", "Sensor data", "Trends", "Ultrasound",
-            "AI / Models", "Clinical inputs", "Reports", "Notes", "Provenance", "Audit"
+            "AI / Models", "Clinical inputs", "PCOD Healing & Complications", "Reports",
+            "Notes", "Provenance", "Audit"
         ]
         # A compact tab row using QPushButtons is more stable across Qt styles.
         tabrow = QHBoxLayout()
@@ -989,13 +1143,17 @@ class DoctorWindow(QMainWindow):
             "Ultrasound": self._patient_ultrasound,
             "AI / Models": self._patient_models,
             "Clinical inputs": self._patient_clinical,
+            "PCOD Healing & Complications": self._patient_complications,
             "Reports": self._patient_reports,
             "Notes": self._patient_notes,
             "Provenance": self._patient_provenance,
             "Audit": self._patient_audit,
         }
+        self.patient_tab_widgets = {}
         for name in self.patient_tab_names:
-            self.patient_stack.addWidget(builders[name]())
+            widget = builders[name]()
+            self.patient_tab_widgets[name] = widget
+            self.patient_stack.addWidget(widget)
         self._show_patient_tab("Overview")
 
     def _patient_overview(self):
@@ -1104,114 +1262,56 @@ class DoctorWindow(QMainWindow):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setSpacing(10)
-        box = QFrame()
-        box.setObjectName("card")
-        b = QVBoxLayout(box)
-        b.addWidget(section_header("Full event timeline", "Chronological patient-scoped activity"))
-        for date, title, detail in self._patient_events() + [("Earlier", "Patient record created", "local database")]:
-            row = QHBoxLayout()
-            dot = QLabel("◉")
-            dot.setStyleSheet("color:#9aaeff;font-size:16px;")
-            row.addWidget(dot)
-            col = QVBoxLayout()
-            d = QLabel(str(date))
-            d.setObjectName("muted")
-            col.addWidget(d)
-            tx = QLabel(title)
-            tx.setStyleSheet("font-weight:850;color:#e7ebf3;")
-            col.addWidget(tx)
-            de = QLabel(detail)
-            de.setObjectName("muted")
-            de.setWordWrap(True)
-            col.addWidget(de)
-            row.addLayout(col, 1)
-            b.addLayout(row)
-        o.addWidget(box)
+        o.addWidget(section_header("Patient Timeline", "A visual timeline plus physiological context."))
+        split=QGridLayout()
+        timeline=QFrame(); timeline.setObjectName("card"); tv=QVBoxLayout(timeline)
+        tv.addWidget(QLabel("RECENT EVENTS"))
+        for i,(date,title,detail) in enumerate(self._patient_events()[:6]):
+            row=QHBoxLayout()
+            tag=QLabel(f"{i+1:02d}"); tag.setStyleSheet("background:#5b3cff;color:white;border-radius:10px;padding:5px;font-weight:900;")
+            row.addWidget(tag)
+            col=QVBoxLayout(); col.addWidget(QLabel(str(date))); h=QLabel(f"<b>{title}</b>"); col.addWidget(h); d=QLabel(detail); d.setObjectName("muted"); d.setWordWrap(True); col.addWidget(d)
+            row.addLayout(col,1); tv.addLayout(row)
+        split.addWidget(timeline,0,0)
+        graphs=QVBoxLayout()
+        graphs.addWidget(trend_panel("Heart rate","").graph if False else trend_panel("Heart rate",self._doctor_series("hr_bpm"),"bpm","#ff4fa3",145))
+        graphs.addWidget(trend_panel("HRV / RMSSD",self._doctor_series("rmssd_ms"),"ms","#39c9ff",145))
+        split.addLayout(graphs,0,1)
+        o.addLayout(split,1)
         return w
 
     def _patient_sensor(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        banner = QFrame()
-        banner.setObjectName("hero")
-        bv = QVBoxLayout(banner)
-        bv.addWidget(QLabel("Provenance is preserved per stream"))
-        bv.addWidget(QLabel("Every value below carries a MEASURED or DERIVED boundary. Nothing here is model-inferred."))
-        o.addWidget(banner)
-
-        specs = [
-            ("Heart rate", "hr_bpm", "bpm", "MEASURED"),
-            ("Heart rate variability", "rmssd_ms", "ms (RMSSD)", "DERIVED"),
-            ("GSR / EDA", "gsr_tonic", "µS proxy", "MEASURED"),
-            ("Skin temperature", "skin_temp_c", "°C", "MEASURED"),
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Sensor Data", "Readable signal cards with provenance and live trends."))
+        grid=QGridLayout()
+        specs=[
+            ("Heart rate","hr_bpm","bpm","MEASURED","#ff4fa3"),
+            ("HRV / RMSSD","rmssd_ms","ms","DERIVED","#39c9ff"),
+            ("GSR / EDA","gsr_tonic","rel.","MEASURED","#a86bff"),
+            ("Skin temperature","skin_temp_c","°C","MEASURED","#ff9f43"),
+            ("Activity","activity_level","%","DERIVED","#31d7a1"),
+            ("SpO₂","spo2_pct","%","AVAILABLE ONLY WITH APPROPRIATE SENSOR","#44d9ff"),
         ]
-        for title, key, unit, prov in specs:
-            panel = QFrame()
-            panel.setObjectName("card")
-            v = QVBoxLayout(panel)
-            head = QHBoxLayout()
-            head.addWidget(QLabel(title))
-            head.addStretch()
-            head.addWidget(status_badge(prov, "measured" if prov=="MEASURED" else "derived"))
-            v.addLayout(head)
-            chart = Sparkline(title, unit)
-            if self.current_case:
-                base = {
-                    "hr_bpm": self.current_case.hr,
-                    "rmssd_ms": self.current_case.hrv,
-                    "gsr_tonic": 18.0 + self.current_case.activity/3,
-                    "skin_temp_c": self.current_case.temp,
-                }[key]
-                offsets = [((i * 7) % 9) - 4 for i in range(28)]
-                chart.set_values([base + o * (0.08 if key=="skin_temp_c" else 1.0) for o in offsets])
-            elif self.latest_row and self.latest_row.get(key) is not None:
-                chart.set_values([float(self.latest_row[key])])
-            v.addWidget(chart)
-            o.addWidget(panel)
+        for i,(name,key,unit,prov,accent) in enumerate(specs):
+            current=(self.latest_row or {}).get(key)
+            if current is None and self.current_case:
+                current={"hr_bpm":self.current_case.hr,"rmssd_ms":self.current_case.hrv,"skin_temp_c":self.current_case.temp,"activity_level":self.current_case.activity}.get(key)
+            p=metric_card(name,self._fmt(current,f" {unit}",1),prov,self._doctor_series(key),accent,unit)
+            grid.addWidget(p,i//3,i%3)
+        o.addLayout(grid)
+        g=QGridLayout()
+        for i,(name,key,unit,accent) in enumerate([("Cardiovascular","hr_bpm","bpm","#ff4fa3"),("Autonomic","rmssd_ms","ms","#39c9ff"),("Stress / EDA","gsr_tonic","","#a86bff"),("Movement","activity_level","%","#31d7a1")]):
+            p=trend_panel(name,self._doctor_series(key),unit,accent,185); g.addWidget(p,i//2,i%2); self.visual_graphs[key]=p.graph
+        o.addLayout(g,1)
         return w
 
     def _patient_trends(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.setSpacing(12)
-        o.addWidget(section_header(
-            "Physiological trends",
-            "Continuous observations and derived features. Gaps indicate unavailable or quality-gated data; they are not imputed."
-        ))
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        names = [
-            ("Heart rate", "bpm", "hr_bpm"),
-            ("HRV / RMSSD", "ms", "rmssd_ms"),
-            ("Activity", "%", "activity_level"),
-            ("Skin temperature", "°C", "skin_temp_c"),
-        ]
-        for i, (name, unit, key) in enumerate(names):
-            panel = QFrame()
-            panel.setObjectName("card")
-            v = QVBoxLayout(panel)
-            v.setContentsMargins(14, 12, 14, 12)
-            top = QHBoxLayout()
-            title = QLabel(name)
-            title.setStyleSheet("font-size:13px;font-weight:850;color:#e7ebf3;")
-            top.addWidget(title)
-            top.addStretch()
-            top.addWidget(status_badge("LIVE" if self.mode.mode == "live" else "DEMO", "measured" if self.mode.mode == "live" else "info"))
-            v.addLayout(top)
-            chart = Sparkline(name, unit)
-            chart.setMinimumHeight(230)
-            values = list(self.metric_history.get(key, []))
-            if not values and self.current_case:
-                p = self.current_case
-                base = {"hr_bpm": p.hr, "rmssd_ms": p.hrv, "activity_level": p.activity, "skin_temp_c": p.temp}[key]
-                pattern = [0, 2, -1, 4, 1, -3, 2, -2, 3, 0, -4, 2, 1, -1, 4, -2, 0, 3, 1, -2, 3, 0]
-                scale = 0.07 if key == "skin_temp_c" else 1.0
-                values = [base + x * scale for x in pattern]
-            chart.set_values(values)
-            v.addWidget(chart, 1)
-            self.trend_charts[key] = chart
-            grid.addWidget(panel, i // 2, i % 2)
-        o.addLayout(grid)
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Physiological Trends", "The graphs are the primary view; gaps remain visible when data is unavailable."))
+        g=QGridLayout()
+        for i,(name,key,unit,accent) in enumerate([("Heart rate","hr_bpm","bpm","#ff4fa3"),("HRV","rmssd_ms","ms","#39c9ff"),("Skin temperature","skin_temp_c","°C","#ff9f43"),("Activity","activity_level","%","#31d7a1"),("GSR / EDA","gsr_tonic","","#a86bff")]):
+            p=trend_panel(name,self._doctor_series(key),unit,accent,210); g.addWidget(p,i//2,i%2); self.visual_graphs[key]=p.graph
+        o.addLayout(g,1)
         return w
 
     def _patient_ultrasound(self):
@@ -1271,103 +1371,61 @@ class DoctorWindow(QMainWindow):
         self._log_event("Ultrasound source attached", Path(path).name)
 
     def _patient_models(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.addWidget(section_header("AI / Models", "Transparent model-facing surface with explicit validation and provenance boundaries."))
-
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("AI / Models", "Simple visual model status with provenance."))
+        top=QGridLayout()
         if self.current_case:
-            hero = QFrame()
-            hero.setObjectName("card")
-            hv = QVBoxLayout(hero)
-            top = QHBoxLayout()
-            top.addWidget(QLabel("CHRONO-PCOS"))
-            top.addStretch()
-            top.addWidget(pill("SYNTHETIC / DEMO_DATA", "#3a2a2b", "#f0a5a0"))
-            hv.addLayout(top)
-            hv.addWidget(QLabel(f"Research-risk example: {self.current_case.risk:.0f}%"))
-            hv.addWidget(QLabel("Synthetic showcase value only — not a probability, diagnosis, clinical severity score or validation result."))
-            o.addWidget(hero)
+            top.addWidget(RingGauge("Research example",self.current_case.risk,"%", "#7d62ff"),0,0)
+            top.addWidget(metric_card("Signal quality",self._fmt(self.current_case.quality*100," %",0),"Synthetic example context",self._doctor_series("hr_bpm"),"#39c9ff",""),0,1)
+            top.addWidget(metric_card("Condition",self.current_case.condition,"Synthetic case label",accent="#ff4fa3"),0,2)
         else:
-            o.addWidget(card("CHRONO-PCOS", "NOT RUN", "Live workstation view deliberately does not fabricate disease-model output."))
-
-        g = QGridLayout()
-        blocks = [
-            ("What did the model layer use?", "Wearable physiology + longitudinal context + disease-specific inputs when available."),
-            ("How good was the data?", self._data_quality_text(self._profile()["quality"])[0] if self._profile() else "UNKNOWN"),
-            ("What is missing?", "Validated clinical and imaging evidence may be missing."),
-            ("Clinical validation", "NOT ESTABLISHED"),
-            ("What this result does not mean", "It is not a diagnosis, lab-equivalent hormone measurement or validated clinical probability."),
-            ("Provenance", "MODEL-INFERRED only for an actual model run; DEMO_DATA for synthetic examples."),
-        ]
-        for i, (a, b) in enumerate(blocks):
-            f = QFrame()
-            f.setObjectName("card")
-            v = QVBoxLayout(f)
-            h = QLabel(a.upper())
-            h.setStyleSheet("color:#e2e6ef;font-weight:850;font-size:10px;")
-            v.addWidget(h)
-            x = QLabel(b)
-            x.setWordWrap(True)
-            x.setObjectName("muted")
-            v.addWidget(x)
-            g.addWidget(f, i//2, i%2)
-        o.addLayout(g)
-        o.addStretch()
+            top.addWidget(RingGauge("Model output",None,"%", "#7d62ff"),0,0)
+            top.addWidget(metric_card("Signal quality",self._data_quality_text(self._profile()["quality"] if self._profile() else None)[0],"Live quality context",accent="#39c9ff"),0,1)
+            top.addWidget(metric_card("CHRONO-PCOS","NOT RUN","No live disease inference fabricated",accent="#ff4fa3"),0,2)
+        o.addLayout(top)
+        blocks=QGridLayout()
+        for i,(title,detail,accent) in enumerate([
+            ("Longitudinal","Baseline + repeated change + recovery context","#39c9ff"),
+            ("Personal Twin","Patient-specific learning state","#31d7a1"),
+            ("PCOD progress","Existing recovery classifications when PCOD = Yes","#ff9f43"),
+            ("Complications","Existing engine enabled only when PCOD = Yes","#a86bff"),
+        ]):
+            blocks.addWidget(metric_card(title,"READY",detail,accent=accent),i//2,i%2)
+        o.addLayout(blocks)
         return w
 
     def _patient_clinical(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        box = QFrame()
-        box.setObjectName("card")
-        v = QVBoxLayout(box)
-        v.addWidget(section_header("Patient-entered / clinician-entered data", "Shown as source-labelled contextual inputs."))
-        p = self._profile()
-        rows = [
-            ("Age", p["age"] if p else "—", "CLINICALLY ENTERED / LOCAL"),
-            ("BMI", p["bmi"] if p else "—", "CLINICALLY ENTERED / LOCAL"),
-            ("Average cycle length", "NOT SUPPLIED", "CLINICALLY ENTERED"),
-            ("Cycle variability", "NOT SUPPLIED", "PATIENT-REPORTED"),
-            ("Hirsutism", "NOT SUPPLIED", "PATIENT-REPORTED"),
-        ]
-        for name, value, src in rows:
-            row = QHBoxLayout()
-            row.addWidget(QLabel(name))
-            row.addStretch()
-            row.addWidget(QLabel(str(value)))
-            row.addWidget(status_badge(src, "neutral"))
-            v.addLayout(row)
-        o.addWidget(box)
-        info = QLabel("Clinical inputs are not inferred from wearable data in this workstation. Production workflows should preserve who entered each value, when, and the audit trail.")
-        info.setObjectName("warning")
-        info.setWordWrap(True)
-        o.addWidget(info)
-        o.addStretch()
-        return w
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Clinical Inputs", "Compact visual cards; values retain their user/clinical provenance."))
+        p=self._shared_patient_profile()
+        top=QGridLayout()
+        fields=[("Age",p.get("age_years"),"years","#5b7cff"),("BMI",p.get("bmi"),"","#ff9f43"),("Systolic BP",p.get("systolic_bp"),"mmHg","#ff4fa3"),("Diastolic BP",p.get("diastolic_bp"),"mmHg","#a86bff"),("Glucose",p.get("glucose_mg_dl"),"mg/dL","#31d7a1"),("Cycle length",p.get("usual_cycle_length_days"),"days","#39c9ff")]
+        for i,(name,val,unit,accent) in enumerate(fields):
+            top.addWidget(metric_card(name,self._fmt(val,f" {unit}",1) if val is not None else "—","USER-ENTERED / PATIENT-REPORTED",accent=accent),0,i)
+        o.addLayout(top)
+        gauge_row=QHBoxLayout()
+        gauge_row.addWidget(RingGauge("PCOD status",100 if p.get("has_pcod") is True else 0,"%","#a86bff"))
+        gauge_row.addWidget(RingGauge("Cycle context",100 if p.get("cycle_irregular") is False else 60 if p.get("cycle_irregular") is True else 0,"%","#ff4fa3"))
+        note=QFrame(); note.setObjectName("card"); nv=QVBoxLayout(note); nv.addWidget(QLabel("STATUS")); nv.addWidget(QLabel("Clinical inputs are not inferred from wearable physiology.")); nv.addWidget(status_badge("SOURCE-TRACKED", "info")); gauge_row.addWidget(note,1)
+        o.addLayout(gauge_row); return w
+
+    def _patient_complications(self):
+        panel = PCODProgressPanel("PCOD Healing & Complications • Current Patient")
+        panel.pcod_status_changed.connect(self._save_pcod_status)
+        panel.set_context(self._shared_patient_profile(), self.feature_history, self.latest_row)
+        return panel
 
     def _patient_reports(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.addWidget(section_header("Reports", "Traceable report assembly keeps observations, quality, models, uncertainty and limitations separate."))
-        card1 = QFrame()
-        card1.setObjectName("card")
-        v = QVBoxLayout(card1)
-        v.addWidget(QLabel("My monitoring / clinical review"))
-        b = QPushButton("Generate report file")
-        b.setObjectName("primary")
-        b.clicked.connect(self._generate_report)
-        v.addWidget(b, 0, Qt.AlignmentFlag.AlignLeft)
-        o.addWidget(card1)
-
-        p = self._profile()
-        txt = "Patient → acquisition → quality → features → baseline → longitudinal → model → uncertainty → limitations"
-        o.addWidget(card("Report structure", txt, "No estimate is promoted to measurement."))
-        if self.current_case:
-            o.addWidget(card("Demo content", "Synthetic showcase", f"{p['pid']} • DEMO_DATA • risk {p['risk']:.0f}%"))
-        else:
-            o.addWidget(card("Live content", "Observations only", "Disease-model output remains NOT RUN in this workstation view."))
-        o.addStretch()
-        return w
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Reports & Export", "Visual report preview with local generation."))
+        p=self._profile()
+        grid=QGridLayout()
+        grid.addWidget(metric_card("Heart rate",self._fmt((self.latest_row or {}).get("hr_bpm")," bpm",0),"Current observation",self._doctor_series("hr_bpm"),"#ff4fa3"),0,0)
+        grid.addWidget(metric_card("HRV",self._fmt((self.latest_row or {}).get("rmssd_ms")," ms",0),"Derived feature",self._doctor_series("rmssd_ms"),"#39c9ff"),0,1)
+        grid.addWidget(RingGauge("Baseline",baseline_summary(self.participant_id)["quality"]*100 if baseline_summary(self.participant_id)["available"] else 0,"%","#31d7a1"),0,2)
+        o.addLayout(grid)
+        o.addWidget(trend_panel("Report-ready trend",self._doctor_series("hr_bpm"),"bpm","#5b7cff",210))
+        row=QHBoxLayout(); b=QPushButton("Generate Report"); b.setObjectName("primary"); b.clicked.connect(self._generate_report); row.addWidget(b); b2=QPushButton("PCOD Healing"); b2.setObjectName("secondary"); b2.clicked.connect(lambda:self._show_patient_tab("PCOD Healing & Complications")); row.addWidget(b2); row.addStretch(); o.addLayout(row); return w
 
     def _generate_report(self):
         p = self._profile()
@@ -1403,25 +1461,15 @@ class DoctorWindow(QMainWindow):
         QMessageBox.information(self, "Report generated", f"Saved locally:\n{path}")
 
     def _patient_notes(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.addWidget(section_header("Notes", "Local-first clinical/research notes. Persist only what your workflow is authorized to store."))
-        self.notes_edit = QTextEdit()
-        self.notes_edit.setPlaceholderText("Write a patient-scoped note…")
-        self.notes_edit.setPlainText(self.note_cache)
-        o.addWidget(self.notes_edit, 1)
-        row = QHBoxLayout()
-        save = QPushButton("Save local note")
-        save.setObjectName("primary")
-        save.clicked.connect(self._save_note)
-        clear = QPushButton("Clear")
-        clear.setObjectName("secondary")
-        clear.clicked.connect(self.notes_edit.clear)
-        row.addWidget(save)
-        row.addWidget(clear)
-        row.addStretch()
-        o.addLayout(row)
-        return w
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Notes & Quick Flags", "Keep the clinical note compact; use visual flags for common observations."))
+        grid=QGridLayout()
+        quick=QFrame(); quick.setObjectName("card"); qv=QVBoxLayout(quick); qv.addWidget(QLabel("QUICK FLAGS"))
+        for label in ["Cycle change","Pelvic symptom","Skin/acne","Mood change","Sleep","Fatigue"]:
+            b=QPushButton(label); b.setObjectName("secondary"); qv.addWidget(b)
+        grid.addWidget(quick,0,0)
+        editor=QFrame(); editor.setObjectName("card"); ev=QVBoxLayout(editor); ev.addWidget(QLabel("PATIENT-SCOPED NOTE")); self.notes_edit=QTextEdit(); self.notes_edit.setPlaceholderText("Add clinician/research note…"); self.notes_edit.setPlainText(self.note_cache); ev.addWidget(self.notes_edit,1); save=QPushButton("Save locally"); save.setObjectName("primary"); save.clicked.connect(self._save_note); ev.addWidget(save,0,Qt.AlignmentFlag.AlignLeft); grid.addWidget(editor,0,1)
+        o.addLayout(grid,1); o.addWidget(status_badge("LOCAL • PATIENT-SCOPED • AUDITABLE", "info")); return w
 
     def _save_note(self):
         self.note_cache = self.notes_edit.toPlainText()
@@ -1436,79 +1484,46 @@ class DoctorWindow(QMainWindow):
         QMessageBox.information(self, "Notes", "Local note saved.")
 
     def _patient_provenance(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.addWidget(section_header("Provenance", "Source labels are displayed next to the data path instead of hidden in metadata."))
-        t = QTableWidget(0, 4)
-        t.setHorizontalHeaderLabels(["Stream / feature", "Provenance", "Current source", "Interpretation boundary"])
-        self._fit_table(t)
-        rows = [
-            ("PPG waveform", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "MAX30102 / demo stream", "Raw signal"),
-            ("Heart rate", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "PPG processing", "Observed / source-derived"),
-            ("HRV RMSSD", "DERIVED", "PPG beat intervals", "Computed feature"),
-            ("GSR / EDA", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "GSR channel / demo", "Conductance proxy"),
-            ("Skin temperature", "MEASURED" if self.mode.mode=="live" else "DEMO_DATA", "DS18B20 / demo", "Validity-gated"),
-            ("Disease-model output", "MODEL-INFERRED / DEMO_DATA", "CHRONO-PCOS", "Only when an actual model run exists"),
-            ("Ultrasound", "IMAGE-DERIVED", self.image_path or "No image attached", "Anatomical inference remains UNKNOWN"),
-        ]
-        for row in rows:
-            r = t.rowCount()
-            t.insertRow(r)
-            for c, val in enumerate(row):
-                t.setItem(r, c, QTableWidgetItem(str(val)))
-        o.addWidget(t, 1)
-        return w
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Data Provenance", "Visual source map so the Doctor can see what is measured, derived or patient-entered."))
+        grid=QGridLayout()
+        for i,(title,value,detail,accent) in enumerate([
+            ("PPG","MEASURED","Wearable source","#ff4fa3"),
+            ("HRV","DERIVED","Beat interval processing","#39c9ff"),
+            ("GSR","MEASURED","Conductance channel","#a86bff"),
+            ("Temperature","MEASURED","Sensor channel","#ff9f43"),
+            ("Clinical","USER-ENTERED","Patient/clinician context","#31d7a1"),
+            ("PCOD status","PATIENT-REPORTED","Self-Learning profile","#7d62ff"),
+        ]):
+            grid.addWidget(metric_card(title,value,detail,accent=accent),i//3,i%3)
+        o.addLayout(grid)
+        o.addWidget(status_badge("No provenance label is promoted into a diagnosis.", "neutral")); return w
 
     def _patient_audit(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.addWidget(section_header("Audit", "Local audit view for this research workstation session."))
-        metrics = QGridLayout()
-        metrics.addWidget(card("Packets received", str(self.packet_count), "Current session"), 0, 0)
-        metrics.addWidget(card("Bridge inbox", str(self.bridge.received_count), "Patient packages received"), 0, 1)
-        metrics.addWidget(card("Mode", "DEMO" if self.mode.mode=="demo" else "LIVE", "Chosen at startup"), 0, 2)
-        metrics.addWidget(card("Model status", "DEMO ONLY" if self.current_case else "NOT RUN", "Clinical validation not established"), 0, 3)
-        o.addLayout(metrics)
-        t = QTableWidget(0, 3)
-        t.setHorizontalHeaderLabels(["Time", "Event", "Detail"])
-        self._fit_table(t)
+        w=QWidget(); o=QVBoxLayout(w); o.setSpacing(10)
+        o.addWidget(section_header("Audit & Session", "Key session state as visual KPIs plus the detailed event table."))
+        g=QGridLayout()
+        g.addWidget(metric_card("Packets",str(self.packet_count),"Current session",accent="#39c9ff"),0,0)
+        g.addWidget(metric_card("Bridge inbox",str(self.bridge.received_count),"Local packages",accent="#31d7a1"),0,1)
+        g.addWidget(metric_card("Mode","DEMO" if self.mode.mode=="demo" else "LIVE","Selected at startup",accent="#a86bff"),0,2)
+        g.addWidget(metric_card("PCOD","YES" if self._shared_patient_profile().get("has_pcod") is True else "NO/UNKNOWN","Patient-reported gate",accent="#ff4fa3"),0,3)
+        o.addLayout(g)
+        t=QTableWidget(0,3); t.setHorizontalHeaderLabels(["Time","Event","Detail"]); self._fit_table(t)
         for row in reversed(self.events):
-            r = t.rowCount()
-            t.insertRow(r)
-            for c, val in enumerate(row):
-                t.setItem(r, c, QTableWidgetItem(str(val)))
-        o.addWidget(t, 1)
-        return w
+            r=t.rowCount(); t.insertRow(r)
+            for col,val in enumerate(row): t.setItem(r,col,QTableWidgetItem(str(val)))
+        o.addWidget(t,1); return w
 
     def _mobile_page(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.setContentsMargins(25, 18, 20, 15)
-        o.addWidget(QLabel("Mobile Link"))
-        o.itemAt(0).widget().setObjectName("title")
-        o.addWidget(QLabel("Pair Patient Android on the same trusted LAN. Research/demo infrastructure only."))
-        info = QGridLayout()
-        self.mobile_endpoint = card("Workstation endpoint", self.bridge.endpoint, "Doctor bridge • port 7777")
-        self.mobile_code = card("Pairing code", self.bridge.pair_code, "Regenerated at bridge restart")
-        self.mobile_received = card("Received packages", str(self.bridge.received_count), "data/bridge/inbox")
-        self.mobile_security = card("Security", "Trusted LAN", "Production needs TLS + strong authentication + audit")
-        for i, f in enumerate([self.mobile_endpoint, self.mobile_code, self.mobile_received, self.mobile_security]):
-            info.addWidget(f, 0, i)
-        o.addLayout(info)
-        copy = QPushButton("Copy pairing instructions")
-        copy.setObjectName("primary")
-        copy.clicked.connect(self._copy_mobile)
-        o.addWidget(copy, 0, Qt.AlignmentFlag.AlignLeft)
-        restart = QPushButton("Restart bridge")
-        restart.setObjectName("secondary")
-        restart.clicked.connect(self._restart_bridge)
-        o.addWidget(restart, 0, Qt.AlignmentFlag.AlignLeft)
-        hint = QLabel("The patient Android transport stays patient-scoped. Its current payload path is intentionally DEMO_DATA.")
-        hint.setObjectName("muted")
-        hint.setWordWrap(True)
-        o.addWidget(hint)
-        o.addStretch()
-        return w
+        w=QWidget(); o=QVBoxLayout(w); o.setContentsMargins(25,18,20,15); o.setSpacing(10)
+        o.addWidget(section_header("Mobile / Patient Link", "Small, clear connection surface."))
+        grid=QGridLayout()
+        grid.addWidget(metric_card("Workstation endpoint",self.bridge.endpoint,"Doctor bridge • port 7777",accent="#39c9ff"),0,0)
+        grid.addWidget(metric_card("Pairing code",self.bridge.pair_code,"Regenerated at bridge restart",accent="#a86bff"),0,1)
+        grid.addWidget(RingGauge("Inbox",min(100,float(self.bridge.received_count)), "", "#31d7a1"),0,2)
+        grid.addWidget(metric_card("Security","TRUSTED LAN","Production needs stronger transport/authentication",accent="#ff9f43"),0,3)
+        o.addLayout(grid)
+        row=QHBoxLayout(); b=QPushButton("Copy pairing"); b.setObjectName("primary"); b.clicked.connect(self._copy_mobile); row.addWidget(b); b2=QPushButton("Restart bridge"); b2.setObjectName("secondary"); b2.clicked.connect(self._restart_bridge); row.addWidget(b2); row.addStretch(); o.addLayout(row); return w
 
     def _copy_mobile(self):
         QApplication.clipboard().setText(
@@ -1529,31 +1544,18 @@ class DoctorWindow(QMainWindow):
         self._log_event("Mobile bridge restarted", self.bridge.endpoint)
 
     def _settings_page(self):
-        w = QWidget()
-        o = QVBoxLayout(w)
-        o.setContentsMargins(25, 18, 20, 15)
-        t = QLabel("Settings")
-        t.setObjectName("title")
-        o.addWidget(t)
-        o.addWidget(QLabel("Workstation preferences, data boundary and research status."))
-        g = QGridLayout()
-        mode = "DEMO MODE" if self.mode.mode == "demo" else f"LIVE SENSOR MODE • {self.mode.port}"
-        g.addWidget(card("Data source", mode, "Selected at startup and fixed for this run"), 0, 0)
-        g.addWidget(card("Transport", self.bridge.endpoint, "Local bridge for Patient Android"), 0, 1)
-        g.addWidget(card("Storage", "LOCAL-FIRST", "Patient-scoped data and reports remain on this workstation"), 0, 2)
-        g.addWidget(card("Validation", "NOT ESTABLISHED", "Research prototype; not a clinical device"), 0, 3)
-        o.addLayout(g)
-        safety = QLabel(
-            "Safety boundary: ENDO-TWIN is the platform; CHRONO-PCOS is its first disease-specific research module. "
-            "Measured, derived, patient-reported, image-derived, model-inferred and demo values must remain distinguishable."
-        )
-        safety.setObjectName("warning")
-        safety.setWordWrap(True)
-        o.addWidget(safety)
-        o.addStretch()
+        w=QWidget(); o=QVBoxLayout(w); o.setContentsMargins(25,18,20,15); o.setSpacing(10)
+        o.addWidget(section_header("Settings & Safety", "Visual status cards with the detailed boundary below."))
+        grid=QGridLayout()
+        mode="DEMO" if self.mode.mode=="demo" else "LIVE"
+        grid.addWidget(metric_card("Data source",mode,"Chosen at startup",accent="#39c9ff"),0,0)
+        grid.addWidget(metric_card("Storage","LOCAL-FIRST","Patient-scoped local data",accent="#31d7a1"),0,1)
+        grid.addWidget(metric_card("Validation","NOT ESTABLISHED","Research prototype",accent="#ff9f43"),0,2)
+        grid.addWidget(metric_card("PCOD gate","YES ONLY","Complications activate only for reported PCOD",accent="#a86bff"),0,3)
+        o.addLayout(grid)
+        o.addWidget(status_badge("Measured • Derived • Patient-reported • Image-derived • Model-inferred • Demo remain distinct.", "info"))
         return w
 
-    # ---------- live updates ----------
     def _on_sample(self, _sample):
         self.packet_count += 1
 
@@ -1569,11 +1571,43 @@ class DoctorWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        self.feature_window_count += 1
+        source = str(row.get("source", "")).lower()
+        if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+            self.feature_history.append(dict(row))
+            self.feature_history = self.feature_history[-1000:]
+        try:
+            source = str(row.get("source", "")).lower()
+            if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
+                self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+                self.personal_model.sync_from_disk()
+                rows = [r for r in self.feature_history[-160:] if str(r.get("gating","")) == "USABLE"]
+                if len(rows) >= 60 and self.personal_model.snapshot()["samples"] % 20 == 0:
+                    cap = BaselineCapture(self.participant_id, duration_s=0, min_samples=60, min_quality=0.45)
+                    cap.accepted_rows = rows[-120:]
+                    cap.started_at = time.time() - 60.0
+                    cap.active = True
+                    cap.finalize(force=True)
+            self.personal_model.sync_from_disk()
+        except Exception as exc:
+            self._log_event("Personal learning warning", str(exc))
+        if hasattr(self, "complications_page"):
+            self.complications_page.set_context(self._shared_patient_profile(), self.feature_history, row)
+        if hasattr(self, "personal_text"):
+            self._refresh_personal_page()
+        if hasattr(self, "patient_tab_widgets"):
+            for widget in self.patient_tab_widgets.values():
+                if isinstance(widget, PCODProgressPanel):
+                    widget.set_context(self._shared_patient_profile(), self.feature_history, row)
+        for key in ("hr_bpm","rmssd_ms","skin_temp_c","gsr_tonic","activity_level","spo2_pct"):
+            graph=self.visual_graphs.get(key)
+            if graph is not None:
+                graph.set_value(row.get(key))
         self.quality_badge.setText("●  " + self._data_quality_text(row.get("signal_quality"))[0])
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
         # Update metric charts when they exist.
-        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
+        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
         for key, value in history_map.items():
             if value is not None:
                 try:
@@ -1607,6 +1641,12 @@ class DoctorWindow(QMainWindow):
                 self.live_patient = self.db.get_patient(local_id)
             except Exception:
                 self.live_patient = None
+        elif isinstance(pid, str) and pid.startswith("TWIN::"):
+            twin_id = pid.split("::", 1)[1]
+            self.live_patient = get_profile(twin_id)
+            self.participant_id = twin_id
+            select_participant(twin_id)
+            self.personal_model.set_participant(twin_id)
         elif self.mode.mode == "demo":
             self.current_case = next((x for x in sorted_cases() if x.patient == pid), None)
             if self.current_case is None:
@@ -1622,6 +1662,29 @@ class DoctorWindow(QMainWindow):
 
         if not self.current_case and not self.live_patient:
             return
+        if self.live_patient:
+            shared_pid = str(
+                self.live_patient.get("anonymous_id")
+                or self.live_patient.get("patient_id")
+                or self.live_patient.get("participant_id")
+                or ""
+            )
+            if shared_pid:
+                twin = get_profile(shared_pid)
+                if not twin:
+                    save_profile({
+                        "participant_id": shared_pid,
+                        "alias": str(self.live_patient.get("display_name") or shared_pid),
+                        "age_years": self.live_patient.get("age_years"),
+                        "bmi": self.live_patient.get("bmi"),
+                        "provenance": "LOCAL-DATABASE",
+                        "updated_at": time.time(),
+                    }, set_active=True)
+                else:
+                    select_participant(shared_pid)
+                self.participant_id = shared_pid
+                self.personal_model.set_participant(shared_pid)
+        self.feature_history = []
         self._log_event("Patient opened", pid)
         self._rebuild_patient_header()
         self._build_patient_tabs()

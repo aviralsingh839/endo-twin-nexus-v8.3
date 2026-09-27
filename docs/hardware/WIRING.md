@@ -4,24 +4,35 @@ The complete physical construction, enclosure dimensions, sensor placement, GSR 
 
 **docs/WEARABLE_AND_MEGA_BUILD_MANUAL.md**
 
-## ESP32-S3 primary wearable
+## ESP32-S3 primary wearable (Adafruit Feather ESP32-S3 2MB PSRAM)
 
-| Module | Connection |
-|---|---|
-| MAX30102 | SDA GPIO8, SCL GPIO9 |
-| MPU6050 | SDA GPIO8, SCL GPIO9 |
-| BME280 | SDA GPIO8, SCL GPIO9 |
-| BH1750 | SDA GPIO8, SCL GPIO9 |
-| GSR module AO | GPIO4 / ADC |
-| Status LED | GPIO2 through 220 Ω resistor |
-| I2C VCC | 3.3 V-compatible supply |
-| Common ground | ESP32-S3 GND |
+The V9 wearable now uses the board's labeled SDA/SCL pins. On this Feather these are GPIO3/GPIO4. GPIO8 is the board's A5/ADC1 pin and is used for analog PPG; GPIO5 (D5) is used for GSR; GPIO6 (D6) is used for DS18B20.
 
-The four I2C devices share the same bus. The wearable uses Wi-Fi/TCP on port 7777.
+| Module | Signal | Feather pin |
+|---|---|---|
+| MPU6050 | SDA | **SDA / GPIO8** |
+| MPU6050 | SCL | **SCL / GPIO9** |
+| BME280 | SDA | **SDA / GPIO8** |
+| BME280 | SCL | **SCL / GPIO9** |
+| BH1750 | SDA | **SDA / GPIO8** |
+| BH1750 | SCL | **SCL / GPIO9** |
+| Analog Pulse Sensor | AO | **GPIO4 / ADC1** |
+| GSR module | AO | **GPIO5 / ADC1** |
+| DS18B20 | DATA | **GPIO6** |
+| Status LED | onboard | `LED_BUILTIN` |
 
+I2C power is supplied through the Feather's I2C power circuit; the V9 firmware explicitly enables `PIN_I2C_POWER` when the board core exposes it.
+
+Expected digital addresses:
+- MPU6050: 0x68 or 0x69
+- BME280: 0x76 or 0x77
+- BH1750: 0x23 or 0x5C
+- MAX17048/LC709203 battery monitor: board-dependent 0x36 or 0x0B
+
+The V9 transport is USB serial at 115200 and Wi-Fi SoftAP `ENDO-TWIN-S3` on TCP port 7777. The wire packet is `$CP3`.
 ## GSR finger electrodes
 
-The electrodes connect to the **GSR module**, not directly to the ESP32 GPIO. The GSR module analog output goes to GPIO4.
+The electrodes connect to the **GSR module**, not directly to the ESP32 GPIO. The GSR module analog output goes to **D5 / GPIO5 (ADC1)**.
 
 Recommended prototype: index-finger electrode + middle-finger electrode, with approximately 20–30 mm center-to-center spacing when the fingers are relaxed.
 

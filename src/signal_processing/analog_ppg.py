@@ -158,7 +158,19 @@ class AnalogPPGProcessor:
         elif hr is None and ac_hr is not None and ac_strength >= 0.35:
             hr=float(ac_hr)
 
-        self.last_ibi_s = ibi.tolist()
+        # Reconstruct valid inter-beat intervals from the detected peak times
+        # for HRV; _peaks() keeps its internal filtering private.
+        ibi = np.diff(np.asarray(peaks, dtype=float)) if len(peaks) >= 2 else np.array([], dtype=float)
+        if ibi.size:
+            ibi = ibi[(ibi >= 60.0 / MAX_HR_BPM) & (ibi <= 60.0 / MIN_HR_BPM)]
+        if ibi.size >= 2:
+            med = float(np.median(ibi))
+            clean = ibi[np.abs(ibi - med) <= 0.25 * med]
+            if clean.size < 2:
+                clean = ibi
+            self.last_ibi_s = clean.tolist()
+        else:
+            self.last_ibi_s = []
 
         # Motion is a reliability penalty, not a physiological value.
         motion_penalty = clamp(1.0 - float(motion_index) / 1.2, 0.0, 1.0)

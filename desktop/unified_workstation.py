@@ -3,6 +3,7 @@
 from __future__ import annotations
 import math, sys, time
 from dataclasses import dataclass
+from types import SimpleNamespace
 from datetime import datetime
 from pathlib import Path
 
@@ -26,10 +27,14 @@ from src.core.feature_extraction import RealtimeFeatureExtractor
 from src.disease_modules.pcos import PCOSModule
 from src.disease_modules.pcos_complications import PCOSComplicationContextEngine
 from src.serial_io.arduino_reader import ArduinoReader
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_capture import BaselineCapture
+from src.personal_twin.profile_store import get_profile, save_profile, select_participant
 from src.serial_io.network_reader import NetworkReader
 from src.utils.demo_stream import DemoSensorStream
 from desktop.unified_engine import DISCLAIMER, context_ready, compute_research_index
 from desktop.model_lab import ModelLabWidget
+from desktop.workstation_runtime import StreamingFeatureProcessor
 
 APP_QSS = """
 QWidget{background:#07111f;color:#edf5f9;font-family:"Noto Sans","DejaVu Sans",sans-serif;}
@@ -116,32 +121,68 @@ class StartupDialog(QDialog):
         self.accept()
 
 class Session(QObject):
-    sample_ready=Signal(object); feature_ready=Signal(object); state_ready=Signal(str); error_ready=Signal(str)
+    sample_ready=Signal(object)
+    feature_ready=Signal(object)
+    state_ready=Signal(str)
+    error_ready=Signal(str)
+    calibration_received=Signal(object)
+
     def __init__(self,cfg,parent=None):
-        super().__init__(parent); self.cfg=cfg; self.reader=None; self.extractor=RealtimeFeatureExtractor()
-        self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
+        super().__init__(parent)
+        self.cfg=cfg
+        self.reader=None
+        self.extractor=StreamingFeatureProcessor()
+        self.samples=0
+        self.packet_errors=0
+        self._last_feature=0.0
+        self.started=time.monotonic()
+        self.last_raw_sample=None
+
     def start(self):
-        self.stop(); self.extractor=RealtimeFeatureExtractor(); self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
+        self.stop()
+        self.extractor=StreamingFeatureProcessor()
+        self.samples=0
+        self.packet_errors=0
+        self._last_feature=0.0
+        self.started=time.monotonic()
         if self.cfg.mode=="demo":
             self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
         elif self.cfg.mode=="wifi":
             self.reader=NetworkReader(self.cfg.host or "192.168.4.1", int(self.cfg.tcp_port or 7777), require_crc=True, parent=self)
         else:
             self.reader=ArduinoReader(self.cfg.port,self.cfg.baud,require_crc=True,parent=self)
-        self.reader.sample_received.connect(self._on_sample); self.reader.state_changed.connect(self.state_ready); self.reader.error_received.connect(self._on_error); self.reader.start()
+        self.reader.sample_received.connect(self._on_sample)
+        if hasattr(self.reader,"calibration_received"):
+            self.reader.calibration_received.connect(self.calibration_received)
+        self.reader.state_changed.connect(self.state_ready)
+        self.reader.error_received.connect(self._on_error)
+        self.reader.start()
+
     def stop(self):
         if self.reader:
             try: self.reader.stop()
             except Exception: pass
         self.reader=None
+
     def command(self,c):
-        if self.reader and hasattr(self.reader,"write_command"): self.reader.write_command(c)
+        if self.reader and hasattr(self.reader,"write_command"):
+            self.reader.write_command(c)
+
     def _on_sample(self,s):
         self.last_raw_sample=s
-        if self.test_active:
-            self.test_rows.append(s)
+        self.samples += 1
+        self.sample_ready.emit(s)
+        try:
+            row=self.extractor.process(s)
+            if row is not None:
+                self._last_feature=time.monotonic()
+                self.feature_ready.emit(SimpleNamespace(**row))
+        except Exception as exc:
+            self._on_error(f"Feature processing failed: {exc}")
+
     def _on_error(self,msg):
-        if "Packet parse error" in msg or "crc" in msg.lower(): self.packet_errors+=1
+        if "Packet parse error" in msg or "crc" in msg.lower():
+            self.packet_errors+=1
         self.error_ready.emit(msg)
 
 class AddPatientDialog(QDialog):
@@ -161,10 +202,38 @@ class AddPatientDialog(QDialog):
 
 class UnifiedWorkstation(QMainWindow):
     def __init__(self,cfg):
-        super().__init__(); self.cfg=cfg; self.db=LocalDatabase(); self.pcos=PCOSModule(); self.complication_engine=PCOSComplicationContextEngine(); self.current=None; self.latest=None; self.last_raw_sample=None; self.test_active=False; self.test_rows=[]; self.test_features=[]; self.test_start=0.0
+        super().__init__()
+        self.cfg=cfg
+        self.db=LocalDatabase()
+        self.pcos=PCOSModule()
+        self.complication_engine=PCOSComplicationContextEngine()
+        self.current=None
+        self.latest=None
+        self.last_raw_sample=None
+        self.test_active=False
+        self.test_rows=[]
+        self.test_features=[]
+        self.test_start=0.0
+        self.participant_id="LOCAL-PARTICIPANT"
+        self.personal_model=PersonalAdaptiveModel(self.participant_id)
+        self.baseline_capture=BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
         self.setWindowTitle("ENDO-TWIN NEXUS — V8.7 Unified Workstation"); self.resize(1580,940); self.setMinimumSize(1180,760); self.setStyleSheet(APP_QSS)
-        self.session=Session(cfg,self); self.session.sample_ready.connect(self._on_sample); self.session.feature_ready.connect(self._on_feature); self.session.state_ready.connect(self._on_state); self.session.error_ready.connect(self._on_error)
-        self._build(); self._seed_demo(); self._refresh_roster(); self.session.start(); self._timer=QTimer(self); self._timer.timeout.connect(self._tick); self._timer.start(250)
+        self.session=Session(cfg,self)
+        self.session.sample_ready.connect(self._on_sample)
+        self.session.feature_ready.connect(self._on_feature)
+        self.session.state_ready.connect(self._on_state)
+        self.session.error_ready.connect(self._on_error)
+        self.session.calibration_received.connect(self._on_ppg_calibration)
+        self._build()
+        self._seed_demo()
+        self._refresh_roster()
+        self.session.start()
+        self._timer=QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(250)
+        self._baseline_timer=QTimer(self)
+        self._baseline_timer.timeout.connect(self._update_baseline_capture_ui)
+        self._baseline_timer.start(500)
     def closeEvent(self,e): self.session.stop(); self.db.close(); e.accept()
     def _build(self):
         root=QWidget(); shell=QGridLayout(root); shell.setContentsMargins(0,0,0,0); shell.setSpacing(0); self.setCentralWidget(root)
@@ -197,7 +266,7 @@ class UnifiedWorkstation(QMainWindow):
         for i,(k,t,d) in enumerate([
             ("hr_bpm","Heart rate","Analog PPG / ECG when available"),
             ("rmssd_ms","HRV RMSSD","Quality-gated pulse variability"),
-            ("skin_temp_c","Skin temperature","Only when a skin-temp channel exists"),
+            ("skin_temp_c","Temperature","Skin or room sensor channel; CP3 uses BME280 room temperature"),
             ("activity_level","Activity","MPU6050-derived"),
             ("gsr_tonic","GSR / EDA","ADC-domain tonic context"),
             ("signal_quality","Signal quality","Composite engineering quality"),
@@ -216,6 +285,12 @@ class UnifiedWorkstation(QMainWindow):
         self.cal_btn=QPushButton("Recalibrate now"); self.cal_btn.setObjectName("secondary"); self.cal_btn.clicked.connect(self._recalibrate); ch.addWidget(self.cal_btn); cv.addLayout(ch)
         self.cal_progress=QProgressBar(); self.cal_progress.setRange(0,100); self.cal_progress.setValue(0); self.cal_progress.setTextVisible(True); cv.addWidget(self.cal_progress)
         self.cal_status=QLabel("Waiting for wearable data…"); self.cal_status.setObjectName("muted"); self.cal_status.setWordWrap(True); cv.addWidget(self.cal_status)
+        self.baseline_status=QLabel("Select a patient and start a 60 s real-data baseline capture."); self.baseline_status.setObjectName("muted"); self.baseline_status.setWordWrap(True); cv.addWidget(self.baseline_status)
+        self.baseline_progress=QProgressBar(); self.baseline_progress.setRange(0,100); self.baseline_progress.setValue(0); cv.addWidget(self.baseline_progress)
+        brow=QHBoxLayout()
+        bstart=QPushButton("Start 60 s Patient Baseline"); bstart.setObjectName("primary"); bstart.clicked.connect(self._start_baseline_capture); brow.addWidget(bstart)
+        bstop=QPushButton("Stop & Save"); bstop.setObjectName("secondary"); bstop.clicked.connect(self._stop_baseline_capture); brow.addWidget(bstop)
+        brow.addStretch(); cv.addLayout(brow)
         self.cal_table=QTableWidget(0,4); self.cal_table.setHorizontalHeaderLabels(["Channel","Mode","State","Baseline / scale"]); self.cal_table.setMaximumHeight(235); cv.addWidget(self.cal_table)
         v.addWidget(cal)
 
@@ -325,7 +400,11 @@ class UnifiedWorkstation(QMainWindow):
             vals=[p.get("anonymous_id","—"),p.get("display_name") or "—",p.get("age_years","—"),p.get("bmi","—"),cyc,"READY" if ok else "INCOMPLETE",datetime.fromtimestamp(p.get("updated_at",time.time())).strftime("%Y-%m-%d %H:%M")]
             for c,x in enumerate(vals): self.roster.setItem(r,c,QTableWidgetItem(str(x)))
         self.roster.resizeColumnsToContents()
-    def _select(self,row): self.current=self._enrich(self._rows[row]); self._refresh_current(); self._go("patient")
+    def _select(self,row):
+        self.current=self._enrich(self._rows[row])
+        self._set_personal_context(self.current)
+        self._refresh_current()
+        self._go("patient")
     def _add_patient(self):
         d=AddPatientDialog(self)
         if d.exec()!=QDialog.DialogCode.Accepted:return
@@ -333,8 +412,69 @@ class UnifiedWorkstation(QMainWindow):
         try:
             pid=self.db.create_patient(display_name=val["display_name"],age_years=val["age_years"],bmi=val["bmi"],anonymous_id=val["anonymous_id"])
             import json; now=time.time(); self.db.conn.execute("INSERT INTO profiles(profile_id,patient_id,data_json,label,created_at,updated_at) VALUES(?,?,?,?,?,?)",(f"profile-{pid}",pid,json.dumps(val),"CLINICALLY-ENTERED",now,now)); self.db.conn.commit()
-            self.current=self._enrich(self.db.get_patient(pid)); self.current.update(val); self._refresh_roster(); self._refresh_current(); self._go("patient")
+            self.current=self._enrich(self.db.get_patient(pid))
+            self.current.update(val)
+            self._set_personal_context(self.current)
+            self._refresh_roster()
+            self._refresh_current()
+            self._go("patient")
         except Exception as e: QMessageBox.critical(self,"Add patient",str(e))
+    def _set_personal_context(self, patient):
+        if not patient:
+            return
+        pid=str(patient.get("anonymous_id") or patient.get("participant_id") or patient.get("patient_id") or "LOCAL-PARTICIPANT")
+        self.participant_id=pid
+        profile=get_profile(pid)
+        if not profile:
+            profile={
+                "participant_id":pid,
+                "alias":patient.get("display_name") or pid,
+                "age_years":patient.get("age_years"),
+                "bmi":patient.get("bmi"),
+                "updated_at":time.time(),
+            }
+            save_profile(profile, set_active=True)
+        else:
+            select_participant(pid)
+        self.personal_model.set_participant(pid)
+        self.baseline_capture=BaselineCapture(pid, duration_s=60.0, min_samples=60, min_quality=0.45)
+
+    def _start_baseline_capture(self):
+        if not self.current or self.current.get("demo"):
+            return
+        if self.cfg.mode == "demo":
+            self.baseline_status.setText("LIVE SENSOR mode is required. Demo data is excluded.")
+            return
+        self.baseline_capture=BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
+        self.baseline_capture.start()
+        self.baseline_progress.setValue(0)
+        self.baseline_status.setText(f"Capturing baseline for {self.participant_id} • keep sensor contact stable.")
+
+    def _stop_baseline_capture(self):
+        result=self.baseline_capture.stop()
+        if result.get("ready"):
+            self.baseline_progress.setValue(100)
+            self.baseline_status.setText(
+                f"Saved {result['samples']} windows • quality {result['quality']*100:.0f}% • "
+                f"confidence {result['confidence']:.2f} • patient-scoped local storage"
+            )
+        else:
+            self.baseline_status.setText("Baseline not saved • " + str(result.get("error","Need more valid live windows.")))
+
+    def _update_baseline_capture_ui(self):
+        if not hasattr(self,"baseline_progress"):
+            return
+        if self.baseline_capture.active:
+            self.baseline_progress.setValue(int(self.baseline_capture.progress*100))
+            self.baseline_status.setText(
+                f"Capturing baseline for {self.participant_id} • "
+                f"{self.baseline_capture.accepted} quality-gated windows • "
+                f"{self.baseline_capture.progress*100:.0f}%"
+            )
+
+    def _on_ppg_calibration(self,event):
+        self.state_lbl.setText(f"PPG CALIBRATED • {event.profile_id} • quality {event.quality:.0f}%")
+
     def _edit_current(self):
         if not self.current or self.current.get("demo"): QMessageBox.information(self,"Demo patient","The demo context is fixed and labelled DEMO_DATA."); return
         d=AddPatientDialog(self); p=self.current; d.alias.setText(p.get("display_name") or ""); d.anon.setText(p.get("anonymous_id") or ""); d.age.setValue(float(p.get("age_years") or 23)); d.bmi.setValue(float(p.get("bmi") or 24)); d.clen.setValue(int(p.get("cycle_length") or 0)); d.ypm.setValue(float(p.get("years_post_menarche") or 0)); d.hyper.setChecked(bool(p.get("hyperandrogenism"))); d.pcom.setChecked(bool(p.get("pcom_present"))); d.excl.setChecked(bool(p.get("exclusions_completed")))
@@ -350,21 +490,43 @@ class UnifiedWorkstation(QMainWindow):
         if not self.current:return
         self.patient_lbl.setText(f"Patient: {self.current.get('anonymous_id','—')}"); ok,msg=context_ready(self.current); self.context.setText(f"ID {self.current.get('anonymous_id')} • age {self.current.get('age_years','—')} • BMI {self.current.get('bmi','—')} • evidence gate: {'READY' if ok else 'INCOMPLETE'} — {msg}"); self._compute_risk(); self.doctor_summary.setPlainText(f"{self.current.get('anonymous_id')}\n\n{DISCLAIMER}\n\n{msg}")
     def _on_sample(self,s):
-        if self.test_active:self.test_rows.append(s)
+        self.last_raw_sample=s
+        if self.test_active:
+            self.test_rows.append(s)
+
     def _on_feature(self,f):
         self.latest=f
-        for k,val in [("hr_bpm",f.hr_bpm),("rmssd_ms",f.rmssd_ms),("skin_temp_c",f.skin_temp_c),("activity_level",f.activity_level),("gsr_tonic",f.gsr_tonic),("signal_quality",f.signal_quality)]:
+        source=str(getattr(f,"source","")).lower()
+        if self.current and source not in {"demo","synthetic"} and not source.startswith("demo"):
+            row=f.__dict__.copy()
+            result=self.baseline_capture.add_row(row)
+            if result is not None:
+                if result.get("ready"):
+                    self.baseline_progress.setValue(100)
+                    self.baseline_status.setText(
+                        f"Baseline saved for {self.participant_id} • {result['samples']} windows • "
+                        f"quality {result['quality']*100:.0f}% • confidence {result['confidence']:.2f}"
+                    )
+                else:
+                    self.baseline_status.setText("Baseline not saved • " + str(result.get("error","Need more valid live windows.")))
+            try:
+                self.personal_model.observe(f, quality=getattr(f,"signal_quality",0.0))
+            except Exception as exc:
+                self._on_error(f"Personal Twin learning failed: {exc}")
+        if self.test_active:
+            self.test_features.append(f)
+        for k,val in [("hr_bpm",getattr(f,"hr_bpm",None)),("rmssd_ms",getattr(f,"rmssd_ms",None)),("skin_temp_c",getattr(f,"skin_temp_c",None)),("activity_level",getattr(f,"activity_level",None)),("gsr_tonic",getattr(f,"gsr_tonic",None)),("signal_quality",getattr(f,"signal_quality",None))]:
             if k in self.metrics:self._set_metric(k,val)
-        self.quality.setText(f"Quality {float(f.signal_quality)*100:.0f}%")
+        self.quality.setText(f"Quality {float(getattr(f,'signal_quality',0.0))*100:.0f}%")
         self.lab_packets.findChildren(QLabel)[1].setText(str(self.session.samples))
-        self.lab_q.findChildren(QLabel)[1].setText(f"{float(f.signal_quality)*100:.0f}%")
-        self.timeline.append(f"{datetime.now().strftime('%H:%M:%S')} • HR {f.hr_bpm if f.hr_bpm is not None else 'UNKNOWN'} • quality {f.signal_quality:.2f}") if hasattr(self,"timeline") else None
+        self.lab_q.findChildren(QLabel)[1].setText(f"{float(getattr(f,'signal_quality',0.0))*100:.0f}%")
+        self.timeline.append(f"{datetime.now().strftime('%H:%M:%S')} • HR {getattr(f,'hr_bpm',None) if getattr(f,'hr_bpm',None) is not None else 'UNKNOWN'} • quality {getattr(f,'signal_quality',0.0):.2f}") if hasattr(self,"timeline") else None
 
-        self.cal_progress.setValue(int(round(float(f.calibration_ready_fraction)*100)))
-        self.cal_badge.setText(f"AUTO-CALIBRATION • {f.calibration_status.replace('_',' ')}")
+        self.cal_progress.setValue(int(round(float(getattr(f,'calibration_ready_fraction',0.0))*100)))
+        self.cal_badge.setText(f"AUTO-CALIBRATION • {str(getattr(f,'calibration_status','WARMING_UP')).replace('_',' ')}")
         self.cal_status.setText(
-            f"Calibration readiness {float(f.calibration_ready_fraction)*100:.0f}% • "
-            f"status {f.calibration_status}. Raw packets are retained; calibrated values are used for analysis."
+            f"Calibration readiness {float(getattr(f,'calibration_ready_fraction',0.0))*100:.0f}% • "
+            f"status {getattr(f,'calibration_status','WARMING_UP')}. Raw packets are retained; calibrated values are used for analysis."
         )
         self._refresh_calibration_table(f)
 
@@ -372,7 +534,6 @@ class UnifiedWorkstation(QMainWindow):
         if len(t):
             self.ppg_curve.setData(t,y)
             self.ppg_mode.setText("ANALOG PPG • GPIO4" if getattr(self.last_raw_sample,"analog_ppg_raw",None) is not None else "DIGITAL PPG COMPATIBILITY")
-        if self.test_active:self.test_features.append(f)
         self._refresh_complications()
         self._compute_risk()
 

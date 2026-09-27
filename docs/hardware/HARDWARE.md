@@ -4,7 +4,7 @@
 
 | Controller | Role | Active |
 |---|---|---|
-| **ESP32-S3-DevKitC-1** | **Primary wireless wearable** | YES |
+| **Adafruit Feather ESP32-S3 2MB PSRAM** | **Primary wireless wearable** | YES |
 | **Arduino Mega 2560** | Bench / lab / expanded controller | YES |
 | ESP8266 | Superseded wearable implementation | Legacy |
 | ESP32 original wearable | Historical implementation | Legacy |
@@ -16,20 +16,26 @@ Firmware:
 `hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
 
 Sensors:
-- MAX30102 PPG
-- MPU6050 IMU
-- BME280 temperature/humidity/pressure
-- BH1750 ambient light
-- GSR/EDA with external finger electrodes
+- Analog Pulse Sensor / PPG: **GPIO4 / ADC1**
+- GSR/EDA module analog output: **GPIO5 / ADC1**
+- DS18B20: **GPIO6**
+- MPU6050: I2C on **SDA GPIO8 / SCL GPIO9**
+- BME280: I2C on **SDA GPIO3 / SCL GPIO4**
+- BH1750: I2C on **SDA GPIO3 / SCL GPIO4**
+
+Expected I2C addresses:
+- MPU6050: 0x68 or 0x69
+- BME280: 0x76 or 0x77
+- BH1750: 0x23 or 0x5C
 
 Transport:
 - USB serial 115200
 - Wi-Fi SoftAP `ENDO-TWIN-S3`
 - password `endotwins3`
 - TCP port 7777
+- V9 packet: `$CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,skinT,roomT,hum,press,lux,status,crc`
 
-The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP2/TCP architecture can be retained. 
-
+The V9 firmware uses the Feather's native I2C pins instead of generic ESP32 DevKit pins. The single analog PPG channel is used for pulse/HR/HRV research features; conventional SpO2 is not computed from one analog channel.
 ## Mega hub
 
 Firmware:

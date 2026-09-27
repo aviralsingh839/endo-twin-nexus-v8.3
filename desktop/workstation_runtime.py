@@ -5,14 +5,17 @@ from collections import deque
 import math
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from src.serial_io.arduino_reader import ArduinoReader
+from src.serial_io.network_reader import NetworkReader
 from src.serial_io.packet_parser import decode_status_flags
 from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.imu import IMUProcessor
 from src.signal_processing.ppg import PPGProcessor
+from src.signal_processing.analog_ppg import AnalogPPGProcessor
+from src.core.raw_calibration import RawAutoCalibrator
 from src.signal_processing.temperature import TemperatureProcessor
 from src.utils.demo_stream import DemoSensorStream
 
@@ -20,6 +23,8 @@ from src.utils.demo_stream import DemoSensorStream
 class ModeConfig:
     mode: str = "demo"
     port: str = ""
+    host: str = "192.168.4.1"
+    tcp_port: int = 7777
     baud: int = 115200
 
 class ModeDialog(QDialog):
@@ -33,9 +38,17 @@ class ModeDialog(QDialog):
         root=QVBoxLayout(self); root.setContentsMargins(30,28,30,28); root.setSpacing(16)
         h=QLabel("Choose data mode"); h.setObjectName("modeTitle"); root.addWidget(h)
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
+        wifi = QFrame(); wifi.setObjectName("hero")
+        wl = QVBoxLayout(wifi); wl.setContentsMargins(18,16,18,16); wl.setSpacing(7)
+        for txt,obj in [("ESP32 WI-FI","eyebrow"),("Direct TCP wearable","metricValue")]:
+            x=QLabel(txt); x.setObjectName(obj); x.setWordWrap(True); wl.addWidget(x)
+        wc=QLabel("Connect directly to the ESP32-S3 SoftAP at 192.168.4.1:7777. Uses the same CRC packet parser as USB.")
+        wc.setObjectName("muted"); wc.setWordWrap(True); wl.addWidget(wc)
+        wb=QPushButton("Open Wi-Fi"); wb.setObjectName("primary"); wb.clicked.connect(lambda:self._accept("wifi")); wl.addWidget(wb)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(wifi)
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)
@@ -44,7 +57,7 @@ class ModeDialog(QDialog):
         b=QPushButton("Refresh"); b.setObjectName("secondary"); b.clicked.connect(self.refresh_ports)
         line.addWidget(self.port,1); line.addWidget(detect); line.addWidget(b); lv.addLayout(line)
         self.port_status=QLabel("Detecting USB serial devices…"); self.port_status.setObjectName("muted"); self.port_status.setWordWrap(True); lv.addWidget(self.port_status)
-        n=QLabel("Active hardware: ESP32-S3 primary wearable or Arduino Mega bench/lab controller. Both emit the canonical ~20 packets/s CP2 stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
+        n=QLabel("Active hardware: ESP32-S3 primary wearable or Arduino Mega bench/lab controller. The V9 ESP32-S3 emits the CP3 analog wearable stream; compatible Mega/legacy paths may use CP2. Sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
         root.addWidget(box)
         self.refresh_ports()
         self.auto_detect_port()
@@ -77,6 +90,10 @@ class ModeDialog(QDialog):
         self.port_status.setText(f"Auto-detected USB serial device: {selected}")
 
     def _accept(self,mode):
+        if mode=="wifi":
+            self.choice=ModeConfig(mode="wifi", host="192.168.4.1", tcp_port=7777)
+            self.accept()
+            return
         if mode=="live" and not self.port.currentText().strip():
             self.auto_detect_port()
         if mode=="live" and not self.port.currentText().strip():
@@ -95,9 +112,11 @@ QComboBox{background:#091827;border:1px solid #1c3a52;border-radius:10px;padding
 """
 
 class StreamingFeatureProcessor:
-    """Decode-ready feature layer with sensor-specific sampling and quality gates."""
+    """Decode-ready feature layer shared by doctor/patient desktop workstations."""
     def __init__(self):
         self.ppg=PPGProcessor(history_s=180,fs_hz=20.0)
+        self.analog_ppg=AnalogPPGProcessor(history_s=180,fs_hz=20.0)
+        self.calibrator=RawAutoCalibrator()
         self.imu=IMUProcessor(history_s=180,fs_hz=20.0)
         self.gsr=GSRProcessor(history_s=600,fs_hz=10.0)
         self.temp=TemperatureProcessor(history_s=3600)
@@ -110,53 +129,92 @@ class StreamingFeatureProcessor:
     def reset(self):
         self.__init__()
 
+    def ppg_waveform(self, last_s: float = 18.0):
+        """Return the active PPG processor waveform for the live UI."""
+        if self.analog_ppg.times:
+            return self.analog_ppg.waveform(last_s=last_s)
+        return self.ppg.waveform(last_s=last_s)
+
     def process(self,sample):
         self.samples+=1
         ts=float(sample.timestamp_s)
         self.times.append(ts)
+        self.calibrator.update(sample)
+        cal=self.calibrator.transform_sample(sample)
 
-        # PPG and IMU follow the received workstation packet stream (~20 Hz).
-        self.ppg.add_sample(ts,sample.ir,sample.red)
-        self.imu.add_sample(ts,sample.ax_g,sample.ay_g,sample.az_g,sample.gx_dps,sample.gy_dps,sample.gz_dps)
+        imu_vals=[cal.get(k) for k in ("ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps")]
+        if all(v is not None for v in imu_vals):
+            self.imu.add_sample(ts,*[float(v) for v in imu_vals])
 
-        # Do not oversample slower channels merely because the transport packet is faster.
+        use_analog=getattr(sample,"analog_ppg_raw",None) is not None
+        if use_analog:
+            ap=cal.get("analog_ppg_raw")
+            if ap is not None:
+                self.analog_ppg.add_sample(ts,float(ap))
+        else:
+            self.ppg.add_sample(ts,sample.ir,sample.red)
+
         if self.last_gsr_ts<=0.0 or ts-self.last_gsr_ts>=0.10:
             self.gsr.add_sample(ts,sample.gsr_raw)
             self.last_gsr_ts=ts
-        if self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0:
-            self.temp.add_sample(ts,sample.temp_c)
+
+        # Prefer the direct DS18B20 channel when present; otherwise use BME280 room temperature.
+        temp_sample = getattr(sample,"temp_c",None)
+        if temp_sample is None or not math.isfinite(float(temp_sample)):
+            temp_sample = getattr(sample,"room_temp_c",None)
+        if (self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0) and temp_sample is not None:
+            try:
+                value=float(temp_sample)
+                if math.isfinite(value):
+                    self.temp.add_sample(ts,value)
+            except (TypeError,ValueError):
+                pass
             self.last_temp_ts=ts
 
         if ts-self.last_emit<0.5:
             return None
         self.last_emit=ts
 
+        imu_available=bool(self.imu.times)
         motion=self.imu.features(10.0)
-        ppg=self.ppg.features(motion_index=motion["motion_index"])
+        ppg=(self.analog_ppg.features(motion_index=motion["motion_index"]) if use_analog
+             else self.ppg.features(motion_index=motion["motion_index"]))
         gsr=self.gsr.features(60.0)
-        temp=self.temp.features(300.0)
 
         ppg_q=float(ppg.get("ppg_quality") or 0.0)
         flags=decode_status_flags(int(sample.status))
-        ppg_absent=any("PPG finger absent" in x for x in flags)
+        ppg_low=any("PPG" in x and ("absent" in x.lower() or "low" in x.lower()) for x in flags)
         ppg_sat=any("PPG saturated" in x for x in flags)
         gsr_bad=any("GSR saturated" in x for x in flags)
-        temp_bad=any("DS18B20 error" in x for x in flags)
-
-        if ppg_absent: ppg_q*=0.35
+        if ppg_low: ppg_q*=0.35
         if ppg_sat: ppg_q*=0.50
 
-        gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>1018 else 1.0
-        temp_q=0.0 if temp_bad else (1.0 if temp.get("skin_temp_c") is not None else 0.0)
-        motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45))
+        gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>4090 else 1.0
+        motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45)) if imu_available else 0.0
+        skin_value=getattr(sample,"temp_c",None)
+        room_value=getattr(sample,"room_temp_c",None)
+        skin_q=1.0 if skin_value is not None and math.isfinite(float(skin_value)) else 0.0
+        room_q=1.0 if room_value is not None and math.isfinite(float(room_value)) else 0.0
+        temp_value=skin_value if skin_q>0.0 else room_value
+        temp_q=max(skin_q,room_q)
+        components=[]
+        if ppg_q>0.0:
+            components.append((ppg_q,0.55))
+        if gsr_q>0.0:
+            components.append((gsr_q,0.20))
+        if motion_q>0.0:
+            components.append((motion_q,0.15))
+        if temp_q>0.0:
+            components.append((temp_q,0.10))
+        weight_sum=sum(w for _,w in components)
+        quality=max(0.0,min(1.0,sum(v*w for v,w in components)/weight_sum)) if weight_sum else 0.0
+        ppg_usable=ppg_q>=0.45 and not ppg_low and not ppg_sat
+        usable=quality>=0.45
 
-        quality=max(0.0,min(1.0,0.65*ppg_q+0.12*gsr_q+0.10*temp_q+0.13*motion_q))
-        usable=quality>=0.45 and not ppg_absent and not ppg_sat
-
-        hr=ppg.get("hr_bpm") if usable else None
-        rmssd=ppg.get("rmssd_ms") if usable else None
-        sdnn=ppg.get("sdnn_ms") if usable else None
-        spo2=ppg.get("spo2_pct") if quality>=0.55 and not ppg_absent and not ppg_sat else None
+        hr=ppg.get("hr_bpm") if ppg_usable else None
+        rmssd=ppg.get("rmssd_ms") if ppg_usable else None
+        sdnn=ppg.get("sdnn_ms") if ppg_usable else None
+        spo2=None if use_analog else (ppg.get("spo2_pct") if quality>=0.55 and not ppg_low and not ppg_sat else None)
 
         rate=None
         if len(self.times)>=5:
@@ -170,25 +228,31 @@ class StreamingFeatureProcessor:
             "rmssd_ms":rmssd,
             "sdnn_ms":sdnn,
             "spo2_pct":spo2,
-            "skin_temp_c":temp.get("skin_temp_c"),
-            "temp_slope_c_per_min":temp.get("temp_slope_c_per_min",0.0),
+            "skin_temp_c":skin_value if skin_q>0.0 else None,
+            "temperature_provenance":"SKIN_SENSOR" if skin_q>0.0 else ("ROOM_SENSOR" if room_q>0.0 else "UNKNOWN"),
+            "room_temp_c":getattr(sample,"room_temp_c",None),
+            "humidity_pct":getattr(sample,"humidity_pct",None),
+            "pressure_hpa":getattr(sample,"pressure_hpa",None),
+            "lux":getattr(sample,"lux",None),
             "gsr_tonic":gsr.get("gsr_tonic"),
             "gsr_phasic_per_min":gsr.get("gsr_phasic_per_min",0.0),
             "motion_index":motion.get("motion_index",0.0),
             "activity_level":motion.get("activity_level",0.0),
             "signal_quality":quality,
             "ppg_quality":ppg_q,
+            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": imu_available, "temperature": temp_q > 0.0, "skin_temperature": skin_q > 0.0, "room_temperature": room_q > 0.0},
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
+            "raw_analog_ppg":getattr(sample,"analog_ppg_raw",None),
             "gsr_raw":sample.gsr_raw,
             "status_flags":flags,
             "source":sample.source,
             "status":int(sample.status),
             "ecg_raw":sample.ecg_raw,
-            "room_temp_c":sample.room_temp_c,
-            "humidity_pct":sample.humidity_pct,
-            "pressure_hpa":sample.pressure_hpa,
+            "ppg_mode":"ANALOG_GPIO8" if use_analog else "DIGITAL_MAX30102_COMPAT",
+            "calibration_status":self.calibrator.status,
+            "calibration_ready_fraction":self.calibrator.ready_fraction,
             "provenance":"DEMO_DATA" if sample.source=="demo" else "MEASURED",
             "gating":"USABLE" if usable else "QUALITY_GATE",
             "derived_provenance":"DERIVED"
@@ -199,6 +263,7 @@ class LiveSession(QObject):
     sample_received=Signal(object)
     state_changed=Signal(str)
     error_received=Signal(str)
+    calibration_received=Signal(object)
 
     def __init__(self,mode:ModeConfig,parent=None):
         super().__init__(parent)
@@ -206,8 +271,15 @@ class LiveSession(QObject):
 
     def start(self):
         self.processor.reset()
-        self.reader=DemoSensorStream(fs_hz=20.0,parent=self) if self.mode.mode=="demo" else ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
+        if self.mode.mode=="demo":
+            self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
+        elif self.mode.mode=="wifi":
+            self.reader=NetworkReader(self.mode.host, self.mode.tcp_port, require_crc=True, parent=self)
+        else:
+            self.reader=ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample)
+        if hasattr(self.reader, "calibration_received"):
+            self.reader.calibration_received.connect(self.calibration_received)
         self.reader.state_changed.connect(self.state_changed)
         self.reader.error_received.connect(self.error_received)
         self.reader.start()
@@ -254,3 +326,104 @@ class Sparkline(QWidget):
         p.setPen(QPen(QColor(self.line),2)); p.drawPath(path)
         p.setPen(QColor("#eaf2f7")); p.drawText(r.left()+8,r.top()+18,f"{self.label}  {self.unit}")
         p.setPen(QColor("#91a7b7")); p.drawText(r.right()-145,r.top()+18,f"Latest  {vals[-1]:.1f}")
+
+
+class RingGauge(QWidget):
+    """Compact radial KPI widget used by the desktop presentation layer."""
+    def __init__(self, title: str, value: float | None = None, suffix: str = "%", accent: str = "#5b3cff", parent=None):
+        super().__init__(parent)
+        self.title = title
+        self.value = value
+        self.suffix = suffix
+        self.accent = accent
+        self.setMinimumSize(150, 150)
+
+    def set_value(self, value: float | None):
+        self.value = value
+        self.update()
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        side = min(self.width(), self.height()) - 22
+        cx = self.width() / 2
+        cy = self.height() / 2 - 5
+        rect = int(cx - side / 2), int(cy - side / 2), int(side), int(side)
+        p.setPen(QPen(QColor("#1c2947"), 11, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawArc(*rect, 0, 360 * 16)
+        if self.value is not None:
+            pct = max(0.0, min(100.0, float(self.value)))
+            p.setPen(QPen(QColor(self.accent), 11, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawArc(*rect, 90 * 16, int(-pct * 360 * 16 / 100.0))
+        p.setPen(QColor("#f4f8ff"))
+        font = QFont(self.font())
+        font.setPointSize(19)
+        font.setBold(True)
+        p.setFont(font)
+        shown = "—" if self.value is None else f"{float(self.value):.0f}{self.suffix}"
+        p.drawText(self.rect().adjusted(0, -2, 0, 10), Qt.AlignmentFlag.AlignCenter, shown)
+        p.setPen(QColor("#8ea6c2"))
+        font.setPointSize(8)
+        font.setBold(True)
+        p.setFont(font)
+        p.drawText(self.width() // 2 - 70, int(cy + side / 2 / 1.25), 140, 22, Qt.AlignmentFlag.AlignCenter, self.title)
+
+
+def metric_card(title: str, value: str, detail: str, values=None,
+                accent: str = "#39c9ff", unit: str = "") -> QFrame:
+    frame = QFrame()
+    frame.setObjectName("card")
+    outer = QVBoxLayout(frame)
+    outer.setContentsMargins(13, 11, 13, 11)
+    head = QHBoxLayout()
+    label = QLabel(title)
+    label.setObjectName("sectionTitle")
+    head.addWidget(label)
+    head.addStretch()
+    outer.addLayout(head)
+    row = QHBoxLayout()
+    value_label = QLabel(str(value))
+    value_label.setObjectName("bigValue")
+    value_label.setStyleSheet(f"color:{accent};")
+    row.addWidget(value_label)
+    row.addStretch()
+    if values is not None:
+        chart = Sparkline(title, unit, line=accent)
+        chart.setMinimumHeight(60)
+        chart.setMaximumHeight(78)
+        chart.set_values(list(values))
+        row.addWidget(chart, 1)
+    frame.value_label = value_label
+    frame.detail_label = detail_label = QLabel(str(detail))
+    detail_label.setObjectName("muted")
+    detail_label.setWordWrap(True)
+    outer.addWidget(detail_label)
+    return frame
+
+
+def trend_panel(title: str, values=None, unit: str = "",
+                accent: str = "#39c9ff", height: int = 185) -> QFrame:
+    frame = QFrame()
+    frame.setObjectName("card")
+    layout = QVBoxLayout(frame)
+    layout.setContentsMargins(12, 10, 12, 10)
+    top = QHBoxLayout()
+    label = QLabel(title)
+    label.setObjectName("sectionTitle")
+    top.addWidget(label)
+    top.addStretch()
+    latest = QLabel("Latest —")
+    latest.setObjectName("muted")
+    top.addWidget(latest)
+    layout.addLayout(top)
+    graph = Sparkline(title, unit, line=accent)
+    graph.setMinimumHeight(height)
+    graph.setMaximumHeight(height + 25)
+    if values:
+        data = list(values)
+        graph.set_values(data)
+        latest.setText(f"Latest {data[-1]:.1f}{unit}")
+    layout.addWidget(graph, 1)
+    frame.graph = graph
+    frame.latest_label = latest
+    return frame

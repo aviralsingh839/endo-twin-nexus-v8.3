@@ -46,8 +46,14 @@ from src.ui.vital_cards import VitalCard
 from src.ui.live_plots import TimeSeriesPlot
 from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
+from desktop.workstation_runtime import RingGauge, metric_card, trend_panel
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
 from src.utils.public_study import PublicStudyManager
+from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_engine
+from src.ui.pcos_complication_panel import PCODProgressPanel
+from src.personal_twin.participant_selector import choose_participant
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
 
@@ -60,10 +66,20 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(DARK_QSS)
 
         # Core engines
+        state = load_state()
+        saved_profile = state.get("profile", {}) if isinstance(state, dict) else {}
         self.profile = UserProfile()
-        self.baseline_engine = PersonalBaselineEngine()
+        for key, value in saved_profile.items():
+            if hasattr(self.profile, key):
+                try:
+                    setattr(self.profile, key, value)
+                except Exception:
+                    pass
+        self.participant_id = str(saved_profile.get("participant_id") or "LOCAL-PARTICIPANT")
+        self.baseline_engine = baseline_engine(self.participant_id)
         self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
         self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
+        self.visual_graphs = {}
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
         self.fusion_engine = FusionEngine()
         self.explanation_engine = ExplanationEngine()
@@ -84,6 +100,11 @@ class MainWindow(QMainWindow):
         self.public_study = PublicStudyManager(self.history_store)
         self.public_study.attach_latest()
         self._last_public_study_log = 0.0
+
+        self.adaptive_model = PersonalAdaptiveModel(participant_id=self.participant_id)
+        self.current_session_id = None
+        self._last_feature_compute = 0.0
+        self._sample_count = 0
 
         # Timers
         self.feature_timer = QTimer()
@@ -146,8 +167,10 @@ class MainWindow(QMainWindow):
         pages = [
             ("⌂", "Command Center"),
             ("◉", "Personal Baseline"),
+            ("◫", "Personal Adaptive Twin"),
             ("∿", "Trends & Analysis"),
             ("✦", "CHRONO-PCOS / Signals"),
+            ("⚕", "PCOS Complications"),
             ("◌", "Data Quality"),
             ("＋", "Clinical Inputs"),
             ("▣", "Ultrasound"),
@@ -174,8 +197,10 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(self._build_overview_tab(), "Dashboard")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
+        self.tabs.addTab(self._build_personal_twin_tab(), "Personal Twin")
         self.tabs.addTab(self._build_trends_tab(), "Trends & Analysis")
         self.tabs.addTab(self._build_health_signals_tab(), "Health Signals")
+        self.tabs.addTab(self._build_complications_tab(), "PCOS Complications")
         self.tabs.addTab(self._build_data_quality_tab(), "Data Quality")
         self.tabs.addTab(self._build_clinical_tab(), "Clinical Inputs")
         self.tabs.addTab(self._build_ultrasound_tab(), "Ultrasound")
@@ -189,6 +214,7 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel(f"{APP_NAME} • {APP_VERSION_LABEL} • {DISCLAIMER}")
         self.status_label.setObjectName("SmallMuted")
         shell.addWidget(self.status_label)
+        self._load_saved_profile_into_controls()
         self._select_workstation_page(0)
 
         if start_demo:
@@ -197,6 +223,38 @@ class MainWindow(QMainWindow):
             self.connect_serial(port)
         if net:
             self.connect_network(net)
+
+    def _load_saved_profile_into_controls(self):
+        p = load_state().get("profile", {})
+        if not isinstance(p, dict):
+            p = {}
+        mappings = [
+            (getattr(self, "age_spin", None), p.get("age_years")),
+            (getattr(self, "bmi_spin", None), p.get("bmi")),
+            (getattr(self, "sys_spin", None), p.get("systolic_bp")),
+            (getattr(self, "dia_spin", None), p.get("diastolic_bp")),
+            (getattr(self, "glucose_spin", None), p.get("glucose_mg_dl")),
+            (getattr(self, "cycle_spin", None), p.get("cycle_day")),
+            (getattr(self, "length_spin", None), p.get("usual_cycle_length_days")),
+        ]
+        for widget, value in mappings:
+            if widget is not None and value is not None:
+                try:
+                    widget.setValue(float(value))
+                except Exception:
+                    pass
+        combo = getattr(self, "cycle_irregular_combo", None)
+        if combo is not None:
+            if p.get("cycle_irregular") is True:
+                combo.setCurrentText("irregular")
+            elif p.get("cycle_irregular") is False:
+                combo.setCurrentText("regular")
+        self.participant_id = str(p.get("participant_id") or self.participant_id)
+        self._clinical_changed()
+        if hasattr(self, "personal_profile_text"):
+            self._refresh_personal_twin()
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, self.feature_history[-1] if self.feature_history else None)
 
     def _named_label(self, text: str, object_name: str):
         label = QLabel(text)
@@ -494,64 +552,204 @@ class MainWindow(QMainWindow):
         content = QWidget()
         root = QVBoxLayout(content)
 
-        info = QLabel(
-            "Personal Baseline Engine V8.3\n"
-            "Learns what is normal for THIS person: mean, median, std, robust MAD, rolling baseline, confidence, "
-            "minimum observations, seasonal/circadian context.\n"
-            "CURRENT vs PERSONAL BASELINE -> normalized deviation (z-score, % change)"
-        )
-        info.setWordWrap(True)
-        root.addWidget(info)
+        grid = QGridLayout()
+        grid.addWidget(metric_card("Baseline status", "READY" if self.baseline_engine.has_baseline else "BUILDING", "Patient-specific reference", accent="#31d7a1"), 0, 0)
+        grid.addWidget(metric_card("Observations", str(len(self.feature_history)), "Current local timeline", accent="#39c9ff"), 0, 1)
+        grid.addWidget(RingGauge("Confidence", getattr(getattr(self.baseline_engine, "baseline", None), "confidence", 0.0) * 100, "%", "#7d62ff"), 0, 2)
+        root.addLayout(grid)
 
-        self.baseline_status = QLabel("No baseline yet. Collect at least 5 min calm data, then capture.")
-        self.baseline_status.setWordWrap(True)
-        root.addWidget(self.baseline_status)
+        graphs = QGridLayout()
+        self.baseline_hr_graph = trend_panel("HR vs baseline", [f.hr_bpm for f in self.feature_history if f.hr_bpm is not None], "bpm", "#ff4fa3", 170)
+        self.baseline_hrv_graph = trend_panel("HRV vs baseline", [f.rmssd_ms for f in self.feature_history if f.rmssd_ms is not None], "ms", "#39c9ff", 170)
+        graphs.addWidget(self.baseline_hr_graph, 0, 0)
+        graphs.addWidget(self.baseline_hrv_graph, 0, 1)
+        self.visual_graphs["hr_bpm"] = self.baseline_hr_graph.graph
+        self.visual_graphs["rmssd_ms"] = self.baseline_hrv_graph.graph
+        root.addLayout(graphs)
 
         btn_row = QHBoxLayout()
         capture_btn = QPushButton("Capture Baseline (1 hour)")
+        capture_btn.setObjectName("primary")
         capture_btn.clicked.connect(self._capture_baseline)
         btn_row.addWidget(capture_btn)
         root.addLayout(btn_row)
 
+        self.baseline_status = QLabel("No baseline yet. Collect at least 5 min calm data, then capture.")
+        self.baseline_status.setWordWrap(True)
+        self.baseline_status.setObjectName("muted")
+        root.addWidget(self.baseline_status)
+
         self.baseline_details = QTextEdit()
         self.baseline_details.setReadOnly(True)
-        self.baseline_details.setPlaceholderText("Baseline details appear here...")
+        self.baseline_details.setMaximumHeight(90)
         root.addWidget(self.baseline_details)
 
         self.baseline_comparison = QTextEdit()
         self.baseline_comparison.setReadOnly(True)
-        self.baseline_comparison.setPlaceholderText("Current vs baseline comparison...")
+        self.baseline_comparison.setMaximumHeight(90)
         root.addWidget(self.baseline_comparison)
 
         scroll.setWidget(content)
         layout.addWidget(scroll)
         return tab
 
+    def _build_personal_twin_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+
+        title = QLabel("Personal Adaptive Twin")
+        title.setObjectName("HeroTitle")
+        layout.addWidget(title)
+        intro = QLabel(
+            "Local personalization engine. It learns recurring patterns from this participant's "
+            "quality-gated observations and updates the personal reference range over time. "
+            "It does not retrain the CHRONO-PCOS disease model or create a diagnosis."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        self.personal_profile_text = QTextEdit()
+        self.personal_profile_text.setReadOnly(True)
+        self.personal_profile_text.setMaximumHeight(95)
+        layout.addWidget(self.personal_profile_text)
+
+        self.personal_twin_text = QTextEdit()
+        self.personal_twin_text.setReadOnly(True)
+        layout.addWidget(self.personal_twin_text, 1)
+
+        actions = QHBoxLayout()
+        refresh = QPushButton("Refresh learned profile")
+        refresh.clicked.connect(self._refresh_personal_twin)
+        actions.addWidget(refresh)
+        switch = QPushButton("Switch Person")
+        switch.clicked.connect(self._switch_participant)
+        actions.addWidget(switch)
+        actions.addStretch()
+        layout.addLayout(actions)
+        self._refresh_personal_twin()
+        return tab
+
+    def _refresh_personal_twin(self):
+        state = self.adaptive_model.snapshot()
+        self.personal_profile_text.setText(
+            f"Participant: {self.participant_id}\n"
+            f"{profile_summary(load_state().get('profile', {}))}\n"
+            f"Learning samples: {state['samples']:,} • quality-weighted: {state['quality_weighted_samples']:.1f}\n"
+            "Learning mode: local adaptive baseline / hour-of-day context"
+        )
+        lines = []
+        for name, item in state.get("metrics", {}).items():
+            lines.append(
+                f"{name}: learned mean {item['mean']:.3f} • std {item['std']:.3f} • "
+                f"weighted observations {item['samples']:.1f} • latest {item['last']}"
+            )
+        self.personal_twin_text.setText("\n".join(lines) if lines else "No quality-gated measurements learned yet.")
+
+    def _switch_participant(self):
+        from src.personal_twin.participant_selector import choose_participant
+
+        pid = choose_participant("ENDO-TWIN • Switch Person")
+        if not pid or pid == self.participant_id:
+            return
+
+        try:
+            self.stop_stream()
+        except Exception:
+            pass
+
+        # Clear live analysis buffers so the new person's workstation starts
+        # from that person's own timeline rather than carrying over the prior one.
+        self.feature_history.clear()
+        self.shared_history.clear()
+        self.module_results = {}
+        self.fusion_result = None
+        self.current_shared = None
+        self.clinical_data = {}
+        self.latest_row = None
+        self._sample_count = 0
+
+        select_participant(pid)
+        self.participant_id = str(pid)
+        self.baseline_engine = baseline_engine(self.participant_id)
+        self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
+        self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
+        self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
+
+        saved = get_profile(self.participant_id)
+        for key, value in saved.items():
+            if hasattr(self.profile, key):
+                try:
+                    setattr(self.profile, key, value)
+                except Exception:
+                    pass
+
+        self.adaptive_model.set_participant(self.participant_id)
+        self._load_saved_profile_into_controls()
+        self._refresh_personal_twin()
+
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self._shared_pcod_profile(), self.feature_history, self.feature_history[-1] if self.feature_history else None)
+
+        self.top_patient.setText(f"PATIENT  {self.participant_id}")
+        self.top_mode.setText("●  NO STREAM")
+        self.status_label.setText(f"Active participant: {self.participant_id}")
+
+    def _shared_pcod_profile(self):
+        shared = get_profile(self.participant_id)
+        if not shared:
+            shared = {"participant_id": self.participant_id}
+        for key in (
+            "age_years", "bmi", "systolic_bp", "diastolic_bp",
+            "glucose_mg_dl", "cycle_irregular", "days_since_last_period",
+            "usual_cycle_length_days", "years_post_menarche",
+        ):
+            if key not in shared and hasattr(self.profile, key):
+                shared[key] = getattr(self.profile, key)
+        return shared
+
+    def _save_pcod_status(self, value):
+        profile = self._shared_pcod_profile()
+        profile["participant_id"] = self.participant_id
+        profile["has_pcod"] = value
+        profile["updated_at"] = time.time()
+        try:
+            save_profile(profile, set_active=True)
+        except Exception as exc:
+            self.status_label.setText(f"PCOD profile save warning: {exc}")
+
+    def _build_complications_tab(self):
+        tab = PCODProgressPanel("PCOD Healing & Complications")
+        tab.pcod_status_changed.connect(self._save_pcod_status)
+        tab.set_context(
+            self._shared_pcod_profile(),
+            self.feature_history,
+            self.feature_history[-1] if self.feature_history else None,
+        )
+        self.complication_panel = tab
+        return tab
+
     def _build_trends_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-
-        info = QLabel(
-            "Longitudinal Engine - Heart of V8.3\n"
-            "Rolling windows, persistence detection, trend detection, change-point detection, recovery detection, "
-            "missing-data handling, confidence scoring.\n"
-            "ONE ABNORMAL -> weak signal, REPEATED CHANGE -> stronger, MULTIPLE FEATURES -> multimodal, "
-            "PERSISTENT + GOOD QUALITY -> higher confidence"
-        )
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        top = QGridLayout()
+        top.addWidget(metric_card("Windows", str(len(self.feature_history)), "Longitudinal observations", accent="#39c9ff"),0,0)
+        top.addWidget(metric_card("Recovery", "TRACKING", "Existing engine classifications", accent="#31d7a1"),0,1)
+        top.addWidget(metric_card("Patient", self.participant_id, "Selected person", accent="#a86bff"),0,2)
+        layout.addLayout(top)
 
         self.trend_plot = TimeSeriesPlot("HR Trend", "bpm", "#f87171")
+        self.trend_plot.setMinimumHeight(220)
         layout.addWidget(self.trend_plot)
-
         self.trend_plot2 = TimeSeriesPlot("HRV Trend", "ms", "#60a5fa")
+        self.trend_plot2.setMinimumHeight(220)
         layout.addWidget(self.trend_plot2)
 
         self.longitudinal_text = QTextEdit()
         self.longitudinal_text.setReadOnly(True)
-        self.longitudinal_text.setPlaceholderText("Longitudinal analysis appears here...")
+        self.longitudinal_text.setMaximumHeight(110)
         layout.addWidget(self.longitudinal_text)
-
         return tab
 
     def _build_health_signals_tab(self):
@@ -621,245 +819,295 @@ class MainWindow(QMainWindow):
     def _build_data_quality_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-
-        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact\nDetects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data\nBad data must not silently become model input.")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        top=QGridLayout()
+        top.addWidget(metric_card("Quality gate","ACTIVE","Bad data is excluded from model input",accent="#31d7a1"),0,0)
+        top.addWidget(metric_card("Latest quality","—","Per-feature quality metadata",accent="#39c9ff"),0,1)
+        top.addWidget(RingGauge("Data quality",0,"%", "#5b7cff"),0,2)
+        layout.addLayout(top)
 
         self.quality_text = QTextEdit()
         self.quality_text.setReadOnly(True)
+        self.quality_text.setMaximumHeight(130)
         layout.addWidget(self.quality_text)
-
         self.quality_gauge = GaugeWidget("Overall Data Quality")
-        layout.addWidget(self.quality_gauge)
-
+        layout.addWidget(self.quality_gauge,1)
         return tab
 
     def _build_clinical_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        top=QGridLayout()
+        top.addWidget(metric_card("BMI","—","USER-ENTERED",accent="#ff9f43"),0,0)
+        top.addWidget(metric_card("Blood pressure","—","USER-ENTERED",accent="#ff4fa3"),0,1)
+        top.addWidget(metric_card("Glucose","—","USER-ENTERED",accent="#31d7a1"),0,2)
+        top.addWidget(metric_card("PCOD status","—","PATIENT-REPORTED",accent="#a86bff"),0,3)
+        layout.addLayout(top)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         root = QVBoxLayout(content)
-
-        info = QLabel("Clinical Inputs - Manual measurements (USER-ENTERED)\nBMI, BP, glucose, cycle info, age, etc.\nClearly labelled as USER-ENTERED, not MEASURED")
-        info.setWordWrap(True)
+        info = QLabel("Manual clinical context. All values stay labelled USER-ENTERED / PATIENT-REPORTED.")
+        info.setObjectName("muted")
         root.addWidget(info)
 
-        grid = QGridLayout()
-        self.age_spin = QDoubleSpinBox()
-        self.age_spin.setRange(10, 80)
-        self.age_spin.setValue(22)
-        self.bmi_spin = QDoubleSpinBox()
-        self.bmi_spin.setRange(10, 60)
-        self.bmi_spin.setValue(23.5)
-        self.bmi_spin.setDecimals(1)
-        self.sys_spin = QDoubleSpinBox()
-        self.sys_spin.setRange(0, 250)
-        self.sys_spin.setValue(0)
-        self.sys_spin.setSpecialValueText("none")
-        self.dia_spin = QDoubleSpinBox()
-        self.dia_spin.setRange(0, 150)
-        self.dia_spin.setValue(0)
-        self.dia_spin.setSpecialValueText("none")
-        self.glucose_spin = QDoubleSpinBox()
-        self.glucose_spin.setRange(0, 500)
-        self.glucose_spin.setValue(0)
-        self.glucose_spin.setSpecialValueText("none")
-        self.cycle_spin = QSpinBox()
-        self.cycle_spin.setRange(0, 120)
-        self.cycle_spin.setValue(0)
-        self.cycle_spin.setSpecialValueText("unknown")
-        self.length_spin = QSpinBox()
-        self.length_spin.setRange(0, 120)
-        self.length_spin.setValue(28)
-        self.cycle_irregular_combo = QComboBox()
-        self.cycle_irregular_combo.addItems(["unknown", "regular", "irregular"])
-
-        grid.addWidget(QLabel("Age"), 0, 0)
-        grid.addWidget(self.age_spin, 0, 1)
-        grid.addWidget(QLabel("BMI"), 0, 2)
-        grid.addWidget(self.bmi_spin, 0, 3)
-        grid.addWidget(QLabel("Systolic BP"), 1, 0)
-        grid.addWidget(self.sys_spin, 1, 1)
-        grid.addWidget(QLabel("Diastolic BP"), 1, 2)
-        grid.addWidget(self.dia_spin, 1, 3)
-        grid.addWidget(QLabel("Glucose mg/dL"), 2, 0)
-        grid.addWidget(self.glucose_spin, 2, 1)
-        grid.addWidget(QLabel("Cycle day"), 2, 2)
-        grid.addWidget(self.cycle_spin, 2, 3)
-        grid.addWidget(QLabel("Usual length"), 3, 0)
-        grid.addWidget(self.length_spin, 3, 1)
-        grid.addWidget(QLabel("Irregular"), 3, 2)
-        grid.addWidget(self.cycle_irregular_combo, 3, 3)
-
-        for w in [self.age_spin, self.bmi_spin, self.sys_spin, self.dia_spin, self.glucose_spin, self.cycle_spin, self.length_spin]:
-            w.valueChanged.connect(self._clinical_changed)
+        grid=QGridLayout()
+        self.age_spin=QDoubleSpinBox(); self.age_spin.setRange(10,80); self.age_spin.setValue(22)
+        self.bmi_spin=QDoubleSpinBox(); self.bmi_spin.setRange(10,60); self.bmi_spin.setValue(23.5); self.bmi_spin.setDecimals(1)
+        self.sys_spin=QDoubleSpinBox(); self.sys_spin.setRange(0,250); self.sys_spin.setValue(0); self.sys_spin.setSpecialValueText("none")
+        self.dia_spin=QDoubleSpinBox(); self.dia_spin.setRange(0,150); self.dia_spin.setValue(0); self.dia_spin.setSpecialValueText("none")
+        self.glucose_spin=QDoubleSpinBox(); self.glucose_spin.setRange(0,500); self.glucose_spin.setValue(0); self.glucose_spin.setSpecialValueText("none")
+        self.cycle_spin=QSpinBox(); self.cycle_spin.setRange(0,120); self.cycle_spin.setValue(0); self.cycle_spin.setSpecialValueText("unknown")
+        self.length_spin=QSpinBox(); self.length_spin.setRange(0,120); self.length_spin.setValue(28)
+        self.cycle_irregular_combo=QComboBox(); self.cycle_irregular_combo.addItems(["unknown","regular","irregular"])
+        fields=[("Age",self.age_spin,0,0),("BMI",self.bmi_spin,0,2),("Systolic BP",self.sys_spin,1,0),("Diastolic BP",self.dia_spin,1,2),("Glucose mg/dL",self.glucose_spin,2,0),("Cycle day",self.cycle_spin,2,2),("Usual length",self.length_spin,3,0),("Cycle pattern",self.cycle_irregular_combo,3,2)]
+        for label,widget,r,c0 in fields:
+            grid.addWidget(QLabel(label),r,c0); grid.addWidget(widget,r,c0+1)
+        for widget in [self.age_spin,self.bmi_spin,self.sys_spin,self.dia_spin,self.glucose_spin,self.cycle_spin,self.length_spin]:
+            widget.valueChanged.connect(self._clinical_changed)
         self.cycle_irregular_combo.currentTextChanged.connect(self._clinical_changed)
-
         root.addLayout(grid)
-
-        self.clinical_text = QTextEdit()
-        self.clinical_text.setReadOnly(True)
-        root.addWidget(self.clinical_text)
-
+        self.clinical_text=QTextEdit(); self.clinical_text.setReadOnly(True); self.clinical_text.setMaximumHeight(120); root.addWidget(self.clinical_text)
         scroll.setWidget(content)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll,1)
         return tab
 
     def _build_ultrasound_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Ultrasound - Periodic clinical imaging\nProvenance preserved: source image -> preprocessing -> detected features -> quality -> uncertainty\nIf feature cannot be reliably extracted: return UNKNOWN, never invent.\nFeatures labelled as CLINICALLY-ENTERED or IMAGE-DERIVED")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.ultrasound_text = QTextEdit()
-        self.ultrasound_text.setReadOnly(True)
-        self.ultrasound_text.setPlaceholderText("Ultrasound features appear here...")
-        layout.addWidget(self.ultrasound_text)
-
-        btn_row = QHBoxLayout()
-        self.cyst_size_spin = QDoubleSpinBox()
-        self.cyst_size_spin.setRange(0, 100)
-        self.cyst_size_spin.setValue(0)
-        self.cyst_size_spin.setSpecialValueText("none")
-        self.cyst_size_spin.setSuffix(" mm")
-        btn_row.addWidget(QLabel("Cyst size"))
-        btn_row.addWidget(self.cyst_size_spin)
-        add_btn = QPushButton("Add Ultrasound (Clinically Entered)")
-        add_btn.clicked.connect(self._add_ultrasound)
-        btn_row.addWidget(add_btn)
-        layout.addLayout(btn_row)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Ultrasound", "Image evidence stays separate from wearable and model signals."))
+        top=QGridLayout()
+        top.addWidget(metric_card("Image status","UNKNOWN","Attach a source image",accent="#39c9ff"),0,0)
+        top.addWidget(metric_card("Follicle count","UNKNOWN","No unsupported inference",accent="#a86bff"),0,1)
+        top.addWidget(metric_card("Morphology","UNKNOWN","Validated model required",accent="#ff9f43"),0,2)
+        layout.addLayout(top)
+        self.ultrasound_text=QTextEdit(); self.ultrasound_text.setReadOnly(True); self.ultrasound_text.setMaximumHeight(150); layout.addWidget(self.ultrasound_text)
+        btn_row=QHBoxLayout()
+        self.cyst_size_spin=QDoubleSpinBox(); self.cyst_size_spin.setRange(0,100); self.cyst_size_spin.setValue(0); self.cyst_size_spin.setSpecialValueText("none"); self.cyst_size_spin.setSuffix(" mm")
+        btn_row.addWidget(QLabel("Cyst size")); btn_row.addWidget(self.cyst_size_spin)
+        add_btn=QPushButton("Add Ultrasound (Clinically Entered)"); add_btn.setObjectName("primary"); add_btn.clicked.connect(self._add_ultrasound); btn_row.addWidget(add_btn)
+        btn_row.addStretch(); layout.addLayout(btn_row)
         return tab
 
     def _build_explanation_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Explainability - Every risk signal explains main contributing factors\nDrivers: e.g. resting HR increased from baseline, HRV decreased, sleep regularity decreased, activity decreased\nThen: 'These changes are not specific to one disease and should not be interpreted as a diagnosis.'")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.explanation_text = QTextEdit()
-        self.explanation_text.setReadOnly(True)
-        layout.addWidget(self.explanation_text)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Explainability", "Visual driver cards plus the existing detailed explanation."))
+        grid=QGridLayout()
+        for i,(t,v,a) in enumerate([
+            ("Baseline","Personal reference","#39c9ff"),
+            ("Longitudinal","Repeated change / recovery","#31d7a1"),
+            ("Quality","Quality gate before inference","#ff9f43"),
+            ("Provenance","Measured / derived / reported","#a86bff"),
+        ]):
+            grid.addWidget(metric_card(t,v,"Existing pipeline stage",accent=a),0,i)
+        layout.addLayout(grid)
+        self.explanation_text=QTextEdit(); self.explanation_text.setReadOnly(True); layout.addWidget(self.explanation_text,1)
         return tab
 
     def _build_report_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Report Generation - Research report with limitations and recommendation: 'Discuss relevant findings with qualified healthcare professional.'\nIncludes: subject ID, observation period, sensor data, data quality, personal baseline, longitudinal changes, disease signals, contributing factors, ultrasound if available, clinical inputs, limitations")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.report_text = QTextEdit()
-        self.report_text.setReadOnly(True)
-        layout.addWidget(self.report_text)
-
-        btn_row = QHBoxLayout()
-        gen_btn = QPushButton("Generate Report")
-        gen_btn.clicked.connect(self._generate_report)
-        btn_row.addWidget(gen_btn)
-        save_btn = QPushButton("Save Report")
-        save_btn.clicked.connect(self._save_report)
-        btn_row.addWidget(save_btn)
-        layout.addLayout(btn_row)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Report", "Visual summary before the detailed research report."))
+        grid=QGridLayout()
+        grid.addWidget(metric_card("Patient",self.participant_id,"Local patient-scoped record",accent="#39c9ff"),0,0)
+        grid.addWidget(metric_card("Windows",str(len(self.feature_history)),"Current longitudinal timeline",accent="#31d7a1"),0,1)
+        grid.addWidget(RingGauge("Quality",float(self.feature_history[-1].signal_quality)*100 if self.feature_history else 0,"%","#7d62ff"),0,2)
+        grid.addWidget(metric_card("PCOD","YES" if getattr(self.profile, "has_pcod", None) is True else "UNKNOWN","Patient-reported context",accent="#ff4fa3"),0,3)
+        layout.addLayout(grid)
+        self.report_text=QTextEdit(); self.report_text.setReadOnly(True); self.report_text.setMaximumHeight(220); layout.addWidget(self.report_text)
+        btn_row=QHBoxLayout()
+        gen_btn=QPushButton("Generate Report"); gen_btn.setObjectName("primary"); gen_btn.clicked.connect(self._generate_report); btn_row.addWidget(gen_btn)
+        save_btn=QPushButton("Save Report"); save_btn.setObjectName("secondary"); save_btn.clicked.connect(self._save_report); btn_row.addWidget(save_btn)
+        btn_row.addStretch(); layout.addLayout(btn_row)
         return tab
 
     def _build_validation_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Validation - Engineering vs Clinical\nTests: baseline accuracy, trend detection, persistence, recovery, missing sensor handling, noisy data, multimodal fusion, disease module isolation, subject-level validation, reproducibility")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.validation_text = QTextEdit()
-        self.validation_text.setReadOnly(True)
-        self.validation_text.setText(
-            "CHRONO-TWIN NEXUS V8.3 Validation Status\n"
-            "========================================\n\n"
-            "Engineering Validation:\n"
-            "- Personal baseline: mean, median, std, MAD, rolling, confidence, min obs, circadian context - IMPLEMENTED\n"
-            "- Longitudinal engine: rolling windows, persistence, trend, change-point, recovery, missing handling, confidence - IMPLEMENTED\n"
-            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
-            "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED\n"
-            "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED\n"
-            "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
-            "- Synthetic longitudinal data with 6 scenarios - IMPLEMENTED\n"
-            "- Multimodal fusion with provenance - IMPLEMENTED\n"
-            "- Explainability - IMPLEMENTED\n"
-            "- Subject-level validation (no leakage) - IMPLEMENTED\n"
-            "- Data honesty: REAL, SYNTHETIC, PUBLIC, USER-ENTERED labelled - IMPLEMENTED\n\n"
-            "Clinical Validation: NOT ESTABLISHED\n"
-            "- All modules are research-only signals\n"
-            "- No diagnostic claims\n"
-            "- Requires ethics-approved prospective study\n"
-            "- Model confidence vs data quality vs clinical validation separated\n\n"
-            "Hardware:\n"
-            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
-            "- Mega Hub: expanded experimental sensors - PRESERVED\n"
-            "- Software gracefully handles missing sensors - IMPLEMENTED\n"
-        )
-        layout.addWidget(self.validation_text)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Validation & Research Boundaries", "Engineering status stays visual and separate from clinical validation."))
+        g=QGridLayout()
+        g.addWidget(RingGauge("Engineering",100,"%","#31d7a1"),0,0)
+        g.addWidget(RingGauge("Clinical",0,"%","#ff9f43"),0,1)
+        g.addWidget(metric_card("Tests","IMPLEMENTED","Unit/integration coverage",accent="#39c9ff"),0,2)
+        g.addWidget(metric_card("Clinical validation","NOT ESTABLISHED","Research prototype",accent="#ff4fa3"),0,3)
+        layout.addLayout(g)
+        self.validation_text=QTextEdit(); self.validation_text.setReadOnly(True); layout.addWidget(self.validation_text,1)
         return tab
 
-    # ------------------------------------------------- logic
     def _refresh_ports(self):
         # Simple refresh - in real app would scan serial ports
         self.port_combo.addItem("/dev/ttyACM0")
 
     def connect_serial(self, port=None):
-        p = port or self.port_combo.currentText()
-        try:
-            self.arduino_reader = ArduinoReader(port=p, baud=115200)
-            self.arduino_reader.start()
-            self.mode_label.setText(f"Mode: LIVE SERIAL {p}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
-        except Exception as e:
-            self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
-
-    def connect_network(self, hostport: str):
-        if not hostport:
+        self.stop_stream()
+        p = port or self.port_combo.currentText().strip()
+        if not p:
+            self._refresh_ports()
+            p = self.port_combo.currentText().strip()
+        if not p:
+            self.mode_label.setText("Mode: NO SERIAL PORT")
             return
         try:
-            parts = hostport.split(":")
-            host = parts[0]
-            port = int(parts[1]) if len(parts) > 1 else 7777
-            self.network_reader = NetworkReader(host=host, port=port)
-            self.network_reader.start()
-            self.mode_label.setText(f"Mode: LIVE NETWORK {hostport}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+            reader = ArduinoReader(port=p, baud=115200, require_crc=True, parent=self)
+            reader.sample_received.connect(self._on_sample_received)
+            reader.state_changed.connect(self._on_reader_state)
+            reader.error_received.connect(self._on_reader_error)
+            self.arduino_reader = reader
+            self.current_session_id = self.history_store.start_session(
+                source=f"serial:{p}", note="ESP32-S3 / Arduino USB wearable", participant_id=self.participant_id
+            )
+            reader.start()
+            self.mode_label.setText(f"Mode: LIVE USB • {p}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#4ade80;")
         except Exception as e:
-            self.mode_label.setText(f"Mode: NETWORK FAILED {e}")
+            self.mode_label.setText(f"Mode: SERIAL FAILED • {e}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
+
+    def connect_network(self, hostport: str):
+        self.stop_stream()
+        target = hostport.strip() or "192.168.4.1:7777"
+        try:
+            host, sep, raw_port = target.rpartition(":")
+            if not sep:
+                host, raw_port = target, "7777"
+            port = int(raw_port)
+            reader = NetworkReader(host=host, port=port, require_crc=True, parent=self)
+            reader.sample_received.connect(self._on_sample_received)
+            reader.state_changed.connect(self._on_reader_state)
+            reader.error_received.connect(self._on_reader_error)
+            self.network_reader = reader
+            self.current_session_id = self.history_store.start_session(
+                source=f"wifi:{host}:{port}", note="ESP32-S3 Wi-Fi wearable", participant_id=self.participant_id
+            )
+            reader.start()
+            self.mode_label.setText(f"Mode: LIVE Wi-Fi • {host}:{port}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#4ade80;")
+        except Exception as e:
+            self.mode_label.setText(f"Mode: NETWORK FAILED • {e}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
 
     def start_demo(self):
-        self.demo_stream = DemoSensorStream()
+        self.stop_stream()
+        self.demo_stream = DemoSensorStream(fs_hz=20.0, parent=self)
+        self.demo_stream.sample_received.connect(self._on_sample_received)
+        self.demo_stream.state_changed.connect(self._on_reader_state)
+        self.demo_stream.error_received.connect(self._on_reader_error)
         self.demo_stream.start()
-        self.mode_label.setText("Mode: DEMO SYNTHETIC - clearly labelled")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
+        self.current_session_id = self.history_store.start_session(source="demo", note="Synthetic showcase stream", participant_id=self.participant_id)
+        self.mode_label.setText("Mode: DEMO DATA • synthetic")
+        self.mode_label.setStyleSheet("font-weight:bold;color:#60a5fa;")
 
     def stop_stream(self):
-        if self.arduino_reader:
-            self.arduino_reader.stop()
-            self.arduino_reader = None
-        if self.network_reader:
-            self.network_reader.stop()
-            self.network_reader = None
-        if self.demo_stream:
-            self.demo_stream.stop()
-            self.demo_stream = None
+        for reader_name in ("arduino_reader", "network_reader", "demo_stream"):
+            reader = getattr(self, reader_name, None)
+            if reader is not None:
+                try: reader.stop()
+                except Exception: pass
+                setattr(self, reader_name, None)
+        if self.current_session_id is not None:
+            try:
+                self.history_store.end_session(self.current_session_id, sample_count=self._sample_count)
+            except Exception:
+                pass
+            self.current_session_id = None
         self.mode_label.setText("Mode: NO STREAM")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+        self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
+    def _on_reader_state(self, state):
+        self.mode_label.setText(f"Mode: {state.replace('_',' ').upper()}")
+
+    def _on_reader_error(self, message):
+        self.status_label.setText(f"Sensor link: {message}")
+
+    def _on_sample_received(self, sample):
+        self._sample_count += 1
+        # Raw acquisition is persisted locally without being allowed to alter
+        # the decoded source values.
+        if str(getattr(sample, "source", "")).startswith("serial") or str(getattr(sample, "source", "")).startswith("wifi"):
+            append_event({
+                "kind": "raw_sensor_sample",
+                "participant_id": self.participant_id,
+                "ms": getattr(sample, "ms", None),
+                "source": getattr(sample, "source", None),
+                "values": {
+                    name: getattr(sample, name, None) for name in (
+                        "analog_ppg_raw", "ir", "red", "gsr_raw",
+                        "ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps",
+                        "temp_c", "room_temp_c", "humidity_pct", "pressure_hpa", "lux",
+                        "status"
+                    )
+                }
+            })
+
+        self.extractor.add_sample(sample)
+        now = time.time()
+        if now - self._last_feature_compute < 0.5:
+            return
+        self._last_feature_compute = now
+        try:
+            fv = self.extractor.compute()
+        except Exception as exc:
+            self.status_label.setText(f"Feature computation failed: {exc}")
+            return
+        self.feature_history.append(fv)
+        if self.current_session_id is not None:
+            try:
+                self.history_store.log_feature(
+                    self.current_session_id,
+                    {
+                        "ts": fv.timestamp_s,
+                        "hr": fv.hr_bpm,
+                        "rmssd": fv.rmssd_ms,
+                        "spo2": fv.spo2_pct,
+                        "skin_temp": fv.skin_temp_c,
+                        "gsr": fv.gsr_tonic,
+                        "motion": fv.motion_index,
+                        "activity": fv.activity_level,
+                        "stress": fv.stress_index,
+                        "sleep_prob": fv.sleep_probability,
+                        "circadian": fv.circadian_disruption,
+                        "anomaly": fv.anomaly_score,
+                        "signal_quality": fv.signal_quality,
+                    },
+                    extra_json=json.dumps({
+                        "calibration_status": getattr(fv, "calibration_status", None),
+                        "calibration_ready_fraction": getattr(fv, "calibration_ready_fraction", 0.0),
+                        "participant_id": self.participant_id,
+                    }),
+                )
+            except Exception:
+                pass
+
+        src = str(getattr(sample, "source", "")).lower()
+        is_real = src not in {"demo", "synthetic"} and not src.startswith("demo")
+        if is_real:
+            try:
+                self.adaptive_model.observe(fv, quality=fv.signal_quality)
+            except Exception as exc:
+                self.status_label.setText(f"Personal learning warning: {exc}")
+
+        self._update_vital_cards(fv)
+        try:
+            shared = self.shared_extractor.extract(fv, self.feature_history[-50:])
+            self.current_shared = shared
+            self.shared_history.append(shared)
+            if len(self.shared_history) > 500:
+                self.shared_history = self.shared_history[-500:]
+            self.shared_text.setText(self.explanation_engine.explain_shared_features(shared))
+        except Exception:
+            pass
+        self.top_quality.setText(f"QUALITY  {float(fv.signal_quality):.2f}")
+        self.top_baseline.setText(
+            f"PERSONAL LEARNING  {self.adaptive_model.snapshot()['samples']:,}"
+        )
+        self.top_patient.setText(f"PATIENT  {self.participant_id}")
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, fv)
+        self._refresh_personal_twin()
+        try:
+            self._update_risk()
+        except Exception:
+            pass
+
 
     def _load_scenario_dialog(self):
         # Load one of the 6 scenarios as demo
@@ -901,63 +1149,11 @@ class MainWindow(QMainWindow):
             self.mode_label.setText(f"Failed to load scenario: {e}")
 
     def _update_features(self):
-        sample = None
-        if self.arduino_reader and self.arduino_reader.has_sample():
-            sample = self.arduino_reader.get_sample()
-        elif self.network_reader and self.network_reader.has_sample():
-            sample = self.network_reader.get_sample()
-        elif self.demo_stream and self.demo_stream.has_sample():
-            sample = self.demo_stream.get_sample()
+        # Acquisition is signal-driven. The legacy polling path was removed to
+        # prevent duplicate processing and to preserve the wearable sample rate.
+        if self.feature_history and hasattr(self, "top_quality"):
+            self.top_quality.setText(f"QUALITY  {float(self.feature_history[-1].signal_quality):.2f}")
 
-        if sample:
-            # Convert to SensorSample if needed
-            if isinstance(sample, dict):
-                # demo stream dict
-                from src.data_models import SensorSample
-                import time
-                s = SensorSample(
-                    timestamp_s=time.time(),
-                    ms=int(sample.get("ms", 0)),
-                    ir=int(sample.get("ir", 5000)),
-                    red=int(sample.get("red", 5000)),
-                    ax_g=float(sample.get("ax", 0)),
-                    ay_g=float(sample.get("ay", 0)),
-                    az_g=float(sample.get("az", 1)),
-                    gx_dps=float(sample.get("gx", 0)),
-                    gy_dps=float(sample.get("gy", 0)),
-                    gz_dps=float(sample.get("gz", 0)),
-                    temp_c=float(sample.get("temp_c", 32.5)),
-                    gsr_raw=int(sample.get("gsr", 450)),
-                    lux=float(sample.get("lux", 100)),
-                    source="demo" if self.demo_stream else "serial"
-                )
-                sample = s
-
-            self.extractor.add_sample(sample)
-            fv = self.extractor.compute()
-            self.feature_history.append(fv)
-            if self.public_study.study and (time.time() - self._last_public_study_log) >= 10.0:
-                try:
-                    self.public_study.record_feature(fv)
-                    self._last_public_study_log = time.time()
-                except Exception as e:
-                    self.history_store.log_error(self.public_study.study.session_id, "study", str(e))
-            if len(self.feature_history) > 5000:
-                self.feature_history = self.feature_history[-5000:]
-
-            # Update UI vitals
-            self._update_vital_cards(fv)
-
-            # Update shared
-            try:
-                shared = self.shared_extractor.extract(fv, self.feature_history[-50:])
-                self.current_shared = shared
-                self.shared_history.append(shared)
-                if len(self.shared_history) > 500:
-                    self.shared_history = self.shared_history[-500:]
-                self.shared_text.setText(self.explanation_engine.explain_shared_features(shared))
-            except Exception as e:
-                pass
 
     def _update_vital_cards(self, fv: FeatureVector):
         def set_card(key, value, fmt="{:.0f}"):
@@ -1180,7 +1376,6 @@ class MainWindow(QMainWindow):
             self.baseline_status.setText(f"Baseline failed: {e}")
 
     def _clinical_changed(self):
-        # Update profile
         self.profile.age_years = float(self.age_spin.value())
         bmi = float(self.bmi_spin.value())
         self.profile.bmi = bmi if bmi > 0 else None
@@ -1202,6 +1397,27 @@ class MainWindow(QMainWindow):
         else:
             self.profile.cycle_irregular = None
 
+        saved = load_state().get("profile", {})
+        if not isinstance(saved, dict):
+            saved = {}
+        profile = {
+            **saved,
+            "participant_id": self.participant_id,
+            "age_years": self.profile.age_years,
+            "bmi": self.profile.bmi,
+            "systolic_bp": self.profile.systolic_bp,
+            "diastolic_bp": self.profile.diastolic_bp,
+            "glucose_mg_dl": self.profile.glucose_mg_dl,
+            "cycle_day": self.profile.cycle_day,
+            "usual_cycle_length_days": self.profile.usual_cycle_length_days,
+            "cycle_irregular": self.profile.cycle_irregular,
+            "provenance": "USER-ENTERED",
+        }
+        try:
+            save_profile(profile)
+        except Exception:
+            pass
+
         self.clinical_data = {
             "age_years": self.profile.age_years,
             "bmi": self.profile.bmi,
@@ -1213,8 +1429,12 @@ class MainWindow(QMainWindow):
             "cycle_irregular": self.profile.cycle_irregular,
             "profile": self.profile,
         }
-        self.clinical_text.setText(json.dumps({k: v for k, v in self.clinical_data.items() if k != "profile"}, indent=2))
+        if hasattr(self, "clinical_text"):
+            self.clinical_text.setText(json.dumps({k: v for k, v in self.clinical_data.items() if k != "profile"}, indent=2))
         self.extractor.set_profile(self.profile)
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, self.feature_history[-1] if self.feature_history else None)
+
 
     def _add_ultrasound(self):
         size = float(self.cyst_size_spin.value())
@@ -1326,15 +1546,21 @@ class MainWindow(QMainWindow):
 
 
 
-def run(start_demo: bool = True, port: str | None = None, net: str | None = None, db_path=None):
+def run(start_demo: bool = False, port: str | None = None, net: str | None = None, db_path=None):
     """Launch the unified ENDO-TWIN scientific workstation."""
     from PySide6.QtWidgets import QApplication
     import sys
     app = QApplication.instance() or QApplication(sys.argv)
+    state = load_state()
+    if not state.get("active_participant_id") or not get_profile(str(state.get("active_participant_id"))):
+        from src.personal_twin.onboarding import PeopleManagerDialog
+        dlg = PeopleManagerDialog()
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return 0
     window = MainWindow(start_demo=start_demo, port=port, net=net, db_path=db_path)
     window.showMaximized()
     return app.exec()
 
 
 if __name__ == "__main__":
-    raise SystemExit(run(start_demo=True))
+    raise SystemExit(run(start_demo=False))

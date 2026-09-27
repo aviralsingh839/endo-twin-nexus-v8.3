@@ -18,17 +18,26 @@ class _SerialStaleError(Exception):
 
 class ArduinoReader(QObject):
     sample_received=Signal(object)
+    calibration_received=Signal(object)
     error_received=Signal(str)
     state_changed=Signal(str)
     def __init__(self,port:str,baud:int=SERIAL_BAUD,require_crc:bool=True,parent=None):
         super().__init__(parent); self.port=port; self.baud=baud; self.require_crc=require_crc
         self._thread:Optional[threading.Thread]=None; self._stop=threading.Event(); self._serial=None
         self.parser=PacketParser(require_crc=require_crc)
+        self._latest_sample: Optional[SensorSample] = None
+        self._sample_seq = 0
+        self._consumed_seq = 0
+        self._sample_lock = threading.Lock()
     @staticmethod
     def available_ports()->list[str]:
         return [] if list_ports is None else [p.device for p in list_ports.comports()]
     def start(self):
         if self._thread and self._thread.is_alive(): return
+        with self._sample_lock:
+            self._latest_sample = None
+            self._sample_seq = 0
+            self._consumed_seq = 0
         self._stop.clear(); self._thread=threading.Thread(target=self._run,daemon=True); self._thread.start()
     def stop(self):
         self._stop.set()
@@ -36,6 +45,16 @@ class ArduinoReader(QObject):
             try:self._serial.close()
             except Exception:pass
         self.state_changed.emit("stopped")
+    def has_sample(self) -> bool:
+        with self._sample_lock:
+            return self._sample_seq > self._consumed_seq
+
+    def get_sample(self) -> Optional[SensorSample]:
+        with self._sample_lock:
+            sample = self._latest_sample
+            self._consumed_seq = self._sample_seq
+            return sample
+
     def write_command(self,command:str):
         if self._serial is None:return
         if not command.endswith("\n"):command+="\n"
@@ -70,7 +89,20 @@ class ArduinoReader(QObject):
                 if not line:
                     if time.time()-last_data>STALE_DATA_TIMEOUT_S: raise _SerialStaleError()
                     continue
-                sample:SensorSample=self.parser.parse(line); last_data=time.time(); self.sample_received.emit(sample)
+                # Firmware diagnostics/ACKs are human-readable and are not data packets.
+                if line.startswith("[") or line.startswith("$ACK,"):
+                    last_data=time.time()
+                    continue
+                if line.startswith("$PCAL,"):
+                    self.calibration_received.emit(self.parser.parse_calibration_event(line))
+                    last_data=time.time()
+                    continue
+                sample:SensorSample=self.parser.parse(line)
+                last_data=time.time()
+                with self._sample_lock:
+                    self._latest_sample = sample
+                    self._sample_seq += 1
+                self.sample_received.emit(sample)
             except PacketParseError as exc:self.error_received.emit(f"Packet parse error: {exc}")
             except Exception as exc:
                 if isinstance(exc,_SerialStaleError): raise

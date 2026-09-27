@@ -38,7 +38,7 @@ jobs:
           arduino-cli lib install 'Adafruit BME280 Library'
           arduino-cli lib install 'Adafruit GFX Library'
           arduino-cli lib install 'Adafruit SSD1306'
-      - name: Compile ESP32-S3 primary wearable
-        run: arduino-cli compile --fqbn esp32:esp32:esp32s3 --export-binaries 'hardware/esp32s3/endo_twin_wearable'
+      - name: Compile Adafruit Feather ESP32-S3 2MB PSRAM primary wearable
+        run: arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32s3 --export-binaries 'hardware/esp32s3/endo_twin_wearable'
       - name: Compile Arduino Mega bench/lab
         run: arduino-cli compile --fqbn arduino:avr:mega --export-binaries 'hardware/arduino/endo_twin_mega_lab'

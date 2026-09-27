@@ -3,34 +3,34 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QHBoxLayout
 
 APP_QSS = """
 QMainWindow,QWidget{
-    background:#050d18;color:#eef7ff;
+    background:#040817;color:#f3f7ff;
     font-family:"Inter","Noto Sans","Segoe UI",sans-serif;font-size:12px;
 }
 QFrame#sidebar{
-    background:#071321;border-right:1px solid #1c3852;
+    background:#060c1b;border-right:1px solid #182443;
 }
 QFrame#topbar{
-    background:#09182a;border-bottom:1px solid #244663;
+    background:#090f24;border-bottom:1px solid #1d3158;
 }
 QFrame#patientHeader{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #10253a,stop:1 #0b1b2c);
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #111a35,stop:1 #0a1126);
     border:1px solid #244663;border-radius:14px;
 }
 QFrame#card{
-    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #10243a,stop:1 #0b1b2d);
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #101a32,stop:1 #0a1225);
     border:1px solid #244663;border-radius:14px;
 }
 QFrame#soft{
-    background:#0c1d30;border:1px solid #203f5b;border-radius:11px;
+    background:#0c1530;border:1px solid #243762;border-radius:11px;
 }
 QFrame#hero{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #0d3044,stop:1 #0b1d31);
-    border:1px solid #245a76;border-radius:12px;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16265a,stop:1 #0b1531);
+    border:1px solid #2a4480;border-radius:12px;
 }
-QLabel#brand{color:#f6fbff;font-size:20px;font-weight:850;}
-QLabel#eyebrow{color:#48d9ff;font-size:9px;font-weight:850;letter-spacing:1.2px;}
-QLabel#title{color:#f4f9ff;font-size:29px;font-weight:850;}
-QLabel#subtitle{color:#91abc5;font-size:12px;font-weight:650;}
+QLabel#brand{color:#f8fbff;font-size:20px;font-weight:850;}
+QLabel#eyebrow{color:#65b8ff;font-size:9px;font-weight:850;letter-spacing:1.2px;}
+QLabel#title{color:#f7f9ff;font-size:29px;font-weight:850;}
+QLabel#subtitle{color:#a7b5d3;font-size:12px;font-weight:650;}
 QLabel#muted{color:#87a1bb;font-size:10px;}
 QLabel#metricValue{color:#f4fbff;font-size:25px;font-weight:850;}
 QLabel#bigValue{color:#f4fbff;font-size:37px;font-weight:850;}
@@ -47,19 +47,19 @@ QPushButton#nav{
     text-align:left;background:transparent;border:1px solid transparent;border-radius:9px;
     padding:10px 11px;color:#8fa9c2;font-size:11px;font-weight:750;
 }
-QPushButton#nav:hover{background:#102a42;color:#ffffff;border-color:#214d6b;}
+QPushButton#nav:hover{background:#17224a;color:#ffffff;border-color:#314f9a;}
 QPushButton#nav:checked{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0d5b88,stop:1 #153e76);
-    color:#ffffff;border-color:#1b88c0;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d7bff);
+    color:#ffffff;border-color:#735cff;
 }
 QPushButton#nav:disabled{color:#536b80;}
 QPushButton#primary{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #24c8ee,stop:1 #587fff);color:white;border:0;border-radius:9px;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d8cff);color:white;border:0;border-radius:9px;
     padding:9px 14px;font-weight:850;
 }
-QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #3ed7f5,stop:1 #7092ff);}
+QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7d6aff,stop:1 #55a7ff);}
 QPushButton#secondary{
-    background:#102b43;color:#bfeaff;border:1px solid #2b5b7a;
+    background:#121e3a;color:#d6e3ff;border:1px solid #304774;
     border-radius:8px;padding:8px 12px;font-weight:750;
 }
 QPushButton#danger{
@@ -77,9 +77,9 @@ QLineEdit,QTextEdit,QListWidget,QTableWidget,QComboBox{
     padding:8px;color:#eef7ff;selection-background-color:#164b6b;
 }
 QLineEdit:focus,QComboBox:focus{border-color:#37bfe9;}
-QTableWidget{gridline-color:#1c3850;}
+QTableWidget{gridline-color:#18294d;}
 QHeaderView::section{
-    background:#0d2135;color:#8fa8c0;padding:9px;border:0;
+    background:#101a31;color:#9baccc;padding:9px;border:0;
     border-bottom:1px solid #244663;font-weight:800;
 }
 QTableWidget::item{padding:8px;}
@@ -87,7 +87,7 @@ QTableWidget::item:selected{background:#123b57;color:#ffffff;}
 QScrollBar:vertical{background:#071321;width:9px;}
 QScrollBar::handle:vertical{background:#294b65;border-radius:5px;min-height:30px;}
 QProgressBar{
-    background:#081522;border:1px solid #25445e;border-radius:6px;
+    background:#091226;border:1px solid #243d68;border-radius:6px;
     text-align:center;color:#9ab1c7;height:10px;
 }
 QProgressBar::chunk{background:#22c7ec;border-radius:6px;}
@@ -113,6 +113,8 @@ def card(title, value, detail, parent=None, accent=None):
     b.setWordWrap(True)
     if accent:
         b.setStyleSheet(f"color:{accent};")
+    frame.value_label = b
+    frame.title_label = a
     lay.addWidget(b)
     c = QLabel(detail)
     c.setObjectName("muted")
