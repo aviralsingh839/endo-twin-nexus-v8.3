@@ -104,3 +104,41 @@ def test_patient_scoped_baseline_storage(tmp_path, monkeypatch):
     assert baseline.samples == 70
     assert baseline_store.baseline_summary("PT-BASE")["available"]
     assert (tmp_path / "baselines" / "PT-BASE.json").exists()
+
+
+def test_pcod_progress_panel_accepts_feature_dict():
+    from src.ui.pcos_complication_panel import PCODProgressPanel
+
+    panel = PCODProgressPanel()
+    panel.set_context(
+        {
+            "participant_id": "PT-UI",
+            "has_pcod": True,
+            "age_years": 25,
+            "bmi": 22.0,
+        },
+        [
+            {
+                "timestamp": 1.0,
+                "hr_bpm": 70.0,
+                "rmssd_ms": 40.0,
+                "skin_temp_c": 32.0,
+                "gsr_tonic": 10.0,
+                "activity_level": 20.0,
+                "sleep_duration_h": 7.0,
+                "signal_quality": 0.9,
+            }
+        ],
+        {
+            "timestamp": 2.0,
+            "hr_bpm": 71.0,
+            "rmssd_ms": 41.0,
+            "skin_temp_c": 32.1,
+            "gsr_tonic": 10.1,
+            "activity_level": 22.0,
+            "sleep_duration_h": 7.1,
+            "signal_quality": 0.9,
+        },
+    )
+    assert panel.latest_feature is not None
+    assert panel.latest_feature.hr_bpm == 71.0
