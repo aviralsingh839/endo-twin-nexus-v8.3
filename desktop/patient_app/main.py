@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 from desktop.demo_data import DEMO_CASES
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
+from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
@@ -43,6 +44,7 @@ class PatientWindow(QMainWindow):
         self.feature_history = []
         self.note_text = ""
         self.metric_labels = {}
+        self.visual_graphs = {}
         self.charts = {}
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
 
@@ -356,57 +358,115 @@ class PatientWindow(QMainWindow):
         o.addWidget(quick)
         return w
 
+    def _visual_series(self, key):
+        if not key:
+            return []
+        values = []
+        for row in self.feature_history:
+            if isinstance(row, dict):
+                value = row.get(key)
+            else:
+                value = getattr(row, key, None)
+            try:
+                if value is not None:
+                    values.append(float(value))
+            except (TypeError, ValueError):
+                pass
+        if values:
+            return values[-120:]
+        if self.mode.mode == "demo":
+            vals=self._current_values()
+            base={"hr_bpm":vals["hr"],"rmssd_ms":vals["hrv"],"skin_temp_c":vals["temp"],"gsr_tonic":0.28,"activity_level":vals["activity"]}.get(key)
+            if base is not None:
+                scale=0.05 if key=="skin_temp_c" else max(abs(float(base))*0.05,0.5)
+                return [float(base)+scale*x for x in [0,2,-1,3,1,-2,2,0,-1,2,1,-1,3,0]]
+        return []
+
     def _health(self):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
+        o.setSpacing(11)
         title = QLabel("My Health")
         title.setObjectName("title")
         o.addWidget(title)
-        o.addWidget(QLabel("Build a personal baseline from repeated observations and patient-entered context."))
-        grid = QGridLayout()
+
         vals = self._current_values()
-        for i, (a, b, c) in enumerate([
-            ("Personal baseline", "Building", "Requires repeated observations"),
-            ("Activity", self._fmt(vals["activity"], " %", 0), "IMU-derived activity index"),
-            ("Temperature", self._fmt(vals["temp"], " °C", 1), "Validity-gated sensor channel"),
-            ("Sleep duration", self._fmt(vals["sleep"], " h", 1), "Patient-reported/demo context"),
+        snap = self.personal_model.snapshot()
+        baseline = baseline_summary(self.participant_id)
+        top = QGridLayout()
+        for i, (name, value, detail, accent) in enumerate([
+            ("Personal baseline", "READY" if baseline["available"] else "BUILDING", "Patient-specific reference", "#36d9b6"),
+            ("Learning samples", f"{snap['samples']:,}", "Quality-gated observations", "#5d8dff"),
+            ("Data quality", self._fmt((vals["quality"] or 0)*100, " %", 0), "Latest signal quality", "#ff4fa3"),
+            ("PCOD status", "YES" if self.profile.get("has_pcod") is True else "NO" if self.profile.get("has_pcod") is False else "UNKNOWN", "Patient-reported", "#a86bff"),
         ]):
-            grid.addWidget(card(a, b, c), 0, i)
-        o.addLayout(grid)
-        o.addWidget(section_header("Your data has provenance", "MEASURED • DERIVED • PATIENT-REPORTED • IMAGE-DERIVED • MODEL-INFERRED • DEMO_DATA • UNKNOWN"))
-        o.addStretch()
+            top.addWidget(metric_card(name, value, detail, accent=accent), 0, i)
+        o.addLayout(top)
+
+        graphs = QGridLayout()
+        series = [
+            ("Heart rate", "bpm", "hr_bpm", "#ff4fa3"),
+            ("HRV / RMSSD", "ms", "rmssd_ms", "#38bdf8"),
+            ("Skin temperature", "°C", "skin_temp_c", "#ff9f43"),
+            ("Activity", "%", "activity_level", "#31d7a1"),
+        ]
+        for i, (name, unit, key, accent) in enumerate(series):
+            values = self._visual_series(key)
+            panel = trend_panel(name, values, unit, accent, 165)
+            graphs.addWidget(panel, i//2, i%2)
+            self.visual_graphs[key] = panel.graph
+        o.addLayout(graphs)
+
+        bottom = QHBoxLayout()
+        g = RingGauge("Baseline confidence", baseline["confidence"]*100 if baseline["available"] else None, "%", "#39c9ff")
+        bottom.addWidget(g)
+        g2 = RingGauge("Learning coverage", min(100.0, snap["samples"]/100.0*100.0), "%", "#7f62ff")
+        bottom.addWidget(g2)
+        note = QFrame()
+        note.setObjectName("card")
+        nv = QVBoxLayout(note)
+        nv.addWidget(section_header("Today", "Visual summary"))
+        nv.addWidget(QLabel("Green = measured/derived data • purple = Personal Twin • pink/orange = health signal"))
+        nv.addWidget(status_badge("LOCAL • PATIENT-SCOPED", "info"))
+        bottom.addWidget(note, 1)
+        o.addLayout(bottom)
         return w
 
     def _measurements(self):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        title = QLabel("Measurements")
-        title.setObjectName("title")
-        o.addWidget(title)
-        o.addWidget(QLabel("Live sensor processing and derived features, kept distinct from disease-model inference."))
+        o.setSpacing(10)
+        o.addWidget(section_header("Live Measurements", "Large visuals first; provenance remains visible on every metric."))
 
-        grid = QGridLayout()
         vals = self._current_values()
         specs = [
-            ("Heart rate", self._fmt(vals["hr"], " bpm", 1), "Processed from PPG", "MEASURED"),
-            ("HRV RMSSD", self._fmt(vals["hrv"], " ms", 1), "Cleaned beat-to-beat intervals", "DERIVED"),
-            ("SpO₂", "—", "Quality-gated research estimate", "DERIVED"),
-            ("Skin temperature", self._fmt(vals["temp"], " °C", 1), "Validity-gated", "MEASURED"),
-            ("GSR / EDA", "—", "Conductance proxy", "MEASURED"),
-            ("Activity", self._fmt(vals["activity"], " %", 1), "IMU-derived index", "DERIVED"),
+            ("Heart rate", "hr", "bpm", "MEASURED", "#ff4fa3"),
+            ("HRV / RMSSD", "hrv", "ms", "DERIVED", "#33a8ff"),
+            ("Skin temperature", "temp", "°C", "MEASURED", "#ff9f43"),
+            ("GSR / EDA", "gsr", "rel.", "MEASURED", "#a86bff"),
+            ("Activity", "activity", "%", "DERIVED", "#31d7a1"),
+            ("SpO₂", None, "%", "NOT AVAILABLE — analog PPG", "#44d9ff"),
         ]
-        for i, (a, b, c, p) in enumerate(specs):
-            panel = card(a, b, c)
-            panel.layout().addWidget(status_badge(p, "measured" if p=="MEASURED" else "derived"))
-            grid.addWidget(panel, i//3, i%3)
+        grid = QGridLayout()
+        for i,(name,key,unit,prov,accent) in enumerate(specs):
+            value = "—" if key is None else self._fmt(vals.get(key), f" {unit}", 1)
+            card_widget = metric_card(name, value, prov, self._visual_series({"hr":"hr_bpm","hrv":"rmssd_ms","temp":"skin_temp_c","gsr":"gsr_tonic","activity":"activity"}.get(key),), accent, unit)
+            grid.addWidget(card_widget, i//3, i%3)
         o.addLayout(grid)
-        self.measure_chart = Sparkline("Activity / motion", "%")
-        self.measure_chart.setMinimumHeight(210)
-        if vals["activity"] is not None:
-            self.measure_chart.set_values([vals["activity"] + x for x in (-9,-4,2,6,-2,3,8,-5,0,4)])
-        o.addWidget(self.measure_chart)
+
+        graphrow = QGridLayout()
+        for i,(name,unit,key,accent) in enumerate([
+            ("Cardiovascular", "", "hr_bpm", "#ff4fa3"),
+            ("Autonomic", "", "rmssd_ms", "#39c9ff"),
+            ("Stress / EDA", "", "gsr_tonic", "#a86bff"),
+            ("Movement", "", "activity_level", "#31d7a1"),
+        ]):
+            p = trend_panel(name, self._visual_series(key), unit, accent, 190)
+            graphrow.addWidget(p, i//2, i%2)
+            self.visual_graphs[key] = p.graph
+        o.addLayout(graphrow, 1)
         self.measure_status = QLabel("Waiting for stream…")
         self.measure_status.setObjectName("muted")
         o.addWidget(self.measure_status)
@@ -416,59 +476,69 @@ class PatientWindow(QMainWindow):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        title = QLabel("My timeline")
-        title.setObjectName("title")
-        o.addWidget(title)
-        o.addWidget(QLabel("Chronological patient-scoped events and sessions."))
+        o.setSpacing(10)
+        o.addWidget(section_header("Today’s Timeline", "Events and physiological movement, visualized together."))
+        split = QGridLayout()
+
         box = QFrame()
         box.setObjectName("card")
         v = QVBoxLayout(box)
-        events = [
-            ("Today", "Current session", "Live measurements / demo stream"),
-            ("Today", "Latest observations", "PPG, HRV, activity and temperature path"),
-            ("Earlier", "Baseline building", "Repeated observations remain longitudinal context"),
-            ("Earlier", "Report workflow", "Research report generated locally"),
-        ]
-        for date, head, detail in events:
+        v.addWidget(QLabel("RECENT EVENTS"))
+        for idx, (date, head, detail) in enumerate([
+            ("NOW", "Wearable stream", "Live observations linked to this patient"),
+            ("TODAY", "Personal Twin", "Quality-gated learning updates"),
+            ("TODAY", "Baseline", "Person-specific baseline stored locally" if baseline_summary(self.participant_id)["available"] else "Baseline is still being built"),
+            ("EARLIER", "Report", "Local report workflow available"),
+        ]):
             row = QHBoxLayout()
-            dot = QLabel("◉")
-            dot.setStyleSheet("color:#9aaeff;font-size:15px;")
-            row.addWidget(dot)
-            col = QVBoxLayout()
-            d = QLabel(date)
-            d.setObjectName("muted")
-            col.addWidget(d)
-            h = QLabel(head)
-            h.setStyleSheet("font-weight:850;color:#e7ebf3;")
-            col.addWidget(h)
-            de = QLabel(detail)
-            de.setObjectName("muted")
-            de.setWordWrap(True)
-            col.addWidget(de)
-            row.addLayout(col, 1)
-            v.addLayout(row)
-        o.addWidget(box)
-        o.addStretch()
+            badge = QLabel(f"{idx+1:02d}")
+            badge.setStyleSheet("background:#5b3cff;color:white;border-radius:10px;padding:5px;font-weight:900;")
+            row.addWidget(badge)
+            txt = QVBoxLayout()
+            txt.addWidget(QLabel(date))
+            txt.addWidget(QLabel(f"<b>{head}</b>"))
+            d = QLabel(detail); d.setObjectName("muted"); d.setWordWrap(True); txt.addWidget(d)
+            row.addLayout(txt,1); v.addLayout(row)
+        split.addWidget(box,0,0)
+
+        gcol = QVBoxLayout()
+        gcol.addWidget(trend_panel("Heart rate", self._visual_series("hr_bpm"), "bpm", "#ff4fa3", 145))
+        gcol.addWidget(trend_panel("HRV", self._visual_series("rmssd_ms"), "ms", "#38bdf8", 145))
+        split.addLayout(gcol,0,1)
+        o.addLayout(split,1)
         return w
 
     def _personal_twin(self):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        o.addWidget(section_header("My Personal Adaptive Twin", "Patient-scoped learning shared with the Doctor and Unified Workstations."))
-        self.personal_text = QTextEdit()
-        self.personal_text.setReadOnly(True)
-        o.addWidget(self.personal_text, 1)
+        o.addWidget(section_header("Personal Adaptive Twin", "Your local patient-specific baseline and learning state."))
+
+        snap = self.personal_model.snapshot()
+        baseline = baseline_summary(self.participant_id)
+        kpi = QGridLayout()
+        kpi.addWidget(metric_card("Learning samples", f"{snap['samples']:,}", "Quality-gated", accent="#5b7cff"),0,0)
+        kpi.addWidget(metric_card("Baseline", "READY" if baseline["available"] else "BUILDING", "Stored locally", accent="#32d6a0"),0,1)
+        kpi.addWidget(metric_card("PCOD status", "YES" if self.profile.get("has_pcod") is True else "NO" if self.profile.get("has_pcod") is False else "UNKNOWN", "Set in patient profile", accent="#a86bff"),0,2)
+        q = baseline["quality"]*100 if baseline["available"] else 0
+        kpi.addWidget(metric_card("Baseline quality", f"{q:.0f}%", "Capture quality", accent="#ff9f43"),0,3)
+        o.addLayout(kpi)
+
+        graphs = QGridLayout()
+        for i,(key,title,unit,accent) in enumerate([
+            ("hr_bpm","Heart rate","bpm","#ff4fa3"),
+            ("rmssd_ms","HRV","ms","#39c9ff"),
+            ("skin_temp_c","Temperature","°C","#ff9f43"),
+            ("gsr_tonic","GSR","","#a86bff"),
+        ]):
+            p = trend_panel(title,self._visual_series(key),unit,accent,175)
+            graphs.addWidget(p,i//2,i%2); self.visual_graphs[key]=p.graph
+        o.addLayout(graphs,1)
+
         row = QHBoxLayout()
-        refresh = QPushButton("Refresh learned data")
-        refresh.clicked.connect(self._refresh_personal)
-        row.addWidget(refresh)
-        switch = QPushButton("Switch Patient")
-        switch.clicked.connect(self._switch_patient)
-        row.addWidget(switch)
-        row.addStretch()
-        o.addLayout(row)
-        self._refresh_personal()
+        refresh = QPushButton("Refresh"); refresh.setObjectName("secondary"); refresh.clicked.connect(self._refresh_personal); row.addWidget(refresh)
+        switch = QPushButton("Switch Patient"); switch.setObjectName("primary"); switch.clicked.connect(self._switch_patient); row.addWidget(switch)
+        row.addStretch(); o.addLayout(row)
         return w
 
     def _refresh_personal(self):
@@ -513,22 +583,24 @@ class PatientWindow(QMainWindow):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        title = QLabel("Reports")
-        title.setObjectName("title")
-        o.addWidget(title)
-        o.addWidget(QLabel("Review-ready summaries keep source, quality, uncertainty and limitations visible."))
-        box = QFrame()
-        box.setObjectName("card")
-        v = QVBoxLayout(box)
-        v.addWidget(QLabel("My monitoring summary"))
-        v.addWidget(QLabel("Observation → quality → baseline → longitudinal context → model layer → limitations"))
-        b = QPushButton("Generate local demo report")
-        b.setObjectName("primary")
-        b.clicked.connect(self._generate_report)
-        v.addWidget(b, 0, Qt.AlignmentFlag.AlignLeft)
-        o.addWidget(box)
-        o.addWidget(card("Clinical validation", "NOT ESTABLISHED", "This prototype is not a medical device or diagnostic system."))
-        o.addStretch()
+        o.addWidget(section_header("Reports & Export", "Visual summary first, traceable local report second."))
+        vals = self._current_values()
+        grid = QGridLayout()
+        for i,(title,value,detail,accent) in enumerate([
+            ("Heart rate",self._fmt(vals["hr"]," bpm",0),"Latest observation","#ff4fa3"),
+            ("HRV",self._fmt(vals["hrv"]," ms",0),"Derived from PPG","#39c9ff"),
+            ("Temperature",self._fmt(vals["temp"]," °C",1),"Sensor channel","#ff9f43"),
+            ("Activity",self._fmt(vals["activity"]," %",0),"IMU context","#31d7a1"),
+        ]):
+            grid.addWidget(metric_card(title,value,detail,self._visual_series({"Heart rate":"hr_bpm","HRV":"rmssd_ms","Temperature":"skin_temp_c","Activity":"activity_level"}[title]),accent),0,i)
+        o.addLayout(grid)
+        graph = trend_panel("30-window visual summary", self._visual_series("hr_bpm"), "bpm", "#5b7cff", 220)
+        self.visual_graphs["report_hr"] = graph.graph
+        o.addWidget(graph,1)
+        actions=QHBoxLayout()
+        b=QPushButton("Generate local report"); b.setObjectName("primary"); b.clicked.connect(self._generate_report); actions.addWidget(b)
+        b2=QPushButton("Personal Twin"); b2.setObjectName("secondary"); b2.clicked.connect(lambda:self._go("personal")); actions.addWidget(b2)
+        actions.addStretch(); o.addLayout(actions)
         return w
 
     def _generate_report(self):
@@ -558,24 +630,25 @@ class PatientWindow(QMainWindow):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        title = QLabel("Connect")
-        title.setObjectName("title")
-        o.addWidget(title)
-        o.addWidget(QLabel("Pair your Patient Android app with the Doctor Workstation on a trusted local network."))
+        o.addWidget(section_header("Wearable & Workstation Connection", "Visual connection status for this patient session."))
         grid = QGridLayout()
-        grid.addWidget(card("Patient bridge", self.bridge.endpoint, "This workstation • port 7778"), 0, 0)
-        grid.addWidget(card("Doctor bridge", "Port 7777", "Doctor workstation endpoint"), 0, 1)
-        grid.addWidget(card("Packages received", str(self.bridge.received_count), "Local bridge inbox"), 0, 2)
+        state = "CONNECTED" if self.latest_row else "WAITING"
+        grid.addWidget(RingGauge("Wearable", 100 if self.latest_row else 0, "%", "#31d7a1"),0,0)
+        grid.addWidget(metric_card("Patient bridge", self.bridge.endpoint, "Local bridge • patient-scoped", accent="#39c9ff"),0,1)
+        grid.addWidget(metric_card("Doctor bridge", "7777", "Local workstation endpoint", accent="#a86bff"),0,2)
+        grid.addWidget(metric_card("Packets", str(self.bridge.received_count), "Packages received", accent="#ff9f43"),0,3)
         o.addLayout(grid)
-        c = QPushButton("Copy patient endpoint")
-        c.setObjectName("primary")
-        c.clicked.connect(lambda: (QApplication.clipboard().setText(self.bridge.endpoint), QMessageBox.information(self, "Connect", "Endpoint copied.")))
-        o.addWidget(c, 0, Qt.AlignmentFlag.AlignLeft)
-        note = QLabel("Transport is research LAN infrastructure. Production health systems need encrypted transport, strong authentication, authorization and audit logging.")
-        note.setObjectName("warning")
-        note.setWordWrap(True)
-        o.addWidget(note)
-        o.addStretch()
+        if state == "CONNECTED":
+            q = QLabel("●  Wearable connected • live patient stream")
+            q.setStyleSheet("color:#31d7a1;font-weight:900;font-size:15px;")
+        else:
+            q = QLabel("○  Waiting for wearable data")
+            q.setStyleSheet("color:#ffb14a;font-weight:850;font-size:15px;")
+        o.addWidget(q)
+        actions=QHBoxLayout()
+        c=QPushButton("Copy patient endpoint"); c.setObjectName("primary"); c.clicked.connect(lambda:(QApplication.clipboard().setText(self.bridge.endpoint),QMessageBox.information(self,"Connect","Endpoint copied."))); actions.addWidget(c)
+        c2=QPushButton("Personal Twin"); c2.setObjectName("secondary"); c2.clicked.connect(lambda:self._go("personal")); actions.addWidget(c2)
+        actions.addStretch(); o.addLayout(actions)
         return w
 
     def _complications(self):
@@ -600,17 +673,19 @@ class PatientWindow(QMainWindow):
         w = QWidget()
         o = QVBoxLayout(w)
         o.setContentsMargins(24, 16, 20, 14)
-        title = QLabel("Notes")
-        title.setObjectName("title")
-        o.addWidget(title)
-        o.addWidget(QLabel("Local patient-scoped notes for personal context and clinician discussion."))
-        self.note_editor = QTextEdit()
-        self.note_editor.setPlaceholderText("Write something you want to remember…")
-        o.addWidget(self.note_editor, 1)
-        save = QPushButton("Save local note")
-        save.setObjectName("primary")
-        save.clicked.connect(self._save_note)
-        o.addWidget(save, 0, Qt.AlignmentFlag.AlignLeft)
+        o.addWidget(section_header("Symptoms & Notes", "Quick capture on the left, detailed note on the right."))
+        body=QGridLayout()
+        quick=QFrame(); quick.setObjectName("card"); qv=QVBoxLayout(quick)
+        qv.addWidget(QLabel("QUICK SYMPTOMS"))
+        for label in ["Cycle change","Pelvic discomfort","Acne / skin","Mood change","Sleep change","Fatigue"]:
+            b=QPushButton(label); b.setObjectName("secondary"); qv.addWidget(b)
+        body.addWidget(quick,0,0)
+        note=QFrame(); note.setObjectName("card"); nv=QVBoxLayout(note)
+        nv.addWidget(QLabel("PATIENT NOTE"))
+        self.note_editor=QTextEdit(); self.note_editor.setPlaceholderText("Write something you want to remember…"); nv.addWidget(self.note_editor,1)
+        save=QPushButton("Save local note"); save.setObjectName("primary"); save.clicked.connect(self._save_note); nv.addWidget(save,0,Qt.AlignmentFlag.AlignLeft)
+        body.addWidget(note,0,1); o.addLayout(body,1)
+        o.addWidget(status_badge("LOCAL • PATIENT-SCOPED", "info"))
         return w
 
     def _save_note(self):
@@ -644,6 +719,10 @@ class PatientWindow(QMainWindow):
             self.side_state.setText(f"Learning warning • {exc}")
         if hasattr(self, "pcod_progress_panel"):
             self.pcod_progress_panel.set_context(self.profile, self.feature_history, row)
+        for key in ("hr_bpm","rmssd_ms","skin_temp_c","gsr_tonic","activity_level"):
+            graph=self.visual_graphs.get(key)
+            if graph is not None:
+                graph.set_value(row.get(key))
         q = row.get("signal_quality")
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
