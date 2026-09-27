@@ -26,6 +26,9 @@ from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
+from src.personal_twin.profile_store import load_state, profile_summary
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
 
@@ -52,7 +55,10 @@ class DoctorWindow(QMainWindow):
         self.trend_charts = {}
         self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
         self.tab_pages = {}
-        self.page_keys = ["dashboard", "patients", "lab", "patient", "mobile", "settings"]
+        shared_profile = load_state().get("profile", {})
+        self.participant_id = str(shared_profile.get("participant_id") or "LOCAL-PARTICIPANT")
+        self.personal_model = PersonalAdaptiveModel(self.participant_id)
+        self.page_keys = ["dashboard", "patients", "lab", "complications", "personal", "patient", "mobile", "settings"]
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7777)
         self.bridge.start()
@@ -112,6 +118,8 @@ class DoctorWindow(QMainWindow):
             ("dashboard", "▦  Dashboard"),
             ("patients", "♙  Patients"),
             ("lab", "⌁  Prototype Lab"),
+            ("complications", "⚕  PCOS Complications"),
+            ("personal", "◎  Personal Twin"),
         ]:
             b = QPushButton(text)
             b.setObjectName("nav")
@@ -201,6 +209,9 @@ class DoctorWindow(QMainWindow):
             "dashboard": self._dashboard_page(),
             "patients": self._patients_page(),
             "lab": PrototypeLabWidget(self.session, self.mode, ROOT),
+            "complications": self._complications_page(),
+            "personal": self._personal_page(),
+            "personal": self._personal_page(),
             "patient": self._patient_page(),
             "mobile": self._mobile_page(),
             "settings": self._settings_page(),
@@ -909,6 +920,61 @@ class DoctorWindow(QMainWindow):
                 self._open_case(str(hit.get("patient_id") or hit.get("anonymous_id")))
 
     # ---------- patient workspace ----------
+    def _complication_context(self):
+        p = self._profile() or {}
+        return {
+            "age_years": p.get("age"),
+            "bmi": p.get("bmi"),
+            "systolic_bp": None,
+            "diastolic_bp": None,
+            "glucose_mg_dl": None,
+            "cycle_irregular": None,
+            "usual_cycle_length_days": None,
+            "days_since_last_period": None,
+            "years_post_menarche": None,
+        }
+
+    def _complications_page(self):
+        page = PCOSComplicationPanel("PCOS / Complication Context")
+        page.set_context(self._complication_context(), self.latest_row)
+        return page
+
+    def _personal_page(self):
+        page = QWidget()
+        o = QVBoxLayout(page)
+        o.setContentsMargins(24, 16, 20, 14)
+        o.addWidget(section_header("Personal Adaptive Twin", "Shared local personalization state."))
+        state = load_state()
+        p = state.get("profile", {})
+        info = QLabel(
+            f"Participant: {p.get('participant_id', self.participant_id)}\n"
+            f"{profile_summary(p)}"
+        )
+        info.setWordWrap(True)
+        o.addWidget(info)
+        self.personal_text = QTextEdit()
+        self.personal_text.setReadOnly(True)
+        o.addWidget(self.personal_text, 1)
+        self._refresh_personal_page()
+        return page
+
+    def _refresh_personal_page(self):
+        state = load_state()
+        learning = state.get("learning", {})
+        lines = [
+            f"Model: {learning.get('version', 'adaptive-personal-twin-v1')}",
+            f"Quality-gated observations: {int(learning.get('samples', 0)):,}",
+            f"Quality-weighted observations: {float(learning.get('quality_weighted_samples', 0.0)):.1f}",
+            "",
+            "Learned personal reference:",
+        ]
+        for name, item in (learning.get("metrics", {}) or {}).items():
+            lines.append(
+                f"{name}: mean={float(item.get('mean', 0.0)):.3f}, "
+                f"std={float(item.get('m2', 0.0)):.3f} proxy, last={item.get('last')}"
+            )
+        self.personal_text.setText("\n".join(lines))
+
     def _patient_page(self):
         page = QWidget()
         outer = QVBoxLayout(page)
@@ -1569,6 +1635,11 @@ class DoctorWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        self.personal_model.sync_from_disk()
+        if hasattr(self, "complications_page"):
+            self.complications_page.set_context(self._complication_context(), row)
+        if hasattr(self, "personal_text"):
+            self._refresh_personal_page()
         self.quality_badge.setText("●  " + self._data_quality_text(row.get("signal_quality"))[0])
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
