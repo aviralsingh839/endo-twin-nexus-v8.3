@@ -139,6 +139,11 @@ class PersonalTwinOnboarding(QDialog):
         self.summary.setText(profile_summary(p) if p else "New participant — enter the profile below.")
 
     def save(self):
+        patient_name = self.patient_name.text().strip()
+        if not patient_name:
+            QMessageBox.warning(self, "Patient name required", "Enter the patient's name before saving this Personal Twin.")
+            self.patient_name.setFocus()
+            return
         pid = self.participant_id or ("PT-" + uuid.uuid4().hex[:10].upper())
         h = float(self.height.value())
         w = float(self.weight.value())
