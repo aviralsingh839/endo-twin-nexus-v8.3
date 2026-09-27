@@ -60,6 +60,7 @@ class DoctorWindow(QMainWindow):
         self.trend_charts = {}
         self.metric_history = {"hr_bpm": deque(maxlen=240), "rmssd_ms": deque(maxlen=240), "activity_level": deque(maxlen=240), "skin_temp_c": deque(maxlen=240), "gsr_tonic": deque(maxlen=240), "spo2_pct": deque(maxlen=240)}
         self.feature_history = []
+        self.feature_window_count = 0
         self.tab_pages = {}
         self.visual_graphs = {}
         shared_profile = load_state().get("profile", {})
@@ -1570,6 +1571,7 @@ class DoctorWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
+        self.feature_window_count += 1
         source = str(row.get("source", "")).lower()
         if source not in {"demo", "synthetic"} and not source.startswith("demo"):
             self.feature_history.append(dict(row))
@@ -1578,6 +1580,7 @@ class DoctorWindow(QMainWindow):
             source = str(row.get("source", "")).lower()
             if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
                 self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+                self.personal_model.sync_from_disk()
                 rows = [r for r in self.feature_history[-160:] if str(r.get("gating","")) == "USABLE"]
                 if len(rows) >= 60 and self.personal_model.snapshot()["samples"] % 20 == 0:
                     cap = BaselineCapture(self.participant_id, duration_s=0, min_samples=60, min_quality=0.45)
