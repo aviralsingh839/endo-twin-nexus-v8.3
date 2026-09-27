@@ -38,6 +38,7 @@ from src.core.quality_control import SensorQualityControl
 from src.disease_modules.registry import GLOBAL_REGISTRY
 from src.fusion.multimodal_fusion import FusionEngine
 from src.explainability.explanation_engine import ExplanationEngine
+from src.models.complications import compute_complication_signals
 from src.serial_io.arduino_reader import ArduinoReader
 from src.serial_io.network_reader import NetworkReader
 from src.ui.theme import DARK_QSS, GREEN, ORANGE, RED, YELLOW, TEXT_MUTED
@@ -77,6 +78,8 @@ class MainWindow(QMainWindow):
         self.clinical_data: dict = {}
         self.ultrasound_data: dict | None = None
         self.demo_stream: DemoSensorStream | None = None
+        self.complication_signals = []
+        self.last_packet_time: float | None = None
         self.arduino_reader: ArduinoReader | None = None
         self.network_reader: NetworkReader | None = None
         self.history_store = HistoryStore(db_path) if db_path else HistoryStore()
@@ -107,6 +110,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
         self.tabs.addTab(self._build_trends_tab(), "Trends")
         self.tabs.addTab(self._build_health_signals_tab(), "Health Signals")
+        self.tabs.addTab(self._build_complications_tab(), "Complications")
         self.tabs.addTab(self._build_data_quality_tab(), "Data Quality")
         self.tabs.addTab(self._build_clinical_tab(), "Clinical Inputs")
         self.tabs.addTab(self._build_ultrasound_tab(), "Ultrasound")
@@ -238,6 +242,7 @@ class MainWindow(QMainWindow):
             ("♙", "Baseline"),
             ("⌁", "Trends"),
             ("◈", "Health Signals"),
+            ("⚠", "Complications"),
             ("◌", "Data Quality"),
             ("▣", "Clinical Inputs"),
             ("▧", "Ultrasound"),
@@ -494,6 +499,29 @@ class MainWindow(QMainWindow):
         layout.addWidget(tabs)
         return tab
 
+    def _build_complications_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        info = QLabel(
+            "COMPLICATION-RELATED RESEARCH SIGNALS\n"
+            "These are transparent research-domain signals, NOT calibrated chances/probabilities. "
+            "When sensor quality or required clinical inputs are insufficient, the result stays "
+            "'Not established' rather than inventing a number."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+        self.complication_text = QTextEdit()
+        self.complication_text.setReadOnly(True)
+        self.complication_text.setPlaceholderText("Connect the wearable and/or enter supported clinical inputs to populate this view.")
+        layout.addWidget(self.complication_text, 1)
+        note = QLabel(
+            "Domains: metabolic/insulin-resistance, hypertension, sleep-disordered breathing, "
+            "ovulatory/fertility-related, and metabolic-liver. Research only; clinical assessment is required."
+        )
+        note.setWordWrap(True)
+        note.setObjectName("SmallMuted")
+        layout.addWidget(note)
+        return tab
     def _build_data_quality_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
