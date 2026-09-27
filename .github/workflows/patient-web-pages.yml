@@ -6,6 +6,7 @@ on:
       - main
       - feature/v9-self-learning-unified-workstation
       - feature/patient-web-portal-local-first
+      - feature/wearable-auto-calibration-pcos-complications
   pull_request:
     paths:
       - website/**
