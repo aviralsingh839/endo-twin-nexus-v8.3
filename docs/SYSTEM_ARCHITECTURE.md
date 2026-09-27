@@ -243,3 +243,12 @@ Future modules must have:
 
 - Argparse: --demo, --port, --net, --scenario
 - QApplication, MainWindow, exec
+
+
+### V9.1 Desktop UI orchestration
+- Self-Learning Model is a menu-launched UI, not an automatic startup step.
+- Patient name/details and patient-reported PCOD/PCOS status are collected in the Personal Twin profile UI.
+- PCODProgressPanel is presentation/orchestration only: it reuses PersonalBaselineEngine, LongitudinalEngine and PCOSComplicationContextEngine.
+- PCOD-specific complication context is gated in the UI by the stored patient-reported PCOD status: Yes enables the existing complication engine; No/Unknown leaves it disabled.
+- Patient and Doctor workstations maintain a UI-side longitudinal feature history so the existing recovery/trend engine can be presented without a duplicate model.
+- The pre-redesign feature state is preserved on backup/pre-ui-redesign-2026-09-27.
