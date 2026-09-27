@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import List
 
 # V8.4 branding
-APP_VERSION = "8.6.1"
-APP_VERSION_LABEL = "V8.6.1, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
+APP_VERSION = "9.0.0"
+APP_VERSION_LABEL = "V9.0.0, Personalized Physiological Modelling Platform (research prototype, not clinically validated)"
 APP_NAME = "ENDO-TWIN"
 APP_TAGLINE = "Understand your physiological patterns over time."
 # Disease-specific module identity remains separate from the general platform name.
@@ -46,9 +46,17 @@ BASELINE_CONFIDENCE_MIN_OBS = 30
 FEATURE_LOG_INTERVAL_S = 10.0
 
 # Sampling targets
-PPG_FS_HZ = 50.0  # Sensor-core default; desktop live packet processing overrides to 20 Hz
+PPG_FS_HZ = 50.0  # Digital MAX30102 compatibility path.
+ANALOG_PPG_FS_HZ = 20.0  # ESP32 ADC Pulse Sensor wearable path.
 IMU_FS_HZ = 50.0
 GSR_FS_HZ = 10.0
+
+# ENDO-TWIN primary wearable pin map (ESP32-S3 + desktop workstation).
+WEARABLE_I2C_SDA_PIN = 21
+WEARABLE_I2C_SCL_PIN = 22
+WEARABLE_ANALOG_PPG_PIN = 4
+WEARABLE_GSR_PIN = 34
+WEARABLE_STATUS_LED_PIN = 2
 TEMP_FS_HZ = 1.0
 
 # HR limits
