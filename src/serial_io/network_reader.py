@@ -35,6 +35,10 @@ class NetworkReader(QObject):
         self._stop = threading.Event()
         self._sock: Optional[socket.socket] = None
         self.parser = PacketParser(require_crc=require_crc)
+        self._latest_sample = None
+        self._sample_pending = False
+        self._sample_lock = threading.Lock()
+        self._last_packet_time: float | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -42,6 +46,20 @@ class NetworkReader(QObject):
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+
+    def has_sample(self) -> bool:
+        with self._sample_lock:
+            return self._sample_pending
+
+    def get_sample(self):
+        with self._sample_lock:
+            sample = self._latest_sample
+            self._sample_pending = False
+            return sample
+
+    @property
+    def last_packet_time(self) -> float | None:
+        return self._last_packet_time
 
     def stop(self) -> None:
         self._stop.set()
@@ -101,6 +119,10 @@ class NetworkReader(QObject):
                         continue
                     try:
                         sample = self.parser.parse(line)
+                        self._last_packet_time = time.time()
+                        with self._sample_lock:
+                            self._latest_sample = sample
+                            self._sample_pending = True
                         self.sample_received.emit(sample)
                     except Exception as exc:
                         self.error_received.emit(f"Packet parse error: {exc}")
