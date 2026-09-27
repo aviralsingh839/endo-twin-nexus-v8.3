@@ -13,6 +13,8 @@ const DoctorViews = (() => {
     ]},
     { label: 'Clinical', items: [
       { id: 'signals', label: 'Physiological Signals', icon: 'pulse' },
+      { id: 'complications', label: 'Complication Risk', icon: 'shield', pill: true },
+      { id: 'livedevice', label: 'Live Device & Calibration', icon: 'watch' },
       { id: 'longitudinal', label: 'Longitudinal Analysis', icon: 'trends', caret: true },
       { id: 'imaging', label: 'Ultrasound Review', icon: 'scan' },
       { id: 'lab', label: 'AI / ML Laboratory', icon: 'flask', caret: true },
@@ -768,7 +770,48 @@ const DoctorViews = (() => {
   function about() { return PatientViews.pages.about(active()); }
 
   /* ------------------------------ registry ------------------------------- */
-  const pages = { dashboard, registry, chart, reviews, cohorts, signals, longitudinal, imaging, lab,
+  /* ------------------- complication prediction (clinician) --------------- */
+  function complications() {
+    const p = Store.patient();
+    if (!p) return C.pageHead('Complication Risk', 'No participant selected.') + C.empty('No participant', 'Open a record from the registry first.');
+    const data = PatientViews.compState.data;
+    const scored = data ? data.items.filter(i => i.status === 'ok') : [];
+    const clinicalHead = C.card({
+      title: `${p.name} · ${p.id}`, sub: 'Clinical inputs the engine can use', icon: 'stethoscope', color: U.C.violet,
+      right: `<button class="btn sm" data-act="editClinical">${U.icon('edit')} Edit clinical data</button>`,
+      body: C.kvs([
+        { k: 'Age / BMI', v: `${U.num(p.age)} y · ${U.num(p.bmi, 1)} kg/m²` },
+        { k: 'Blood pressure', v: U.num((p.vitals || {}).bp) },
+        { k: 'Waist', v: U.has(p.waist) ? p.waist + ' cm' : '—' },
+        { k: 'Cycle length', v: U.has(p.cycleLen) ? p.cycleLen + ' days' : '—' },
+        { k: 'Labs on file', v: (p.labs || []).length },
+        { k: 'Medications', v: (p.meds || []).length },
+        { k: 'Family history', v: [p.familyDiabetes ? 'diabetes' : '', p.familyPcos ? 'PCOS' : '', p.familyCvd ? 'CVD' : ''].filter(Boolean).join(', ') || 'not recorded' },
+        { k: 'Recorded sessions', v: U.num(p.sessionCount) },
+      ]),
+    });
+    return C.pageHead('Complication Risk',
+      `Rule-based complication surveillance for ${p.name} — transparent factors, explicit gaps.`,
+      `<button class="btn ghost" data-act="runComplications">${U.icon('refresh')} Re-run</button>
+       <button class="btn ghost" data-act="saveComplications">${U.icon('db')} Save to model_results</button>
+       <button class="btn primary" data-act="genReport" data-arg="complications">${U.icon('report')} Report</button>`)
+      + `<div class="row g-1">${clinicalHead}</div>`
+      + PatientViews.complicationsBody(p, { clinician: true })
+      + (scored.length ? C.card({ title: 'Escalation shortlist', icon: 'inbox', color: U.C.red,
+          body: C.table([{ t: 'Complication' }, { t: 'Risk' }, { t: 'Confidence' }, { t: 'Suggested next step' }],
+            scored.filter(i => i.band === 'high' || i.band === 'moderate').map(i => ({ cells: [
+              `<b>${i.name}</b><div class="dim">${i.horizon}</div>`,
+              `<span style="color:${i.band === 'high' ? U.C.red : U.C.orange};font-weight:700">${U.num(i.probability, 1)}%</span>`,
+              Math.round((i.confidence || 0) * 100) + '%', i.action] }))) }) : '');
+  }
+
+  /* --------------------- live device (clinician view) -------------------- */
+  function livedevice() {
+    return PatientViews.pages.wearable(Store.patient());
+  }
+
+  const pages = { dashboard, registry, chart, reviews, cohorts, signals, complications, livedevice,
+    longitudinal, imaging, lab,
     explain, provenance, appointments, notes, careplans, messages, clinreports, analytics,
     exports: exports_, doctors, clinic, fleet, database, diagnostics, audit, prefs, about };
 

@@ -27,10 +27,24 @@ const App = (() => {
     U.$('#topAvatar').textContent = U.initials(isDoc ? d.name : p.name);
     U.$('#topName').textContent = isDoc ? d.name : String(p.name).split(' ')[0];
     U.$('#topRole').textContent = isDoc ? 'Doctor View' : 'Patient View';
-    U.$('#deviceSub').textContent = isDoc
-      ? `${DemoData.devices.filter(x => x.state === 'Online').length}/${DemoData.devices.length} devices online`
-      : `${(p.device || '').split('·').pop().trim() || 'Not paired'} • ${U.num(p.battery)}%`;
-    U.$('#devicePill').classList.toggle('off', !isDoc && !p.battery);
+    const link = (window.DeviceLink && DeviceLink.state.status) || {};
+    const linked = link.state === 'connected' || link.state === 'streaming';
+    const pill = U.$('#devicePill');
+    if (linked) {
+      const bat = U.has(link.battery) ? ` • ${Math.round(link.battery)}%` : '';
+      U.$('#deviceLabel').textContent = link.recording ? 'Recording' : 'Wearable Live';
+      U.$('#deviceSub').textContent = `${link.deviceName || 'ENDO-TWIN device'} · ${(link.transport || '').toUpperCase()}${bat}`;
+      pill.classList.remove('off');
+      pill.classList.toggle('rec', !!link.recording);
+    } else {
+      U.$('#deviceLabel').textContent = isDoc ? 'Device Fleet' : 'Wearable';
+      U.$('#deviceSub').textContent = isDoc
+        ? `${DemoData.devices.filter(x => x.state === 'Online').length}/${DemoData.devices.length} devices online`
+        : `${(p.device || '').split('·').pop().trim() || 'Not paired'} • ${U.num(p.battery)}%`;
+      pill.classList.toggle('off', !isDoc && !p.battery);
+      pill.classList.remove('rec');
+    }
+    pill.onclick = () => go(isDoc ? 'livedevice' : 'wearable');
     renderSourceChip();
     U.$('#notifyBadge').textContent = Store.state.notifications.filter(n => !n.read).length || '';
     U.$('#notifyBadge').style.display = Store.state.notifications.some(n => !n.read) ? 'grid' : 'none';
@@ -185,6 +199,79 @@ const App = (() => {
   }
 
   /* -------------------------------- main -------------------------------- */
+  /* Generic add/edit/delete editor for the clinical lists (labs, meds, goals) */
+  function listEditor(kind, title, id) {
+    const p = Store.patient(id) || Store.patient();
+    const items = (p[kind] || []);
+    const cols = {
+      labs: [{ t: 'Test' }, { t: 'Value' }, { t: 'Unit' }, { t: 'Date' }, { t: '', w: '90px' }],
+      meds: [{ t: 'Item' }, { t: 'Dose' }, { t: 'Schedule' }, { t: 'Since' }, { t: '', w: '90px' }],
+      goals: [{ t: 'Goal' }, { t: 'Target' }, { t: 'Progress' }, { t: 'Due' }, { t: '', w: '90px' }],
+    }[kind];
+    const rowOf = it => ({
+      labs: [it.k || it.name, `<b>${U.num(it.value, 2)}</b>`, it.unit || '', it.date || it.added || ''],
+      meds: [it.n || it.name, it.d || it.dose || '', it.t || it.schedule || '', it.since || it.added || ''],
+      goals: [it.k || it.name, it.target || '', U.num(it.v, 0) + '%', it.due || ''],
+    }[kind]).concat([
+      `<button class="btn sm ghost" data-litem="${it.id}" data-lact="edit">${U.icon('edit', 'ic', 'width:13px;height:13px')}</button>
+       <button class="btn sm ghost" data-litem="${it.id}" data-lact="del">${U.icon('trash', 'ic', 'width:13px;height:13px')}</button>`]);
+
+    C.modal({
+      title, sub: `${p.name} · ${p.id}`, icon: kind === 'labs' ? 'flask' : kind === 'meds' ? 'pill' : 'goal',
+      color: U.C.violet,
+      body: (items.length ? C.table(cols, items.map(it => ({ cells: rowOf(it) })))
+        : C.empty('Nothing recorded yet', 'Add the first entry — it feeds straight into the predictions.'))
+        + `<div class="flex gap-6 mt-14"><button class="btn sm primary" data-lact="add">${U.icon('plus')} Add entry</button></div>`,
+      footer: `<button class="btn primary" data-close="1">Done</button>`,
+    });
+
+    const fieldsFor = (it = {}) => ({
+      labs: [
+        { n: 'k', l: 'Test', t: 'select', o: LAB_PRESETS, v: it.k },
+        { n: 'value', l: 'Value', t: 'number', v: it.value },
+        { n: 'unit', l: 'Unit', v: it.unit, ph: 'mg/dL' },
+        { n: 'ref', l: 'Reference range', v: it.ref, ph: '70–99' },
+        { n: 'date', l: 'Sample date', t: 'date', v: it.date },
+      ],
+      meds: [
+        { n: 'n', l: 'Medication / supplement', v: it.n },
+        { n: 'd', l: 'Dose', v: it.d, ph: '500 mg' },
+        { n: 't', l: 'Schedule', t: 'select', o: ['Morning', 'Afternoon', 'Night', 'After dinner', 'Twice daily'], v: it.t },
+        { n: 'k', l: 'Type', t: 'select', o: ['Supplement', 'Prescription', 'OTC'], v: it.k },
+        { n: 'since', l: 'Started', t: 'date', v: it.since },
+      ],
+      goals: [
+        { n: 'k', l: 'Goal', v: it.k },
+        { n: 'target', l: 'Target', v: it.target },
+        { n: 'v', l: 'Progress (%)', t: 'number', v: it.v, min: 0, max: 100 },
+        { n: 'due', l: 'Due', t: 'date', v: it.due },
+      ],
+    }[kind]);
+
+    const save = async (method, payload) => {
+      await Store.api(`/api/patients/${encodeURIComponent(p.id)}/${kind}`, method, payload);
+      await Store.refresh();
+      await loadComplications(true);
+      listEditor(kind, title, p.id);
+    };
+
+    U.$$('[data-lact]').forEach(b => b.onclick = () => {
+      const act = b.dataset.lact;
+      const it = items.find(x => x.id === b.dataset.litem) || {};
+      if (act === 'del') return save('DELETE', { id: it.id }).then(() => C.toast('Entry removed', 'info'));
+      C.modal({
+        title: (act === 'add' ? 'Add to ' : 'Edit ') + title.toLowerCase(), icon: 'edit', color: U.C.violet,
+        body: C.form(fieldsFor(it)), okText: 'Save',
+        async onOk(v) {
+          try {
+            await save(act === 'add' ? 'POST' : 'PATCH', act === 'add' ? v : Object.assign({ id: it.id }, v));
+            C.toast('Saved' + (Store.isLive() ? ' to the database' : ''));
+          } catch (e) { C.toast(e.message, 'err'); }
+        },
+      });
+    });
+  }
+
   function renderMain() {
     const main = U.$('#main');
     if (Store.dbEmpty()) {
@@ -196,6 +283,9 @@ const App = (() => {
     window.scrollTo({ top: 0 });
     bindMain();
     startLive();
+    if (route === 'wearable' || route === 'livedevice') bindDeviceUI();
+    else DeviceLink.start(6000);
+    if (route === 'complications') loadComplications(false);
   }
 
   function renderAll() { renderTop(); renderNav(); renderMain(); }
@@ -301,7 +391,225 @@ const App = (() => {
     { n: 'days', l: 'Working days', v: d.days }, { n: 'slot', l: 'Hours', v: d.slot },
   ];
 
+  /* --------------------- wearable + complications ----------------------- */
+  function bindDeviceUI() {
+    const st = PatientViews.wearState;
+    if (!st.loaded) {
+      st.loaded = true;
+      DeviceLink.getCalibration().then(r => { st.cal = r.calibration || {}; renderMain(); }).catch(() => {});
+      DeviceLink.ports().then(r => { st.ports = r; }).catch(() => {});
+    }
+    DeviceLink.start(1200);
+  }
+
+  function readCalInputs() {
+    const patch = {};
+    U.$$('[data-cal]').forEach(inp => {
+      const [sensor, field] = inp.dataset.cal.split('.');
+      const raw = inp.value;
+      patch[sensor] = patch[sensor] || {};
+      patch[sensor][field] = raw === '' ? null : (isNaN(+raw) ? raw : +raw);
+    });
+    return patch;
+  }
+
+  async function loadComplications(force) {
+    const p = Store.patient();
+    const st = PatientViews.compState;
+    if (!p) return;
+    if (!force && st.data && st.pid === p.id) return;
+    st.loading = true; st.error = null; st.pid = p.id;
+    renderMain();
+    try {
+      st.data = await Store.api('/api/patients/' + encodeURIComponent(p.id) + '/complications');
+      st.error = st.data.error || null;
+    } catch (e) {
+      st.error = e.message; st.data = null;
+    }
+    st.loading = false;
+    renderMain();
+  }
+
+  const clinicalFields = (p = {}) => [
+    { n: 'height', l: 'Height (cm)', t: 'number', v: p.height },
+    { n: 'weight', l: 'Weight (kg)', t: 'number', v: p.weight },
+    { n: 'waist', l: 'Waist (cm)', t: 'number', v: p.waist, hint: 'Metabolic-syndrome criterion (≥80 cm in women)' },
+    { n: 'bp', l: 'Blood pressure (mmHg)', v: (p.vitals || {}).bp || p.bp, ph: '118/76' },
+    { n: 'sleepHours', l: 'Typical sleep (h)', t: 'number', v: p.sleepHours },
+    { n: 'cycleLen', l: 'Average cycle length (days)', t: 'number', v: p.cycleLen },
+    { n: 'smoker', l: 'Smoker', t: 'select', o: ['', 'No', 'Yes'], v: p.smoker },
+    { n: 'alcohol', l: 'Alcohol', t: 'select', o: ['', 'None', 'Occasional', 'Weekly', 'Daily'], v: p.alcohol },
+    { n: 'familyDiabetes', l: 'Family history: diabetes', t: 'select', o: ['', 'No', 'Yes'], v: p.familyDiabetes },
+    { n: 'familyPcos', l: 'Family history: PCOS', t: 'select', o: ['', 'No', 'Yes'], v: p.familyPcos },
+    { n: 'familyCvd', l: 'Family history: heart disease', t: 'select', o: ['', 'No', 'Yes'], v: p.familyCvd },
+    { n: 'pregnancyPlan', l: 'Planning pregnancy', t: 'select', o: ['', 'No', 'Within a year', 'Trying now'], v: p.pregnancyPlan },
+    { n: 'conditions', l: 'Known conditions', t: 'textarea', full: true, v: p.conditions },
+    { n: 'allergies', l: 'Allergies', v: p.allergies },
+  ];
+
+  const LAB_PRESETS = ['Fasting glucose', 'HbA1c', 'LH / FSH ratio', 'Total testosterone', 'TSH',
+    'Vitamin D', 'HDL cholesterol', 'LDL cholesterol', 'Triglycerides', 'ALT', 'Fasting insulin', 'AMH'];
+
   const actions = {
+    /* ---- wearable ---- */
+    async connectBle() {
+      try { await DeviceLink.connectBLE(Store.state.activePatient); C.toast('Wearable paired over Bluetooth'); }
+      catch (e) { C.toast(e.message, 'err'); }
+      renderMain();
+    },
+    async connectUsb() {
+      try { await DeviceLink.connectUSB(Store.state.activePatient); C.toast('Wearable connected over USB'); }
+      catch (e) { C.toast(e.message, 'err'); }
+      renderMain();
+    },
+    async connectWifi() {
+      await DeviceLink.connectServer('wifi', { patientId: Store.state.activePatient });
+      C.modal({
+        title: 'Wi-Fi ingest armed', icon: 'wave', color: U.C.green,
+        body: `<p class="muted" style="font-size:12.6px;line-height:1.6">Point the board (or any script) at this endpoint.
+            Frames are the same <span class="mono">$CP2</span> lines the firmware already prints.</p>
+          <div class="log-box"><div>POST ${location.origin}/api/device/ingest</div>
+          <div>Content-Type: application/json</div>
+          <div>{"lines": ["$CP2,1234,2100,-1,0.02,...,4096,AF"]}</div></div>
+          <p class="muted" style="font-size:12.4px">curl example:</p>
+          <div class="log-box"><div>curl -s ${location.origin}/api/device/ingest \\</div>
+          <div>&nbsp;&nbsp;-H 'Content-Type: application/json' \\</div>
+          <div>&nbsp;&nbsp;-d '{"lines":["$CP2,..."]}'</div></div>`,
+        footer: `<button class="btn primary" data-close="1">Got it</button>`,
+      });
+      renderMain();
+    },
+    async connectSerial() {
+      const ports = PatientViews.wearState.ports || await DeviceLink.ports();
+      PatientViews.wearState.ports = ports;
+      if (!ports.available) return C.toast(ports.hint || 'pyserial is not installed on the server', 'err');
+      C.modal({
+        title: 'Server serial port', icon: 'log', color: U.C.orange,
+        body: C.form([
+          { n: 'port', l: 'Port', t: 'select', o: ports.ports.map(x => ({ v: x.device, l: `${x.device} · ${x.description || ''}` })) },
+          { n: 'baud', l: 'Baud', t: 'number', v: 115200 },
+        ]), okText: 'Open port',
+        async onOk(v) {
+          try { await DeviceLink.connectServer('serial', { port: v.port, baud: +v.baud, patientId: Store.state.activePatient }); C.toast('Serial port opened'); }
+          catch (e) { C.toast(e.message, 'err'); }
+          C.closeModal(); renderMain();
+        },
+      });
+    },
+    async connectBridge() {
+      await DeviceLink.connectServer('bridge', { patientId: Store.state.activePatient });
+      C.toast('Watching data/bridge/inbox for frames', 'info');
+      renderMain();
+    },
+    async deviceDisconnect() { await DeviceLink.disconnect(); C.toast('Wearable disconnected', 'info'); renderMain(); },
+    async deviceRefresh() { await DeviceLink.refresh(); renderMain(); },
+    deviceHelp() {
+      C.modal({
+        title: 'Wiring, firmware and frame format', icon: 'info', color: U.C.sky,
+        body: `${C.kvs([
+            { k: 'Board', v: 'ESP32-S3 (hardware/esp32/endo_twin_wearable)' },
+            { k: 'Pulse sensor', v: 'analog SIG → ADC pin (PULSE_PIN)' },
+            { k: 'Skin temp', v: 'DS18B20 → ONE_WIRE_BUS + 4.7 kΩ pull-up' },
+            { k: 'GSR', v: 'electrodes → GSR_PIN through the divider' },
+            { k: 'IMU', v: 'MPU6050 on the shared I²C bus' },
+            { k: 'BLE service', v: `<span class="mono">${DeviceLink.SERVICE_UUID}</span>` },
+            { k: 'Serial', v: '115200 baud, newline-delimited' },
+          ])}
+          <div class="card-sub mt-14">Frame</div>
+          <div class="log-box"><div>$CP2,ms,pulse,-1,ax,ay,az,gx,gy,gz,tempC,nan,gsr,…,status,CRC</div></div>
+          <div class="small muted mt-10">The red channel is -1 because the fitted sensor is a single-channel analog module,
+          so SpO₂ stays unavailable instead of being estimated.</div>`,
+        footer: `<button class="btn primary" data-close="1">Close</button>`,
+      });
+    },
+    async startRecording() {
+      try {
+        await DeviceLink.startSession(Store.state.activePatient);
+        C.toast('Recording into the database'); renderMain();
+      } catch (e) { C.toast(e.message, 'err'); }
+    },
+    async stopRecording() {
+      try {
+        const r = await DeviceLink.stopSession();
+        C.toast(`Session saved · ${(r.rows || 0).toLocaleString()} rows`);
+        await Store.refresh(); renderMain();
+      } catch (e) { C.toast(e.message, 'err'); }
+    },
+    async calSave() {
+      try {
+        const r = await DeviceLink.saveCalibration(readCalInputs(), Store.state.activePatient);
+        PatientViews.wearState.cal = r.calibration || {};
+        C.toast('Calibration saved to the database'); renderMain();
+      } catch (e) { C.toast(e.message, 'err'); }
+    },
+    async calCapture(sensor) {
+      try {
+        const r = await DeviceLink.captureBaseline(sensor, Store.state.activePatient);
+        PatientViews.wearState.cal = r.calibration || {};
+        C.toast(`${sensor.toUpperCase()} baseline captured from the live buffer`); renderMain();
+      } catch (e) { C.toast(e.message, 'err'); }
+    },
+    calReference(sensor) {
+      const meta = {
+        temp: { title: 'Thermometer reference', label: 'Reference temperature (°C)', ph: '36.6' },
+        ppg: { title: 'Reference heart rate', label: 'Heart rate from a trusted monitor (bpm)', ph: '72' },
+        gsr: { title: 'Reference conductance', label: 'Known conductance (µS)', ph: '5' },
+        spo2: { title: 'Reference SpO₂', label: 'SpO₂ from a pulse oximeter (%)', ph: '98' },
+      }[sensor] || { title: 'Reference value', label: 'Reference', ph: '' };
+      C.modal({
+        title: meta.title, icon: 'settings', color: U.C.violet,
+        body: C.form([
+          { n: 'reference', l: meta.label, t: 'number', ph: meta.ph },
+          ...(sensor === 'temp' ? [{ n: 'point', l: 'Calibration point', t: 'select', o: [{ v: 'low', l: 'Point 1 (e.g. room / cool)' }, { v: 'high', l: 'Point 2 (e.g. body / warm)' }] }] : []),
+        ]), okText: 'Apply calibration',
+        async onOk(v) {
+          try {
+            const r = await DeviceLink.referencePoint(sensor, +v.reference, v.point || 'low', Store.state.activePatient);
+            PatientViews.wearState.cal = r.calibration || {};
+            C.closeModal(); renderMain(); C.toast('Calibration updated');
+          } catch (e) { C.toast(e.message, 'err'); }
+        },
+      });
+    },
+    async calReset(sensor) {
+      const r = await DeviceLink.resetCalibration(sensor, Store.state.activePatient);
+      PatientViews.wearState.cal = r.calibration || {};
+      C.toast(`${sensor.toUpperCase()} calibration reset to defaults`, 'info'); renderMain();
+    },
+
+    /* ---- complication prediction ---- */
+    runComplications() { loadComplications(true); },
+    async saveComplications() {
+      const p = Store.patient();
+      try {
+        await Store.api('/api/patients/' + encodeURIComponent(p.id) + '/complications', 'POST', {});
+        C.toast('Run stored in model_results');
+      } catch (e) { C.toast(e.message, 'err'); }
+    },
+    editClinical(id) {
+      const p = Store.patient(id) || Store.patient();
+      C.modal({
+        title: 'Clinical data · ' + p.name, sub: 'Everything here feeds the complication engine', icon: 'stethoscope', color: U.C.violet,
+        body: C.form(clinicalFields(p)) + `<div class="card-sub mt-14">Labs, medications and goals are edited on their own tabs below.</div>
+          <div class="flex gap-6 mt-10 wrap">
+            <button class="btn sm" data-act="editLabs">${U.icon('flask')} Labs (${(p.labs || []).length})</button>
+            <button class="btn sm" data-act="editMeds">${U.icon('pill')} Medications (${(p.meds || []).length})</button>
+            <button class="btn sm" data-act="editGoals">${U.icon('goal')} Goals (${(p.goals || []).length})</button>
+          </div>`,
+        okText: 'Save clinical data',
+        async onOk(v) {
+          try {
+            await Store.updatePatient(p.id, v);
+            C.closeModal(); await loadComplications(true); renderAll();
+            C.toast('Clinical data saved' + (Store.isLive() ? ' to the database' : ''));
+          } catch (e) { C.toast(e.message, 'err'); }
+        },
+      });
+    },
+    editLabs(id) { listEditor('labs', 'Laboratory results', id); },
+    editMeds(id) { listEditor('meds', 'Medications & supplements', id); },
+    editGoals(id) { listEditor('goals', 'Goals & targets', id); },
+
     /* ---- data source ---- */
     showSource() { sourceModal(); },
     async seedCohort() {
@@ -764,7 +1072,24 @@ const App = (() => {
     tickClock(); setInterval(tickClock, 1000 * 20);
     renderAll();                                  // paint immediately…
     await Store.boot();                           // …then bind to the real database
+    /* let [data-act] buttons work inside modals too, not just in #main */
+    const rawModal = C.modal;
+    C.modal = function (o) {
+      const root = rawModal(o);
+      U.$$('[data-act]', root).forEach(e => {
+        const fn = actions[e.dataset.act];
+        if (!fn) return;
+        e.onclick = ev => { ev.stopPropagation(); fn(e.dataset.arg, e); };
+      });
+      return root;
+    };
+
     Store.onChange(renderAll);
+    DeviceLink.onChange(() => {
+      renderTop();
+      if (route === 'wearable' || route === 'livedevice') renderMain();
+    });
+    DeviceLink.start(6000);
     renderAll();
     if (Store.isLive() && !Store.dbEmpty()) C.toast('Connected to the platform database', 'ok');
     else if (!Store.isLive()) C.toast('Backend not reachable — showing built-in demo data', 'info');

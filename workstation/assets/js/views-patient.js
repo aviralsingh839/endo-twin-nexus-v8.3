@@ -4,6 +4,10 @@
 const PatientViews = (() => {
 
   /* ------------------------------ navigation ----------------------------- */
+  /* live state for the device console and the complication engine */
+  const wearState = { cal: {}, ports: null, loaded: false };
+  const compState = { data: null, loading: false, error: null, pid: null, horizon: 'all' };
+
   const nav = [
     { items: [{ id: 'dashboard', label: 'Dashboard', icon: 'dashboard' }] },
     { label: 'Monitor', items: [
@@ -14,6 +18,7 @@ const PatientViews = (() => {
     ]},
     { label: 'Analysis', items: [
       { id: 'risk', label: 'AI Risk Analysis', icon: 'brain', caret: true },
+      { id: 'complications', label: 'Complication Prediction', icon: 'shield', pill: true },
       { id: 'twin', label: 'Hormonal Twin', icon: 'twin' },
       { id: 'prediction', label: 'Cycle Prediction', icon: 'predict' },
       { id: 'trends', label: 'Trends & Insights', icon: 'trends', caret: true },
@@ -357,38 +362,299 @@ const PatientViews = (() => {
 
   /* ============================= WEARABLE ============================= */
   function wearable(p) {
-    return C.pageHead('Wearable Device', 'Pairing, firmware, calibration and signal health for your ENDO-TWIN band.',
-      `<button class="btn primary" data-act="pairDevice">${U.icon('bluetooth')} Pair new device</button>`)
-      + `<div class="row g-3">
-        ${C.card({ title: p.device, sub: 'Primary device', icon: 'watch', iconColor: U.C.cyan, body: `
-          <div class="flex center gap-14">
-            ${Chart.ring(p.battery, p.battery > 40 ? U.C.green : U.C.orange, 86, p.battery + '%')}
-            <div style="flex:1">${C.kvs([
-              { k: 'Status', v: C.statusTag(p.battery > 0 ? 'Online' : 'Offline') },
-              { k: 'Firmware', v: 'v8.7.1' }, { k: 'Last sync', v: p.lastSync },
-              { k: 'Link', v: 'BLE · -54 dBm' },
-            ])}</div>
-          </div>` })}
-        ${C.card({ title: 'Sensor suite', icon: 'grid', body: C.kvs([
-          { k: 'MAX30102 (PPG / SpO₂)', v: C.statusTag('Online') },
-          { k: 'DS18B20 (Skin temp)', v: C.statusTag('Online') },
-          { k: 'GSR electrodes', v: C.statusTag('Online') },
-          { k: 'MPU6050 (IMU)', v: C.statusTag('Online') },
-          { k: 'Analog pulse sensor', v: C.statusTag('Weak link') },
-        ]) })}
-        ${C.card({ title: 'Signal quality (7 days)', icon: 'chart', body:
-          Chart.bars(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => ({ k: d, v: Math.round(p.quality * 100 - 10 + (i * 7) % 18), color: U.C.cyan })), { h: 150, max: 100 }) })}
+    const d = DeviceLink.state;
+    const st = d.status || {};
+    const live = st.live || {};
+    const sess = st.session || {};
+    const cal = wearState.cal || {};
+    const connected = st.state === 'connected';
+    const tone = st.state === 'connected' ? 'good' : st.state === 'stale' ? 'warn'
+      : st.state === 'waiting' ? 'info' : st.state === 'error' ? 'bad' : 'plain';
+    const stateText = { connected: 'Streaming', stale: 'No packets — check the link',
+      waiting: 'Waiting for the first packet', error: 'Link error', disconnected: 'Not connected' }[st.state] || 'Not connected';
+
+    const transportCard = (id, title, sub, icon, color, body, act, disabled) => `
+      <div class="tp-card ${st.transport === id ? 'on' : ''}">
+        <div class="tp-head"><span class="tp-ico" style="background:${U.soft(color, .16)};color:${color}">${U.icon(icon)}</span>
+          <div><div class="tp-title">${title}</div><div class="tp-sub">${sub}</div></div></div>
+        ${body || ''}
+        <button class="btn sm ${st.transport === id ? 'ghost' : 'primary'}" data-act="${act}" ${disabled ? 'disabled' : ''}>
+          ${st.transport === id ? 'Reconnect' : 'Connect'}</button>
+      </div>`;
+
+    const ingestUrl = (typeof location !== 'undefined' ? location.origin : 'http://<workstation-ip>:8787') + '/api/device/ingest';
+
+    const connectPanel = C.card({
+      title: 'Connect the wearable', icon: 'bluetooth', color: U.C.cyan,
+      sub: 'ESP32-S3 · analog pulse + DS18B20 + GSR + MPU6050 · $CP2 frames',
+      right: `<span class="tag ${tone}" style="margin:0">● ${stateText}</span>`,
+      body: `<div class="tp-grid">
+        ${transportCard('ble', 'Bluetooth LE', DeviceLink.supports.ble ? 'Pair straight from this page' : 'Needs Chrome/Edge over https or localhost',
+          'bluetooth', U.C.sky, `<div class="tp-meta mono">${DeviceLink.SERVICE_UUID.slice(0, 13)}…</div>`,
+          'connectBle', !DeviceLink.supports.ble)}
+        ${transportCard('usb', 'USB cable', DeviceLink.supports.usb ? 'Web Serial · 115200 baud' : 'Needs Chrome/Edge (Web Serial)',
+          'watch', U.C.violet, '<div class="tp-meta">Plug the board in and pick the port</div>',
+          'connectUsb', !DeviceLink.supports.usb)}
+        ${transportCard('wifi', 'Wi-Fi / HTTP', 'The board POSTs frames to this workstation', 'wave', U.C.green,
+          `<div class="tp-meta mono ellip" title="${ingestUrl}">POST ${ingestUrl}</div>`, 'connectWifi')}
+        ${transportCard('serial', 'Server serial port', 'pyserial on this machine', 'log', U.C.orange,
+          `<div class="tp-meta">${wearState.ports && wearState.ports.available
+            ? (wearState.ports.ports.length ? wearState.ports.ports.map(x => x.device).join(', ') : 'no ports detected')
+            : 'pyserial not installed'}</div>`, 'connectSerial')}
+        ${transportCard('bridge', 'Bridge folder', 'Tail frames dropped as files', 'db', U.C.pink,
+          '<div class="tp-meta mono">data/bridge/inbox/</div>', 'connectBridge')}
       </div>
-      <div class="row g-2">
-        ${C.card({ title: 'Calibration', icon: 'settings', body: `
-          ${Chart.hbars([
-            { k: 'PPG gain', v: 72, text: 'auto' }, { k: 'Temp offset', v: 48, text: '-0.3 °C' },
-            { k: 'GSR baseline', v: 61, text: '0.18 µS' }, { k: 'IMU zero-g', v: 88, text: 'calibrated' }])}
-          <div class="flex gap-6 mt-14"><button class="btn sm" data-act="recalibrate">Recalibrate</button>
-          <button class="btn sm ghost" data-act="firmware">Check firmware</button></div>` })}
-        ${C.card({ title: 'Wear compliance', sub: 'Hours per day, last 14 days', icon: 'clock', body:
-          Chart.lines([{ name: 'Hours', color: U.C.green, data: U.series(p.id + 'wear', 14, p.adherence / 5, 3) }], { h: 150, area: true, dots: true, min: 0, max: 24 }) })}
-      </div>${C.disclaimer()}`;
+      ${st.error || d.browserError ? `<div class="warn-box">${U.esc(st.error || d.browserError)}</div>` : ''}
+      <div class="flex gap-6 mt-14 wrap">
+        <button class="btn sm ghost" data-act="deviceDisconnect">${U.icon('close')} Disconnect</button>
+        <button class="btn sm ghost" data-act="deviceRefresh">${U.icon('refresh')} Refresh status</button>
+        <button class="btn sm ghost" data-act="deviceHelp">${U.icon('info')} Wiring & firmware</button>
+      </div>`,
+    });
+
+    const liveCard = C.card({
+      title: 'Live signal', icon: 'pulse', color: U.C.pink,
+      right: `<span class="tag ${tone}" style="margin:0">${U.num(st.rateHz, 1)} Hz</span>`,
+      body: `<div class="wave-box">${d.stream.waveform && d.stream.waveform.length
+          ? Chart.lines([{ name: 'Pulse', color: U.C.pink, data: d.stream.waveform }], { h: 120, area: true, noAxis: true })
+          : Chart.emptyChart('No pulse waveform yet — connect the band and rest your finger on the sensor', 120)}</div>
+        ${C.statMini([
+          { k: 'Heart rate', v: U.has(live.hr_bpm) ? Math.round(live.hr_bpm) + ' bpm' : '—', icon: 'heartbeat', color: U.C.pink },
+          { k: 'RMSSD', v: U.has(live.rmssd_ms) ? Math.round(live.rmssd_ms) + ' ms' : '—', icon: 'pulse', color: U.C.sky },
+          { k: 'Skin temp', v: U.has(live.skin_temp_c) ? live.skin_temp_c + ' °C' : '—', icon: 'temp', color: U.C.orange },
+          { k: 'EDA', v: U.has(live.gsr_us) ? U.round(live.gsr_us, 2) + ' µS' : '—', icon: 'zap', color: U.C.violet },
+          { k: 'Motion', v: U.has(live.motion_index) ? live.motion_index : '—', icon: 'run', color: U.C.green },
+          { k: 'Contact', v: live.contact ? 'Good' : live.contact === false ? 'None' : '—', icon: 'check', color: live.contact ? U.C.green : U.C.muted },
+        ])}
+        <div class="small muted mt-10">SpO₂ is not shown: the fitted analog pulse sensor has a single channel, so oxygen saturation cannot be derived. A red+IR oximeter is required.</div>`,
+    });
+
+    const recCard = C.card({
+      title: 'Recording', icon: 'log', color: U.C.green,
+      right: sess.recording ? '<span class="tag bad" style="margin:0">● REC</span>' : '',
+      body: C.kvs([
+        { k: 'Participant', v: p ? `${p.name} · ${p.id}` : '—' },
+        { k: 'Session', v: sess.id ? `<span class="mono">${sess.id}</span>` : 'not recording' },
+        { k: 'Duration', v: sess.durationS ? U.round(sess.durationS / 60, 1) + ' min' : '—' },
+        { k: 'Rows written', v: (sess.rows || 0).toLocaleString() },
+        { k: 'Packets', v: `${(st.packets || 0).toLocaleString()} · ${st.badCrc || 0} CRC errors · ${st.badFrames || 0} malformed` },
+        { k: 'Mean quality', v: U.has(st.quality) ? Math.round(st.quality * 100) + '%' : '—' },
+      ]) + `<div class="flex gap-6 mt-14 wrap">
+        ${sess.recording
+          ? `<button class="btn sm danger" data-act="stopRecording">${U.icon('close')} Stop & save</button>`
+          : `<button class="btn sm primary" data-act="startRecording" ${connected ? '' : 'disabled'}>${U.icon('plus')} Start recording</button>`}
+        <button class="btn sm ghost" data-act="go" data-arg="logger">Open data logger</button>
+      </div>
+      <div class="small muted mt-10">Recording writes calibrated rows into <span class="mono">hrv_data</span>,
+        <span class="mono">ppg_data</span>, <span class="mono">temperature_data</span> and <span class="mono">gsr_data</span>
+        of the platform database under this participant.</div>`,
+    });
+
+    const flags = (st.statusBits || []).filter(b => b.set);
+    const healthCard = C.card({
+      title: 'Sensor health', icon: 'shield', color: U.C.green,
+      body: C.table([{ t: 'Sensor' }, { t: 'Reading' }, { t: 'State' }], [
+        ['Analog pulse (ADC)', U.num((st.raw || {}).pulse_raw), live.contact ? 'Contact' : 'No contact'],
+        ['DS18B20 skin temp', U.has(live.skin_temp_c) ? live.skin_temp_c + ' °C' : '—', flags.some(f => f.flag === 'TEMP_ERROR') ? 'Error' : 'OK'],
+        ['GSR electrodes', U.num((st.raw || {}).gsr_raw), flags.some(f => f.flag === 'GSR_RAIL') ? 'Open / shorted' : 'OK'],
+        ['MPU6050 IMU', U.has(live.motion_index) ? live.motion_index : '—', flags.some(f => f.flag === 'IMU_ERROR') ? 'Error' : 'OK'],
+        ['SpO₂ (red+IR)', 'unavailable', 'Not fitted'],
+      ].map(r => ({ cells: [r[0], `<span class="mono">${r[1]}</span>`, C.statusTag(r[2] === 'OK' || r[2] === 'Contact' ? 'Online' : r[2] === 'Not fitted' ? 'Offline' : 'Needs review')] })))
+        + (flags.length ? `<div class="flex gap-6 wrap mt-10">${flags.map(f => `<span class="tag warn" style="margin:0" title="${f.text}">${f.flag}</span>`).join('')}</div>` : ''),
+    });
+
+    const calRow = (sensor, label, fields, extra) => `
+      <div class="cal-block">
+        <div class="cal-head"><b>${label}</b>
+          <div class="flex gap-6">
+            ${extra || ''}
+            <button class="btn sm ghost" data-act="calReset" data-arg="${sensor}">Reset</button>
+          </div>
+        </div>
+        <div class="cal-grid">
+          ${fields.map(f => `<label class="cal-field"><span>${f.l}</span>
+            <input type="${f.t || 'number'}" step="${f.step || 'any'}" data-cal="${sensor}.${f.n}"
+              value="${f.v == null ? '' : f.v}" placeholder="${f.ph || ''}">
+            ${f.u ? `<em>${f.u}</em>` : ''}</label>`).join('')}
+        </div>
+        ${fields.some(f => f.hint) ? `<div class="small muted">${fields.filter(f => f.hint).map(f => f.hint).join(' · ')}</div>` : ''}
+      </div>`;
+
+    const calCard = C.card({
+      title: 'Calibration', icon: 'settings', color: U.C.violet,
+      sub: 'Every constant below is editable and is applied to the incoming stream before anything is stored.',
+      right: `<button class="btn sm primary" data-act="calSave">${U.icon('check')} Save calibration</button>`,
+      body: `
+        ${calRow('ppg', 'Pulse sensor (PPG)', [
+          { n: 'baseline_raw', l: 'ADC baseline', v: (cal.ppg || {}).baseline_raw, u: 'counts' },
+          { n: 'gain', l: 'Gain', v: (cal.ppg || {}).gain },
+          { n: 'peak_threshold_k', l: 'Peak threshold k', v: (cal.ppg || {}).peak_threshold_k },
+          { n: 'min_amplitude', l: 'Min amplitude', v: (cal.ppg || {}).min_amplitude, u: 'counts' },
+          { n: 'hr_offset_bpm', l: 'HR offset', v: (cal.ppg || {}).hr_offset_bpm, u: 'bpm' },
+          { n: 'sample_rate_hz', l: 'Packet rate', v: (cal.ppg || {}).sample_rate_hz, u: 'Hz' },
+        ], `<button class="btn sm" data-act="calCapture" data-arg="ppg">Capture baseline</button>
+            <button class="btn sm" data-act="calReference" data-arg="ppg">Match a reference HR</button>`)}
+        ${calRow('temp', 'Skin temperature (DS18B20)', [
+          { n: 'offset_c', l: 'Offset', v: (cal.temp || {}).offset_c, u: '°C' },
+          { n: 'slope', l: 'Slope', v: (cal.temp || {}).slope },
+          { n: 'skin_to_core_delta_c', l: 'Skin→core delta', v: (cal.temp || {}).skin_to_core_delta_c, u: '°C' },
+          { n: 'smoothing_s', l: 'Smoothing', v: (cal.temp || {}).smoothing_s, u: 's' },
+          { n: 'ref_low_c', l: 'Ref point 1', v: (cal.temp || {}).ref_low_c, u: '°C', hint: 'Two reference points give slope + offset; one gives offset only.' },
+          { n: 'ref_high_c', l: 'Ref point 2', v: (cal.temp || {}).ref_high_c, u: '°C' },
+        ], `<button class="btn sm" data-act="calReference" data-arg="temp">Enter thermometer reading</button>`)}
+        ${calRow('gsr', 'Electrodermal activity (GSR)', [
+          { n: 'dry_baseline_raw', l: 'Dry baseline', v: (cal.gsr || {}).dry_baseline_raw, u: 'counts' },
+          { n: 'series_resistor_ohm', l: 'Series resistor', v: (cal.gsr || {}).series_resistor_ohm, u: 'Ω' },
+          { n: 'vref', l: 'ADC reference', v: (cal.gsr || {}).vref, u: 'V' },
+          { n: 'gain_us', l: 'Gain', v: (cal.gsr || {}).gain_us },
+          { n: 'offset_us', l: 'Offset', v: (cal.gsr || {}).offset_us, u: 'µS' },
+          { n: 'phasic_mad_k', l: 'Phasic threshold k', v: (cal.gsr || {}).phasic_mad_k },
+        ], `<button class="btn sm" data-act="calCapture" data-arg="gsr">Capture dry baseline</button>
+            <button class="btn sm" data-act="calReference" data-arg="gsr">Match a reference µS</button>`)}
+        ${calRow('imu', 'Motion (MPU6050)', [
+          { n: 'ax_offset', l: 'X offset', v: (cal.imu || {}).ax_offset, u: 'g' },
+          { n: 'ay_offset', l: 'Y offset', v: (cal.imu || {}).ay_offset, u: 'g' },
+          { n: 'az_offset', l: 'Z offset', v: (cal.imu || {}).az_offset, u: 'g' },
+          { n: 'step_threshold_g', l: 'Step threshold', v: (cal.imu || {}).step_threshold_g, u: 'g' },
+          { n: 'still_threshold_g', l: 'Still threshold', v: (cal.imu || {}).still_threshold_g, u: 'g' },
+        ], `<button class="btn sm" data-act="calCapture" data-arg="imu">Zero on a flat surface</button>`)}
+        ${calRow('spo2', 'SpO₂ (not fitted)', [
+          { n: 'reference_pct', l: 'Reference oximeter', v: (cal.spo2 || {}).reference_pct, u: '%',
+            hint: 'Optional manual entry — the analog pulse sensor cannot measure SpO₂ itself.' },
+        ], '')}`,
+    });
+
+    const logCard = C.card({
+      title: 'Link log', icon: 'log', color: U.C.sky,
+      body: `<div class="log-box">${(st.log && st.log.length ? st.log : ['no activity yet'])
+        .map(l => `<div>${U.esc(l)}</div>`).join('')}</div>`,
+    });
+
+    return C.pageHead('Wearable Device',
+      'Connect the ESP32-S3 band, watch the raw stream, calibrate every sensor and record straight into the database.',
+      `<button class="btn ghost" data-act="deviceRefresh">${U.icon('refresh')} Refresh</button>
+       <button class="btn primary" data-act="connectBle">${U.icon('bluetooth')} Pair over Bluetooth</button>`)
+      + `<div class="row g-1">${connectPanel}</div>
+        <div class="row g-dev-a">${liveCard}${recCard}</div>
+        <div class="row g-dev-b">${calCard}${healthCard}${logCard}</div>
+        ${C.disclaimer()}`;
+  }
+
+  /* ====================== COMPLICATION PREDICTION ====================== */
+  const BAND_TONE = { high: 'bad', moderate: 'warn', low: 'good', minimal: 'good', unknown: 'plain' };
+  const BAND_COLOR = () => ({ high: U.C.red, moderate: U.C.orange, low: U.C.green, minimal: U.C.green, unknown: U.C.muted });
+
+  function complicationCard(it) {
+    const colors = BAND_COLOR();
+    const col = colors[it.band] || U.C.muted;
+    if (it.status !== 'ok') {
+      return C.card({
+        title: it.name, sub: `${it.category} · ${it.horizon}`, icon: 'shield', color: U.C.muted,
+        right: '<span class="tag plain" style="margin:0">Insufficient data</span>',
+        body: `<div class="comp-empty">${U.icon('info')}<span>${it.note || 'Not enough evidence recorded yet.'}</span></div>
+          <div class="card-sub mt-10">Record or enter to unlock this prediction</div>
+          <ul class="need-list">${(it.missing || []).slice(0, 6).map(m => `<li>${U.esc(m)}</li>`).join('')}</ul>
+          <div class="flex gap-6 mt-10 wrap">
+            <button class="btn sm" data-act="editClinical">${U.icon('edit')} Enter clinical data</button>
+            <button class="btn sm ghost" data-act="go" data-arg="wearable">${U.icon('watch')} Connect wearable</button>
+          </div>`,
+      });
+    }
+    return C.card({
+      title: it.name, sub: `${it.category} · ${it.horizon}`, icon: 'shield', color: col,
+      right: `<span class="tag ${BAND_TONE[it.band] || 'plain'}" style="margin:0">${it.band.toUpperCase()}</span>`,
+      body: `<div class="comp-top">
+          ${Chart.ring(it.probability, col, 92, U.num(it.probability, 0) + '%')}
+          <div class="comp-side">
+            ${C.kvs([
+              { k: 'Estimated risk', v: `<b style="color:${col}">${U.num(it.probability, 1)}%</b>` },
+              { k: 'Cohort base rate', v: U.num(it.baseRate, 1) + '%' },
+              { k: 'Confidence', v: Math.round((it.confidence || 0) * 100) + '%' },
+              { k: 'Evidence coverage', v: Math.round((it.coverage || 0) * 100) + '%' },
+            ])}
+          </div>
+        </div>
+        <div class="card-sub mt-10">Top contributing factors</div>
+        ${Chart.hbars((it.drivers || []).map(dv => ({ k: dv.k, v: dv.v, text: dv.value == null ? '' : `${U.num(dv.value, 2)}${dv.unit ? ' ' + dv.unit : ''}` })), { color: col })}
+        ${it.missing && it.missing.length ? `<div class="small muted mt-10">Not yet recorded: ${it.missing.slice(0, 4).map(U.esc).join(', ')}${it.missing.length > 4 ? '…' : ''}</div>` : ''}
+        <div class="action-box mt-10">${U.icon('bulb')}<span>${U.esc(it.action)}</span></div>`,
+    });
+  }
+
+  function complicationsBody(p, opts = {}) {
+    const st = compState;
+    if (st.loading && !st.data) {
+      return `<div class="empty-state"><b>Running the complication model…</b>
+        <span>Reading this participant's recorded physiology, cycles, labs and symptoms.</span></div>`;
+    }
+    if (st.error) {
+      return `<div class="empty-state"><b>Could not run the model</b><span>${U.esc(st.error)}</span>
+        <button class="btn sm" data-act="runComplications">${U.icon('refresh')} Try again</button></div>`;
+    }
+    const data = st.data;
+    if (!data) {
+      return `<div class="empty-state"><b>No prediction yet</b>
+        <span>Run the complication engine against this participant's stored data.</span>
+        <button class="btn sm primary" data-act="runComplications">${U.icon('brain')} Run prediction</button></div>`;
+    }
+    const scored = data.items.filter(i => i.status === 'ok');
+    const unmet = data.items.filter(i => i.status !== 'ok');
+    const colors = BAND_COLOR();
+    const compCol = colors[data.compositeBand] || U.C.muted;
+
+    const head = `<div class="row g-comp-a">
+      ${C.card({ title: 'Composite complication index', icon: 'shield', color: compCol,
+        right: `<span class="tag ${BAND_TONE[data.compositeBand] || 'plain'}" style="margin:0">${(data.compositeBand || 'unknown').toUpperCase()}</span>`,
+        body: `<div class="score-wrap">
+          ${Chart.donut(data.composite, { size: 150, stroke: 15, text: U.num(data.composite, 0) + '%',
+            gradient: [compCol, U.soft(compCol, .5)] })}
+          <div style="flex:1">${C.kvs([
+            { k: 'Complications scored', v: `${scored.length} of ${data.items.length}` },
+            { k: 'Input completeness', v: Math.round((data.dataCompleteness || 0) * 100) + '%' },
+            { k: 'Signal quality', v: U.has(data.signalQuality) ? Math.round(data.signalQuality * 100) + '%' : '—' },
+            { k: 'Model', v: `<span class="mono">${data.model} ${data.version}</span>` },
+            { k: 'Generated', v: U.fmtTime(new Date((data.generatedAt || 0) * 1000)) },
+          ])}</div></div>
+          <div class="small muted mt-10">The index is a confidence-weighted blend of the five highest scored complications.
+          It is a research signal for conversation with a clinician, never a diagnosis.</div>` })}
+      ${C.card({ title: 'Evidence the model used', icon: 'db', color: U.C.sky,
+        right: `<button class="btn sm" data-act="editClinical">${U.icon('edit')} Edit clinical data</button>`,
+        body: C.table([{ t: 'Input' }, { t: 'Value' }, { t: 'State', w: '110px' }],
+          data.inputs.map(i => ({ cells: [i.k,
+            i.have ? `<b>${U.num(i.v, 2)}</b> <span class="dim">${i.unit || ''}</span>` : '<span class="dim">not recorded</span>',
+            i.have ? C.statusTag('Online') : `<span class="tag plain" style="margin:0">missing</span>`] })))
+          + `<div class="small muted mt-10">Missing rows are the fastest way to sharpen every prediction below.</div>` })}
+    </div>`;
+
+    const proj = (data.projection && data.projection.series && data.projection.series.length)
+      ? C.card({ title: '12-month trajectory', sub: 'Linear extrapolation of the current trend — not a forecast of your future.',
+          icon: 'trends', color: U.C.violet,
+          body: Chart.lines(data.projection.series.map((s2, i) => ({
+            name: s2.name, color: [U.C.pink, U.C.orange, U.C.sky][i % 3], data: s2.data })),
+            { h: 200, area: false, dots: false, min: 0, max: 100, labels: data.projection.labels }) })
+      : '';
+
+    return head
+      + `<div class="row g-comp-b">${scored.map(complicationCard).join('')}</div>`
+      + (unmet.length ? `<div class="row g-comp-b">${unmet.map(complicationCard).join('')}</div>` : '')
+      + (proj ? `<div class="row g-1">${proj}</div>` : '')
+      + C.card({ title: 'How these numbers are produced', icon: 'info', color: U.C.sky,
+          body: C.bullets([
+            'Each complication has a named factor list with fixed weights; a factor with no data contributes nothing and is listed as a missing input.',
+            'A complication is only scored when at least a third of its evidence weight is available — otherwise it stays "insufficient data".',
+            'Confidence combines evidence coverage with the measured signal quality of the recordings.',
+            `Basis: ${U.esc(scored.map(i => i.basis).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).join(' · '))}`,
+          ]) })
+      + C.disclaimer(data.limitations);
+  }
+
+  function complications(p) {
+    return C.pageHead('Complication Prediction',
+      'Where your recorded physiology, cycles, labs and symptoms point — with every missing input named.',
+      `<button class="btn ghost" data-act="runComplications">${U.icon('refresh')} Re-run</button>
+       <button class="btn ghost" data-act="saveComplications">${U.icon('db')} Save run to record</button>
+       <button class="btn primary" data-act="editClinical">${U.icon('edit')} Edit clinical data</button>`)
+      + complicationsBody(p);
   }
 
   /* ============================== LOGGER ============================== */
@@ -678,16 +944,22 @@ const PatientViews = (() => {
 
   /* =============================== MEDS =============================== */
   function meds(p) {
+    const list = p.meds || [];
     return C.pageHead('Medications & Supplements', 'Logged medication is CLINICALLY ENTERED data — never inferred by the platform.',
-      `<button class="btn primary" data-act="addMed">${U.icon('plus')} Add item</button>`)
+      `<button class="btn ghost" data-act="editMeds">${U.icon('edit')} Manage list</button>
+       <button class="btn primary" data-act="addMed">${U.icon('plus')} Add item</button>`)
       + `<div class="row g-2">
-        ${C.card({ title: 'Current list', icon: 'pill', iconColor: U.C.orange, body: C.table(
+        ${C.card({ title: 'Current list', icon: 'pill', iconColor: U.C.orange,
+          right: `<button class="btn sm ghost" data-act="editMeds">${U.icon('edit')} Edit</button>`,
+          body: (list.length ? C.table(
           [{ t: 'Item' }, { t: 'Dose' }, { t: 'Schedule' }, { t: 'Type' }, { t: 'Today' }],
-          p.meds.map(m => ({ cells: [`<b>${m.n}</b>`, m.d, m.t, `<span class="tag plain" style="margin:0">${m.k}</span>`,
-            m.taken ? `<span class="tag good" style="margin:0">Taken</span>` : `<button class="btn sm" data-act="markTaken" data-arg="${m.n}">Mark taken</button>`] }))) })}
+          list.map(m => ({ cells: [`<b>${m.n || m.name || '—'}</b>`, m.d || m.dose || '—', m.t || m.schedule || '—',
+            `<span class="tag plain" style="margin:0">${m.k || m.kind || 'Logged'}</span>`,
+            m.taken ? `<span class="tag good" style="margin:0">Taken</span>` : `<button class="btn sm" data-act="markTaken" data-arg="${m.n || m.name}">Mark taken</button>`] })))
+          : C.empty('No medications recorded', 'Add what is actually being taken — it is used by the complication engine.', { act: 'editMeds', label: 'Add medication', icon: 'plus' })) })}
         ${C.card({ title: 'Adherence', sub: 'Last 30 days', icon: 'check', iconColor: U.C.green, body:
-          Chart.heatmap(p.meds.map(m => m.n.split(' ')[0]), Array.from({ length: 15 }, (_, i) => String(i + 1)),
-            p.meds.map((m, ri) => Array.from({ length: 15 }, (_, ci) => ((ci + ri) % 7 === 0 ? 0.1 : p.adherence / 100))), U.C.green, 18)
+          Chart.heatmap(list.map(m => String(m.n || m.name || '—').split(' ')[0]), Array.from({ length: 15 }, (_, i) => String(i + 1)),
+            list.map((m, ri) => Array.from({ length: 15 }, (_, ci) => ((ci + ri) % 7 === 0 ? 0.1 : U.nz(p.adherence) / 100))), U.C.green, 18)
           + `<div class="mt-14">${Chart.hbars([{ k: 'Overall adherence', v: p.adherence, color: 'linear-gradient(90deg,#10b981,#34d399)' }])}</div>` })}
       </div>
       ${C.card({ title: 'Interaction & safety notes', icon: 'shield', iconColor: U.C.orange, body: `
@@ -697,12 +969,15 @@ const PatientViews = (() => {
 
   /* =============================== GOALS ============================== */
   function goals(p) {
-    return C.pageHead('Goals & Plans', 'Small, measurable targets generated from your own data.',
-      `<button class="btn primary" data-act="addGoal">${U.icon('plus')} New goal</button>`)
+    const custom = p.goals || [];
+    return C.pageHead('Goals & Plans', 'Small, measurable targets — derived from your data or entered by you.',
+      `<button class="btn ghost" data-act="editGoals">${U.icon('edit')} Manage goals</button>
+       <button class="btn primary" data-act="addGoal">${U.icon('plus')} New goal</button>`)
       + `<div class="row g-4">
-        ${p.goals.map((g, i) => C.card({ body: `<div class="mini-ring">${Chart.ring(g.v, [U.C.violet, U.C.orange, U.C.cyan, U.C.pink][i], 96)}
-          <div class="mr-label" style="font-size:12px;color:var(--text)">${g.k}</div>
-          <div class="small muted">${g.v >= 80 ? 'On track' : g.v >= 50 ? 'Needs attention' : 'Behind'}</div></div>` })).join('')}
+        ${(custom.length ? custom : p.goals).map((g, i) => C.card({ body: `<div class="mini-ring">${Chart.ring(g.v, [U.C.violet, U.C.orange, U.C.cyan, U.C.pink][i], 96)}
+          <div class="mr-label" style="font-size:12px;color:var(--text)">${g.k || g.name || 'Goal'}</div>
+          <div class="small muted">${!U.has(g.v) ? 'Not measured yet' : g.v >= 80 ? 'On track' : g.v >= 50 ? 'Needs attention' : 'Behind'}</div>
+          ${g.target ? `<div class="small dim">${U.esc(g.target)}</div>` : ''}</div>` })).join('')}
       </div>
       <div class="row g-2">
         ${C.card({ title: 'Active plans', icon: 'goal', body: C.table([{ t: 'Plan' }, { t: 'Target' }, { t: 'Progress' }, { t: 'Ends' }],
@@ -808,9 +1083,24 @@ const PatientViews = (() => {
   }
 
   /* ============================= SETTINGS ============================= */
+  function labsCard(p) {
+    const labs = p.labs || [];
+    return C.card({
+      title: 'Laboratory results', icon: 'flask', color: U.C.cyan,
+      right: `<button class="btn sm" data-act="editLabs">${U.icon('edit')} Manage labs</button>`,
+      body: labs.length
+        ? C.table([{ t: 'Test' }, { t: 'Value' }, { t: 'Reference' }, { t: 'Date' }],
+            labs.map(l => ({ cells: [l.k || l.name, `<b>${U.num(l.value, 2)}</b> <span class="dim">${l.unit || ''}</span>`,
+              l.ref || '—', l.date || l.added || '—'] })))
+        : C.empty('No laboratory values entered', 'Glucose, HbA1c, lipids and hormones unlock several complication predictions.',
+            { act: 'editLabs', label: 'Add a lab result', icon: 'plus' }),
+    });
+  }
+
   function profile(p) {
     return C.pageHead('Profile & Preferences', 'Your identity stays on this device unless you explicitly share it.',
-      `<button class="btn primary" data-act="editPatient" data-arg="${p.id}">${U.icon('edit')} Edit profile</button>`)
+      `<button class="btn ghost" data-act="editClinical">${U.icon('stethoscope')} Clinical data</button>
+       <button class="btn primary" data-act="editPatient" data-arg="${p.id}">${U.icon('edit')} Edit profile</button>`)
       + `<div class="row g-dash-b">
         ${C.card({ body: `<div class="flex center gap-14">${C.avatar(p.name, 'lg')}
           <div><div class="page-title" style="font-size:17px">${p.name}</div>
@@ -831,8 +1121,23 @@ const PatientViews = (() => {
           { k: 'Risk signal', v: `<span style="color:${U.riskTone(p.risk).color}">${U.num(p.risk)}% ${U.riskTone(p.risk).label}</span>` },
           { k: 'Data quality', v: U.has(p.quality) ? (p.quality * 100).toFixed(0) + '%' : '—' }, { k: 'Adherence', v: p.adherence + '%' },
           { k: 'Next visit', v: p.nextVisit || 'Not scheduled' },
+          { k: 'Waist', v: U.has(p.waist) ? p.waist + ' cm' : '—' },
+          { k: 'Blood pressure', v: U.num((p.vitals || {}).bp) },
+          { k: 'Family history', v: [p.familyDiabetes === 'Yes' ? 'diabetes' : '', p.familyPcos === 'Yes' ? 'PCOS' : '', p.familyCvd === 'Yes' ? 'heart disease' : ''].filter(Boolean).join(', ') || 'not recorded' },
         ]) })}
       </div>`;
+      + `<div class="row g-2">${labsCard(p)}${C.card({ title: 'Clinical profile', icon: 'stethoscope', color: U.C.violet, right: `<button class="btn sm" data-act="editClinical">${U.icon('edit')} Edit</button>`, body: C.kvs([
+        { k: 'Height / weight', v: `${U.num(p.height)} cm · ${U.num(p.weight)} kg` },
+        { k: 'BMI', v: U.num(p.bmi, 1) },
+        { k: 'Waist', v: U.has(p.waist) ? p.waist + ' cm' : '—' },
+        { k: 'Blood pressure', v: U.num((p.vitals || {}).bp) },
+        { k: 'Typical sleep', v: U.has(p.sleepHours) ? p.sleepHours + ' h' : '—' },
+        { k: 'Smoking', v: p.smoker || '—' },
+        { k: 'Alcohol', v: p.alcohol || '—' },
+        { k: 'Known conditions', v: p.conditions || '—' },
+        { k: 'Allergies', v: p.allergies || '—' },
+        { k: 'Planning pregnancy', v: p.pregnancyPlan || '—' },
+      ]) })}</div>`
   }
 
   function settingsRows(rows) {
@@ -933,7 +1238,7 @@ const PatientViews = (() => {
   }
 
   /* ------------------------------ registry ------------------------------- */
-  const pages = { dashboard, live, wearable, logger, cycle, risk, twin, prediction, trends,
+  const pages = { dashboard, live, wearable, complications, logger, cycle, risk, twin, prediction, trends,
     comparative, symptoms, nutrition, sleep, meds, goals, reports, sharing, finder,
     community, knowledge, events, profile, device, privacy, about, ultrasound };
 
@@ -943,5 +1248,6 @@ const PatientViews = (() => {
     return fn(p);
   }
 
-  return { nav, render, pages, liveState, liveChartHTML, SERIES_META, usImage, cycleWidget };
+  return { nav, render, pages, liveState, liveChartHTML, SERIES_META, usImage, cycleWidget,
+    wearState, compState, complicationsBody };
 })();

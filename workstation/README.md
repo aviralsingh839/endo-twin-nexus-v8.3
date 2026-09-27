@@ -134,10 +134,68 @@ workstation/
         ├── data.js         synthetic dataset (patients, doctors, content)
         ├── store.js        state + localStorage + CRUD
         ├── components.js   card, table, form, modal, toast, tiles, tags
-        ├── views-patient.js  patient navigation + 26 pages
-        ├── views-doctor.js   doctor navigation + 25 pages
+        ├── device.js       browser wearable link (Web Bluetooth / Web Serial)
+        ├── views-patient.js  patient navigation + 28 pages
+        ├── views-doctor.js   doctor navigation + 27 pages
         └── app.js          shell, routing, role switch, all actions
 ```
+
+Server-side modules used by `/api/*`:
+
+```
+workstation/
+├── api.py                 data API over the real SQLite database
+├── signals.py             $CP2 frame parser, calibration model, PPG/GSR/temp/IMU DSP
+├── devices.py             transport manager (BLE / USB / serial / Wi-Fi / bridge)
+└── complications.py       transparent rule-based complication engine
+```
+
+## Connecting a real wearable
+
+Five transports, all reaching the same parser and the same database:
+
+| Transport | Where it runs | Notes |
+|---|---|---|
+| Bluetooth LE | browser (Web Bluetooth) | pairs with the ESP32-S3 firmware, service `7f300001-…1001` |
+| USB / Web Serial | browser | 115200 baud, no driver install |
+| Server serial | Python host | needs `pyserial`; useful when the board is on the server machine |
+| Wi-Fi / HTTP | anywhere | `POST /api/device/ingest {"lines": ["$CP2,…"]}` |
+| File bridge | host filesystem | drop capture files into `data/bridge/inbox/` |
+
+Frames are `$CP2` lines exactly as the firmware prints them, XOR-CRC checked.
+Per-sample timing is reconstructed from the device `ms` counter, not from host
+arrival time, so batched BLE notifications still yield correct beat intervals.
+
+`Start recording` opens a `sensor_sessions` row and streams derived values into
+`hrv_data`, `ppg_data`, `temperature_data` and `gsr_data`.
+
+SpO₂ stays **unavailable** on purpose: the fitted pulse sensor is a single
+analog channel, and a second wavelength is required to compute saturation.
+
+## Calibration
+
+Per-sensor calibration lives in the database (`workstation_ext`, per patient
+with a global fallback) and is applied in the DSP path, not cosmetically:
+
+* **PPG** — baseline, gain, invert, peak threshold, minimum amplitude, HR offset
+* **Temperature** — two-point reference (`ref/meas low`, `ref/meas high`),
+  offset, slope, skin→core delta, smoothing
+* **GSR** — series resistor, Vref, dry baseline, gain/offset in µS, phasic MAD *k*
+* **IMU** — per-axis zero offsets, step and stillness thresholds
+
+`Capture baseline` reads the live ring buffer; `reference point` solves the
+offset (and slope, for the second temperature point) against a trusted
+instrument.
+
+## Complication prediction
+
+`complications.py` scores twelve endocrine/metabolic complications from vitals,
+symptoms, cycle history, labs, medication and recorded signal quality. It is a
+transparent weighted-factor model — every item exposes its drivers, protective
+factors, missing inputs and base rate. When coverage of a complication's factors
+falls below 34 % the item returns **`insufficient`** and lists what to add,
+rather than inventing a number. Runs can be stored into `model_results` with
+`label='COMPLICATION_RUN'`.
 
 ## Shortcuts
 

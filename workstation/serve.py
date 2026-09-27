@@ -54,8 +54,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return {}
 
     def _api(self, method: str):
-        path = self.path.split("?")[0]
+        from urllib.parse import parse_qs, urlsplit
+        split = urlsplit(self.path)
+        path = split.path
         body = self._read_body() if method in ("POST", "PUT", "PATCH", "DELETE") else {}
+        # query parameters are merged into the body so handlers read one dict
+        for k, v in parse_qs(split.query).items():
+            body.setdefault(k, v[0] if len(v) == 1 else v)
         if API is None:
             status, payload = 503, {"error": "data layer unavailable", "detail": API_ERROR}
         else:

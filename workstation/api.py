@@ -46,7 +46,13 @@ EXT_FIELDS = (
     "gender", "city", "phone", "email", "height", "weight", "blood",
     "cycleLen", "cycleDay", "doctorId", "status", "cohort", "joined",
     "device", "battery", "adherence", "quality", "risk",
+    # clinical profile — everything below is user-editable from the UI and is
+    # fed straight into the complication-prediction engine
+    "waist", "bp", "sleepHours", "smoker", "alcohol",
+    "familyDiabetes", "familyPcos", "familyCvd", "conditions", "allergies",
+    "labs", "meds", "goals", "notesProfile", "pregnancyPlan", "deviceId",
 )
+CLINICAL_LISTS = ("labs", "meds", "goals")
 
 
 # --------------------------------------------------------------------------- #
@@ -59,6 +65,13 @@ def _now() -> float:
 def _pid(body):
     """Accept patientId / patient / pid from the client."""
     return body.get("patientId") or body.get("patient") or body.get("pid") or body.get("id")
+
+
+def _fmt_short(ts) -> str:
+    try:
+        return time.strftime("%d %b %H:%M", time.localtime(float(ts)))
+    except Exception:
+        return "—"
 
 
 def _uid(prefix: str) -> str:
@@ -225,6 +238,19 @@ class WorkstationAPI:
 
         sig = self._signals(con, pid)
         rec.update(sig)
+
+        # manually entered clinical values fill the gaps the sensors cannot cover
+        for key in CLINICAL_LISTS:
+            val = ext.get(key)
+            rec[key] = val if isinstance(val, list) else []
+        vit = rec.get("vitals") or {}
+        if vit.get("bp") is None and ext.get("bp"):
+            vit["bp"] = ext.get("bp")
+        if vit.get("sleep") is None and ext.get("sleepHours") is not None:
+            vit["sleep"] = _f(ext.get("sleepHours"))
+        if vit.get("bmi") is None and rec.get("bmi") is not None:
+            vit["bmi"] = rec["bmi"]
+        rec["vitals"] = vit
 
         model = con.execute(
             "SELECT * FROM model_results WHERE patient_id=? ORDER BY created_at DESC LIMIT 1", (pid,)
@@ -587,6 +613,212 @@ class WorkstationAPI:
             con.commit()
         return {"report_id": rid}
 
+    # --------------------------- calibration ------------------------------- #
+    def get_calibration(self, patient_id: Optional[str] = None) -> Dict[str, Any]:
+        with self.connect() as con:
+            data = self._ext(con, "calibration", patient_id or "_global")
+            if not data and patient_id:
+                data = self._ext(con, "calibration", "_global")
+        return data or {}
+
+    def set_calibration(self, data: Dict[str, Any], patient_id: Optional[str] = None) -> Dict[str, Any]:
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO workstation_ext(entity_type,entity_id,data_json,updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(entity_type,entity_id) DO UPDATE SET data_json=excluded.data_json, "
+                "updated_at=excluded.updated_at",
+                ("calibration", patient_id or "_global", json.dumps(data), _now()))
+            con.commit()
+        return data
+
+    # ------------------------ live sensor sessions -------------------------- #
+    def create_session(self, sid: str, patient_id: str, source: str = "ESP32_WEARABLE",
+                       label: str = "LIVE_DEVICE", notes: str = "") -> str:
+        with self.connect() as con:
+            con.execute(
+                "INSERT OR REPLACE INTO sensor_sessions(session_id,patient_id,source,start_at,end_at,"
+                "sample_count,data_quality,notes,label,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (sid, patient_id, source, _now(), None, 0, None, notes, label, _now()))
+            con.commit()
+        return sid
+
+    def close_session(self, sid: str, rows: int, quality: Optional[float] = None) -> None:
+        with self.connect() as con:
+            con.execute("UPDATE sensor_sessions SET end_at=?, sample_count=?, data_quality=? WHERE session_id=?",
+                        (_now(), rows, quality, sid))
+            con.commit()
+
+    def write_samples(self, sid: str, pid: str, batch: List[Dict[str, Any]],
+                      label: str = "LIVE_DEVICE") -> int:
+        """Persist calibrated wearable samples into the platform's own tables."""
+        if not batch:
+            return 0
+        hrv_rows, ppg_rows, temp_rows, gsr_rows = [], [], [], []
+        for s in batch:
+            t = float(s.get("t") or _now())
+            d = s.get("derived") or {}
+            r = s.get("raw") or {}
+            if d.get("hr_bpm") is not None:
+                hrv_rows.append((sid, t, _round(d.get("hr_bpm"), 1), None, _round(d.get("rmssd_ms"), 1),
+                                 _round(d.get("sdnn_ms"), 1), _round(d.get("pnn50_pct"), 1),
+                                 _round(d.get("quality"), 3), label))
+            if r.get("pulse_raw") is not None:
+                ppg_rows.append((sid, t, _round(r.get("pulse_raw"), 1), _round(r.get("red"), 1),
+                                 _round(d.get("hr_bpm"), 1), None, _round(d.get("amplitude"), 2),
+                                 _round(d.get("quality"), 3), label))
+            if d.get("skin_temp_c") is not None:
+                temp_rows.append((sid, t, _round(d.get("skin_temp_c"), 2), _round(r.get("room_temp_c"), 2),
+                                  _round(d.get("temp_slope_c_per_min"), 4), label))
+            if d.get("gsr_us") is not None or r.get("gsr_raw") is not None:
+                gsr_rows.append((sid, t, _round(r.get("gsr_raw"), 1), _round(d.get("gsr_tonic"), 4),
+                                 _round(d.get("gsr_phasic_per_min"), 2), label))
+        written = 0
+        with self.connect() as con:
+            def ins(sql, rows):
+                nonlocal written
+                if not rows:
+                    return
+                try:
+                    con.executemany(sql, rows)
+                    written += len(rows)
+                except sqlite3.Error:
+                    pass
+            ins("INSERT INTO hrv_data(session_id,timestamp_s,hr_bpm,resting_hr_bpm,rmssd_ms,sdnn_ms,"
+                "pnn50_pct,quality,label) VALUES(?,?,?,?,?,?,?,?,?)", hrv_rows)
+            ins("INSERT INTO ppg_data(session_id,timestamp_s,ir,red,hr_bpm,spo2_pct,pulse_amplitude,"
+                "quality,label) VALUES(?,?,?,?,?,?,?,?,?)", ppg_rows)
+            ins("INSERT INTO temperature_data(session_id,timestamp_s,skin_temp_c,room_temp_c,"
+                "temp_slope_c_per_min,label) VALUES(?,?,?,?,?,?)", temp_rows)
+            ins("INSERT INTO gsr_data(session_id,timestamp_s,gsr_raw,gsr_tonic,gsr_phasic_per_min,label)"
+                " VALUES(?,?,?,?,?,?)", gsr_rows)
+            con.execute("UPDATE sensor_sessions SET sample_count=COALESCE(sample_count,0)+?, end_at=? "
+                        "WHERE session_id=?", (len(batch), _now(), sid))
+            con.commit()
+        return written
+
+    def sessions_for(self, pid: str, limit: int = 20) -> List[Dict[str, Any]]:
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT * FROM sensor_sessions WHERE patient_id=? ORDER BY start_at DESC LIMIT ?",
+                (pid, limit)).fetchall()
+        return [{
+            "id": r["session_id"], "source": r["source"], "label": r["label"],
+            "start": _fmt_short(r["start_at"]), "startAt": r["start_at"],
+            "durationMin": _round(((r["end_at"] or r["start_at"]) - r["start_at"]) / 60.0, 1),
+            "samples": _i(r["sample_count"]) or 0, "quality": _round(r["data_quality"], 2),
+            "notes": r["notes"],
+        } for r in rows]
+
+    # -------------------- complication prediction --------------------------- #
+    def complications(self, pid: str) -> Dict[str, Any]:
+        rec = self.get_patient(pid)
+        if not rec:
+            return {"error": "unknown patient"}
+        import complications as comp
+        out = comp.predict(rec)
+        out["patientName"] = rec.get("name")
+        return out
+
+    def save_complication_run(self, pid: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist a complication run into model_results so it is auditable."""
+        rid = _uid("MR")
+        top = [i for i in payload.get("items", []) if i.get("status") == "ok"][:6]
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO model_results(result_id,patient_id,session_id,module_name,module_version,"
+                "signal,level,confidence,data_quality,clinical_validation,drivers_json,explanation,"
+                "provenance_json,limitations,extra_json,created_at,label) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (rid, pid, None, payload.get("model", "complication_rules"), payload.get("version", "1"),
+                 "complication_composite",
+                 payload.get("compositeBand") or "unknown",
+                 (payload.get("composite") or 0) / 100.0,
+                 payload.get("signalQuality"), "research_only",
+                 json.dumps([{"k": i["name"], "v": i.get("probability")} for i in top]),
+                 "Composite complication index across %d scored complications." % len(top),
+                 json.dumps({"inputs": payload.get("dataCompleteness"), "source": "workstation"}),
+                 payload.get("limitations"), json.dumps({"items": top}), _now(), "COMPLICATION_RUN"))
+            con.commit()
+        return {"result_id": rid}
+
+    def update_list(self, pid: str, key: str, method: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Add / edit / delete one entry of an editable clinical list."""
+        with self.connect() as con:
+            ext = self._ext(con, "patient", pid)
+            items = ext.get(key) if isinstance(ext.get(key), list) else []
+            if method == "POST":
+                entry = dict(body or {})
+                entry.setdefault("id", _uid(key[:3].upper()))
+                entry.setdefault("added", _fmt_short(_now()))
+                items.append(entry)
+            elif method in ("PUT", "PATCH"):
+                eid = (body or {}).get("id")
+                for i, it in enumerate(items):
+                    if it.get("id") == eid:
+                        items[i] = {**it, **body}
+                        break
+                else:
+                    if (body or {}).get("items") is not None:
+                        items = body["items"]
+            elif method == "DELETE":
+                eid = (body or {}).get("id")
+                items = [it for it in items if it.get("id") != eid]
+            ext[key] = items
+            con.execute(
+                "INSERT INTO workstation_ext(entity_type,entity_id,data_json,updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(entity_type,entity_id) DO UPDATE SET data_json=excluded.data_json, "
+                "updated_at=excluded.updated_at",
+                ("patient", pid, json.dumps(ext), _now()))
+            con.commit()
+        return {key: items, "patient": self.get_patient(pid)}
+
+    # ------------------------------ wearable -------------------------------- #
+    def device(self):
+        if getattr(self, "_device", None) is None:
+            from devices import DeviceManager
+            self._device = DeviceManager(self)
+        return self._device
+
+    def _device_routes(self, method: str, parts: List[str], body: Dict[str, Any]) -> Tuple[int, Any]:
+        dev = self.device()
+        sub = parts[1] if len(parts) > 1 else "status"
+        if sub == "status":
+            return 200, dev.status()
+        if sub == "ports":
+            return 200, dev.list_ports()
+        if sub == "transports":
+            from devices import TRANSPORTS
+            return 200, {"transports": [{"id": k, "label": v} for k, v in TRANSPORTS.items()],
+                         "serial": dev.list_ports()}
+        if sub == "connect" and method == "POST":
+            return 200, dev.connect(body.get("transport") or "wifi", body)
+        if sub == "disconnect" and method == "POST":
+            return 200, dev.disconnect()
+        if sub == "ingest" and method == "POST":
+            return 200, dev.ingest(body)
+        if sub == "stream":
+            return 200, dev.stream(int(body.get("since") or 0) if body else 0)
+        if sub == "calibration":
+            pid = (body or {}).get("patientId")
+            if method == "GET":
+                return 200, {"calibration": dev.calibration(pid)}
+            if len(parts) > 2 and parts[2] == "capture" and method == "POST":
+                return 200, {"calibration": dev.capture_baseline(body.get("sensor"), pid)}
+            if len(parts) > 2 and parts[2] == "reference" and method == "POST":
+                return 200, {"calibration": dev.reference_point(
+                    body.get("sensor"), float(body.get("reference")), body.get("point") or "low", pid)}
+            if len(parts) > 2 and parts[2] == "reset" and method == "POST":
+                return 200, {"calibration": dev.reset_calibration(body.get("sensor"), pid)}
+            if method in ("PUT", "PATCH", "POST"):
+                return 200, {"calibration": dev.save_calibration(body.get("calibration") or body, pid)}
+        if sub == "session":
+            act = parts[2] if len(parts) > 2 else ""
+            if act == "start" and method == "POST":
+                return 200, dev.start_session(_pid(body), body.get("note"))
+            if act == "stop" and method == "POST":
+                return 200, dev.stop_session()
+        return 404, {"error": "no device route for /%s" % "/".join(parts)}
+
     # ---------------------------- bootstrap -------------------------------- #
     def bootstrap(self) -> Dict[str, Any]:
         health = self.health()
@@ -754,6 +986,18 @@ class WorkstationAPI:
                 if len(parts) == 3 and parts[2] == "series":
                     with self.connect() as con:
                         return 200, self._signals(con, pid)
+                if len(parts) == 3 and parts[2] == "complications":
+                    out = self.complications(pid)
+                    if method == "POST":
+                        out.update(self.save_complication_run(pid, out))
+                    return (200, out) if "error" not in out else (404, out)
+                if len(parts) == 3 and parts[2] == "sessions":
+                    return 200, {"sessions": self.sessions_for(pid)}
+                if len(parts) == 3 and parts[2] == "clinical" and method in ("PUT", "PATCH", "POST"):
+                    rec = self.update_patient(pid, body)
+                    return (200, rec) if rec else (404, {"error": "unknown patient"})
+                if len(parts) == 3 and parts[2] in CLINICAL_LISTS:
+                    return 200, self.update_list(pid, parts[2], method, body)
                 if method == "GET":
                     rec = self.get_patient(pid)
                     return (200, rec) if rec else (404, {"error": "unknown patient"})
@@ -782,6 +1026,17 @@ class WorkstationAPI:
                 return 201, self.add_cycle(body)
             if head == "reports" and method == "POST":
                 return 201, self.add_report(body)
+            if head == "device":
+                return self._device_routes(method, parts, body)
+            if head == "calibration":
+                dev = self.device()
+                pid = (body or {}).get("patientId")
+                if method == "GET":
+                    return 200, {"calibration": dev.calibration(pid)}
+                if method in ("PUT", "PATCH", "POST"):
+                    return 200, {"calibration": dev.save_calibration(body.get("calibration") or body, pid)}
+                if method == "DELETE":
+                    return 200, {"calibration": dev.reset_calibration(body.get("sensor"), pid)}
             if head == "seed-demo" and method == "POST":
                 return 200, self.seed_demo()
             if head == "clear-demo" and method == "POST":

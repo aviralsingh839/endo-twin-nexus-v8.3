@@ -7,7 +7,7 @@ const C = (() => {
   function card(o) {
     const head = (o.title || o.right) ? `
       <div class="card-head">
-        ${o.icon ? `<span style="color:${o.iconColor || 'var(--violet)'}">${U.icon(o.icon)}</span>` : ''}
+        ${o.icon ? `<span style="color:${o.iconColor || o.color || 'var(--violet)'}">${U.icon(o.icon)}</span>` : ''}
         <div>
           ${o.title ? `<div class="card-title">${o.title}</div>` : ''}
           ${o.sub ? `<div class="card-sub">${o.sub}</div>` : ''}

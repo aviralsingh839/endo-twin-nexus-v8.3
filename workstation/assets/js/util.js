@@ -158,7 +158,8 @@ const U = (() => {
   const C = {
     pink: '#ff4d8d', rose: '#f43f75', purple: '#7c5cff', indigo: '#5b4bf0', violet: '#a78bfa',
     blue: '#3b82f6', sky: '#38bdf8', cyan: '#22d3ee', teal: '#14b8a6', green: '#34d399',
-    lime: '#a3e635', yellow: '#fbbf24', orange: '#fb923c', red: '#f87171', gray: '#8593b5'
+    lime: '#a3e635', yellow: '#fbbf24', orange: '#fb923c', red: '#f87171', gray: '#8593b5',
+    muted: '#8b97b8'
   };
   const soft = (hex, a = 0.15) => {
     const h = hex.replace('#', '');

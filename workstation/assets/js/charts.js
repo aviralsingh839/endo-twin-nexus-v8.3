@@ -268,7 +268,7 @@ const Chart = (() => {
           <span style="color:var(--text-2)">${U.esc(it.k)}</span>
           <span style="color:var(--muted)">${it.text != null ? U.esc(it.text) : it.v + '%'}</span>
         </div>
-        <div class="progress"><span style="width:${Math.min(100, it.v)}%;background:${it.color || 'linear-gradient(90deg,var(--indigo),var(--purple))'}"></span></div>
+        <div class="progress"><span style="width:${Math.min(100, it.v)}%;background:${it.color || opts.color || 'linear-gradient(90deg,var(--indigo),var(--purple))'}"></span></div>
       </div>`).join('') + `</div>`;
   }
 
