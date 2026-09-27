@@ -18,6 +18,7 @@ class _SerialStaleError(Exception):
 
 class ArduinoReader(QObject):
     sample_received=Signal(object)
+    calibration_received=Signal(object)
     error_received=Signal(str)
     state_changed=Signal(str)
     def __init__(self,port:str,baud:int=SERIAL_BAUD,require_crc:bool=True,parent=None):
@@ -88,8 +89,7 @@ class ArduinoReader(QObject):
                 if not line:
                     if time.time()-last_data>STALE_DATA_TIMEOUT_S: raise _SerialStaleError()
                     continue
-                sample:SensorSample=self.parser.parse(line)
-                last_data=time.time()
+                if line.startswith("$PCAL,"):\n                    self.calibration_received.emit(self.parser.parse_calibration_event(line))\n                    last_data=time.time()\n                    continue\n                sample:SensorSample=self.parser.parse(line)\n                last_data=time.time()
                 with self._sample_lock:
                     self._latest_sample = sample
                     self._sample_seq += 1
