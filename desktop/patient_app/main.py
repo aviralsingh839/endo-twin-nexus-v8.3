@@ -446,14 +446,16 @@ class PatientWindow(QMainWindow):
         self.personal_model.sync_from_disk()
         self.profile = get_profile(self.participant_id)
         snap = self.personal_model.snapshot()
+        patient_name = self.profile.get("patient_name") or self.profile.get("alias") or self.participant_id
+        stored_baseline = "YES" if baseline_summary(self.participant_id)["available"] else "NO"
         lines = [
             f"Participant: {self.participant_id}",
-            f"Patient: {self.profile.get("patient_name") or self.profile.get("alias") or self.participant_id}",
+            f"Patient: {patient_name}",
             f"Profile: {profile_summary(self.profile)}",
             f"Learning samples: {snap['samples']:,}",
             f"Quality-weighted samples: {snap['quality_weighted_samples']:.2f}",
             "",
-            f"Stored baseline: {("YES" if baseline_summary(self.participant_id)["available"] else "NO")}",
+            f"Stored baseline: {stored_baseline}",
             "Learned reference ranges:",
         ]
         for name, item in snap.get("metrics", {}).items():
