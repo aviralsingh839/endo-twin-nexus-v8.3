@@ -17,7 +17,7 @@ from src.personal_twin.profile_store import (
 )
 
 METRICS = (
-    "hr_bpm", "rmssd_ms", "skin_temp_c", "gsr_tonic",
+    "hr_bpm", "rmssd_ms", "skin_temp_c", "room_temp_c", "gsr_tonic",
     "activity_level", "stress_index", "sleep_probability",
 )
 
