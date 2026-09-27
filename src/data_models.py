@@ -65,6 +65,9 @@ class SensorSample:
     source: str = "serial"
     # V8.3 quality metadata
     quality_meta: Dict[str, SensorQuality] = field(default_factory=dict)
+    # V9 wearable: single-channel analog pulse sensor on ESP32 ADC.
+    analog_ppg_raw: Optional[float] = None
+    ppg_mode: str = "digital_or_unknown"
 
 
 @dataclass
@@ -149,6 +152,10 @@ class FeatureVector:
     anomalies: List[str] = field(default_factory=list)
     # V8.3: quality per feature
     quality_per_feature: Dict[str, float] = field(default_factory=dict)
+    # V9 automatic raw-data calibration state.
+    calibration_ready_fraction: float = 0.0
+    calibration_status: str = "WARMING_UP"
+    calibration_meta: Dict[str, Any] = field(default_factory=dict)
     # V8.3: shared representation cache
     shared_features: Dict[str, Any] = field(default_factory=dict)
 
