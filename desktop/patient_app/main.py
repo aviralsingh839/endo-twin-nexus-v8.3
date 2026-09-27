@@ -22,6 +22,7 @@ from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choo
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_summary
 from src.personal_twin.participant_selector import choose_participant
 from src.ui.pcos_complication_panel import PCOSComplicationPanel
 from services.bridge.server import EndoTwinBridgeServer
@@ -179,7 +180,7 @@ class PatientWindow(QMainWindow):
         self._go("home")
 
     def _go(self, key):
-        order = ["home", "health", "measure", "timeline", "reports", "connect", "notes"]
+        order = ["home", "health", "measure", "timeline", "reports", "connect", "personal", "complications", "notes"]
         self.stack.setCurrentIndex(order.index(key))
         for k, b in self.nav.items():
             b.setChecked(k == key)
@@ -447,10 +448,12 @@ class PatientWindow(QMainWindow):
         snap = self.personal_model.snapshot()
         lines = [
             f"Participant: {self.participant_id}",
+            f"Patient: {self.profile.get("patient_name") or self.profile.get("alias") or self.participant_id}",
             f"Profile: {profile_summary(self.profile)}",
             f"Learning samples: {snap['samples']:,}",
             f"Quality-weighted samples: {snap['quality_weighted_samples']:.2f}",
             "",
+            f"Stored baseline: {("YES" if baseline_summary(self.participant_id)["available"] else "NO")}",
             "Learned reference ranges:",
         ]
         for name, item in snap.get("metrics", {}).items():
