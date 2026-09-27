@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from collections import deque
 
 from PySide6.QtCore import Qt
@@ -26,9 +27,10 @@ from desktop.doctor_app.patient_management import PatientManager
 from desktop.demo_data import condition_list, sorted_cases, DemoCase
 from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
-from src.personal_twin.profile_store import load_state, profile_summary
+from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.ui.pcos_complication_panel import PCOSComplicationPanel
+from src.personal_twin.participant_selector import choose_participant
 from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
 
@@ -211,7 +213,6 @@ class DoctorWindow(QMainWindow):
             "lab": PrototypeLabWidget(self.session, self.mode, ROOT),
             "complications": self._complications_page(),
             "personal": self._personal_page(),
-            "personal": self._personal_page(),
             "patient": self._patient_page(),
             "mobile": self._mobile_page(),
             "settings": self._settings_page(),
@@ -241,6 +242,8 @@ class DoctorWindow(QMainWindow):
     def _mode_text(self):
         if self.mode.mode == "demo":
             return "DEMO MODE", "Synthetic showcase stream"
+        if self.mode.mode == "wifi":
+            return "LIVE SENSOR MODE", f"ESP32-S3 Wi-Fi • {self.mode.host}:{self.mode.tcp_port}"
         return "LIVE SENSOR MODE", f"USB serial • {self.mode.port}"
 
     def _refresh_header(self):
@@ -896,6 +899,25 @@ class DoctorWindow(QMainWindow):
                     it.setData(Qt.ItemDataRole.UserRole, "LOCAL::" + pid)
                 self.table.setItem(r, col, it)
 
+        # People created by Personal Twin are visible here without duplicating rows already in the DB.
+        db_ids = {str(p.get("patient_id")) for p in local}
+        for p in list_profiles():
+            twin_id = str(p.get("participant_id"))
+            if twin_id in db_ids:
+                continue
+            alias = str(p.get("alias") or twin_id)
+            searchable = f"{twin_id} {alias}"
+            if q and q not in searchable.lower():
+                continue
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            vals = [twin_id, alias, "Personal Twin", "Unknown", "—", "LEARNED", p.get("updated_at", "—")]
+            for col, val in enumerate(vals):
+                it = QTableWidgetItem(str(val))
+                if col == 0:
+                    it.setData(Qt.ItemDataRole.UserRole, "TWIN::" + twin_id)
+                self.table.setItem(r, col, it)
+
         self._refresh_dashboard()
 
     def _select_row(self, row, _col):
@@ -922,16 +944,18 @@ class DoctorWindow(QMainWindow):
     # ---------- patient workspace ----------
     def _complication_context(self):
         p = self._profile() or {}
+        pid = p.get("pid")
+        shared = get_profile(pid) if pid else {}
         return {
-            "age_years": p.get("age"),
-            "bmi": p.get("bmi"),
-            "systolic_bp": None,
-            "diastolic_bp": None,
-            "glucose_mg_dl": None,
-            "cycle_irregular": None,
-            "usual_cycle_length_days": None,
-            "days_since_last_period": None,
-            "years_post_menarche": None,
+            "age_years": shared.get("age_years", p.get("age")),
+            "bmi": shared.get("bmi", p.get("bmi")),
+            "systolic_bp": shared.get("systolic_bp"),
+            "diastolic_bp": shared.get("diastolic_bp"),
+            "glucose_mg_dl": shared.get("glucose_mg_dl"),
+            "cycle_irregular": shared.get("cycle_irregular"),
+            "usual_cycle_length_days": shared.get("usual_cycle_length_days"),
+            "days_since_last_period": shared.get("days_since_last_period"),
+            "years_post_menarche": shared.get("years_post_menarche"),
         }
 
     def _complications_page(self):
@@ -962,6 +986,8 @@ class DoctorWindow(QMainWindow):
     def _refresh_personal_page(self):
         state = load_state()
         learning = state.get("learning", {})
+        p = state.get("profile", {})
+        self.personal_model.set_participant(str(p.get("participant_id") or self.participant_id))
         lines = [
             f"Model: {learning.get('version', 'adaptive-personal-twin-v1')}",
             f"Quality-gated observations: {int(learning.get('samples', 0)):,}",
@@ -1643,7 +1669,13 @@ class DoctorWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
-        self.personal_model.sync_from_disk()
+        try:
+            source = str(row.get("source", "")).lower()
+            if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
+                self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+            self.personal_model.sync_from_disk()
+        except Exception as exc:
+            self._log_event("Personal learning warning", str(exc))
         if hasattr(self, "complications_page"):
             self.complications_page.set_context(self._complication_context(), row)
         if hasattr(self, "personal_text"):
@@ -1686,6 +1718,12 @@ class DoctorWindow(QMainWindow):
                 self.live_patient = self.db.get_patient(local_id)
             except Exception:
                 self.live_patient = None
+        elif isinstance(pid, str) and pid.startswith("TWIN::"):
+            twin_id = pid.split("::", 1)[1]
+            self.live_patient = get_profile(twin_id)
+            self.participant_id = twin_id
+            select_participant(twin_id)
+            self.personal_model.set_participant(twin_id)
         elif self.mode.mode == "demo":
             self.current_case = next((x for x in sorted_cases() if x.patient == pid), None)
             if self.current_case is None:
@@ -1701,6 +1739,28 @@ class DoctorWindow(QMainWindow):
 
         if not self.current_case and not self.live_patient:
             return
+        if self.live_patient:
+            shared_pid = str(
+                self.live_patient.get("anonymous_id")
+                or self.live_patient.get("patient_id")
+                or self.live_patient.get("participant_id")
+                or ""
+            )
+            if shared_pid:
+                twin = get_profile(shared_pid)
+                if not twin:
+                    save_profile({
+                        "participant_id": shared_pid,
+                        "alias": str(self.live_patient.get("display_name") or shared_pid),
+                        "age_years": self.live_patient.get("age_years"),
+                        "bmi": self.live_patient.get("bmi"),
+                        "provenance": "LOCAL-DATABASE",
+                        "updated_at": time.time(),
+                    }, set_active=True)
+                else:
+                    select_participant(shared_pid)
+                self.participant_id = shared_pid
+                self.personal_model.set_participant(shared_pid)
         self._log_event("Patient opened", pid)
         self._rebuild_patient_header()
         self._build_patient_tabs()
