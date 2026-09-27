@@ -51,6 +51,7 @@ from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_engine
+from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 from src.ui.pcos_complication_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 
@@ -78,6 +79,7 @@ class MainWindow(QMainWindow):
         self.baseline_engine = baseline_engine(self.participant_id)
         self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
         self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
+        self.visual_graphs = {}
         self.shared_extractor = SharedFeatureExtractor(baseline_engine=self.baseline_engine)
         self.fusion_engine = FusionEngine()
         self.explanation_engine = ExplanationEngine()
@@ -550,33 +552,41 @@ class MainWindow(QMainWindow):
         content = QWidget()
         root = QVBoxLayout(content)
 
-        info = QLabel(
-            "Personal Baseline Engine V8.3\n"
-            "Learns what is normal for THIS person: mean, median, std, robust MAD, rolling baseline, confidence, "
-            "minimum observations, seasonal/circadian context.\n"
-            "CURRENT vs PERSONAL BASELINE -> normalized deviation (z-score, % change)"
-        )
-        info.setWordWrap(True)
-        root.addWidget(info)
+        grid = QGridLayout()
+        grid.addWidget(metric_card("Baseline status", "READY" if self.baseline_engine.has_baseline else "BUILDING", "Patient-specific reference", accent="#31d7a1"), 0, 0)
+        grid.addWidget(metric_card("Observations", str(len(self.feature_history)), "Current local timeline", accent="#39c9ff"), 0, 1)
+        grid.addWidget(RingGauge("Confidence", getattr(getattr(self.baseline_engine, "baseline", None), "confidence", 0.0) * 100, "%", "#7d62ff"), 0, 2)
+        root.addLayout(grid)
 
-        self.baseline_status = QLabel("No baseline yet. Collect at least 5 min calm data, then capture.")
-        self.baseline_status.setWordWrap(True)
-        root.addWidget(self.baseline_status)
+        graphs = QGridLayout()
+        self.baseline_hr_graph = trend_panel("HR vs baseline", [f.hr_bpm for f in self.feature_history if f.hr_bpm is not None], "bpm", "#ff4fa3", 170)
+        self.baseline_hrv_graph = trend_panel("HRV vs baseline", [f.rmssd_ms for f in self.feature_history if f.rmssd_ms is not None], "ms", "#39c9ff", 170)
+        graphs.addWidget(self.baseline_hr_graph, 0, 0)
+        graphs.addWidget(self.baseline_hrv_graph, 0, 1)
+        self.visual_graphs["hr_bpm"] = self.baseline_hr_graph.graph
+        self.visual_graphs["rmssd_ms"] = self.baseline_hrv_graph.graph
+        root.addLayout(graphs)
 
         btn_row = QHBoxLayout()
         capture_btn = QPushButton("Capture Baseline (1 hour)")
+        capture_btn.setObjectName("primary")
         capture_btn.clicked.connect(self._capture_baseline)
         btn_row.addWidget(capture_btn)
         root.addLayout(btn_row)
 
+        self.baseline_status = QLabel("No baseline yet. Collect at least 5 min calm data, then capture.")
+        self.baseline_status.setWordWrap(True)
+        self.baseline_status.setObjectName("muted")
+        root.addWidget(self.baseline_status)
+
         self.baseline_details = QTextEdit()
         self.baseline_details.setReadOnly(True)
-        self.baseline_details.setPlaceholderText("Baseline details appear here...")
+        self.baseline_details.setMaximumHeight(90)
         root.addWidget(self.baseline_details)
 
         self.baseline_comparison = QTextEdit()
         self.baseline_comparison.setReadOnly(True)
-        self.baseline_comparison.setPlaceholderText("Current vs baseline comparison...")
+        self.baseline_comparison.setMaximumHeight(90)
         root.addWidget(self.baseline_comparison)
 
         scroll.setWidget(content)
@@ -723,28 +733,23 @@ class MainWindow(QMainWindow):
     def _build_trends_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-
-        info = QLabel(
-            "Longitudinal Engine - Heart of V8.3\n"
-            "Rolling windows, persistence detection, trend detection, change-point detection, recovery detection, "
-            "missing-data handling, confidence scoring.\n"
-            "ONE ABNORMAL -> weak signal, REPEATED CHANGE -> stronger, MULTIPLE FEATURES -> multimodal, "
-            "PERSISTENT + GOOD QUALITY -> higher confidence"
-        )
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        top = QGridLayout()
+        top.addWidget(metric_card("Windows", str(len(self.feature_history)), "Longitudinal observations", accent="#39c9ff"),0,0)
+        top.addWidget(metric_card("Recovery", "TRACKING", "Existing engine classifications", accent="#31d7a1"),0,1)
+        top.addWidget(metric_card("Patient", self.participant_id, "Selected person", accent="#a86bff"),0,2)
+        layout.addLayout(top)
 
         self.trend_plot = TimeSeriesPlot("HR Trend", "bpm", "#f87171")
+        self.trend_plot.setMinimumHeight(220)
         layout.addWidget(self.trend_plot)
-
         self.trend_plot2 = TimeSeriesPlot("HRV Trend", "ms", "#60a5fa")
+        self.trend_plot2.setMinimumHeight(220)
         layout.addWidget(self.trend_plot2)
 
         self.longitudinal_text = QTextEdit()
         self.longitudinal_text.setReadOnly(True)
-        self.longitudinal_text.setPlaceholderText("Longitudinal analysis appears here...")
+        self.longitudinal_text.setMaximumHeight(110)
         layout.addWidget(self.longitudinal_text)
-
         return tab
 
     def _build_health_signals_tab(self):
@@ -814,198 +819,118 @@ class MainWindow(QMainWindow):
     def _build_data_quality_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-
-        info = QLabel("Sensor Quality - Every reading has quality metadata: value, quality 0..1, source, timestamp, artifact\nDetects: missing data, impossible values, flatline, excessive noise, motion artifacts, packet corruption, stale data\nBad data must not silently become model input.")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        top=QGridLayout()
+        top.addWidget(metric_card("Quality gate","ACTIVE","Bad data is excluded from model input",accent="#31d7a1"),0,0)
+        top.addWidget(metric_card("Latest quality","—","Per-feature quality metadata",accent="#39c9ff"),0,1)
+        top.addWidget(RingGauge("Data quality",0,"%", "#5b7cff"),0,2)
+        layout.addLayout(top)
 
         self.quality_text = QTextEdit()
         self.quality_text.setReadOnly(True)
+        self.quality_text.setMaximumHeight(130)
         layout.addWidget(self.quality_text)
-
         self.quality_gauge = GaugeWidget("Overall Data Quality")
-        layout.addWidget(self.quality_gauge)
-
+        layout.addWidget(self.quality_gauge,1)
         return tab
 
     def _build_clinical_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        top=QGridLayout()
+        top.addWidget(metric_card("BMI","—","USER-ENTERED",accent="#ff9f43"),0,0)
+        top.addWidget(metric_card("Blood pressure","—","USER-ENTERED",accent="#ff4fa3"),0,1)
+        top.addWidget(metric_card("Glucose","—","USER-ENTERED",accent="#31d7a1"),0,2)
+        top.addWidget(metric_card("PCOD status","—","PATIENT-REPORTED",accent="#a86bff"),0,3)
+        layout.addLayout(top)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
         root = QVBoxLayout(content)
-
-        info = QLabel("Clinical Inputs - Manual measurements (USER-ENTERED)\nBMI, BP, glucose, cycle info, age, etc.\nClearly labelled as USER-ENTERED, not MEASURED")
-        info.setWordWrap(True)
+        info = QLabel("Manual clinical context. All values stay labelled USER-ENTERED / PATIENT-REPORTED.")
+        info.setObjectName("muted")
         root.addWidget(info)
 
-        grid = QGridLayout()
-        self.age_spin = QDoubleSpinBox()
-        self.age_spin.setRange(10, 80)
-        self.age_spin.setValue(22)
-        self.bmi_spin = QDoubleSpinBox()
-        self.bmi_spin.setRange(10, 60)
-        self.bmi_spin.setValue(23.5)
-        self.bmi_spin.setDecimals(1)
-        self.sys_spin = QDoubleSpinBox()
-        self.sys_spin.setRange(0, 250)
-        self.sys_spin.setValue(0)
-        self.sys_spin.setSpecialValueText("none")
-        self.dia_spin = QDoubleSpinBox()
-        self.dia_spin.setRange(0, 150)
-        self.dia_spin.setValue(0)
-        self.dia_spin.setSpecialValueText("none")
-        self.glucose_spin = QDoubleSpinBox()
-        self.glucose_spin.setRange(0, 500)
-        self.glucose_spin.setValue(0)
-        self.glucose_spin.setSpecialValueText("none")
-        self.cycle_spin = QSpinBox()
-        self.cycle_spin.setRange(0, 120)
-        self.cycle_spin.setValue(0)
-        self.cycle_spin.setSpecialValueText("unknown")
-        self.length_spin = QSpinBox()
-        self.length_spin.setRange(0, 120)
-        self.length_spin.setValue(28)
-        self.cycle_irregular_combo = QComboBox()
-        self.cycle_irregular_combo.addItems(["unknown", "regular", "irregular"])
-
-        grid.addWidget(QLabel("Age"), 0, 0)
-        grid.addWidget(self.age_spin, 0, 1)
-        grid.addWidget(QLabel("BMI"), 0, 2)
-        grid.addWidget(self.bmi_spin, 0, 3)
-        grid.addWidget(QLabel("Systolic BP"), 1, 0)
-        grid.addWidget(self.sys_spin, 1, 1)
-        grid.addWidget(QLabel("Diastolic BP"), 1, 2)
-        grid.addWidget(self.dia_spin, 1, 3)
-        grid.addWidget(QLabel("Glucose mg/dL"), 2, 0)
-        grid.addWidget(self.glucose_spin, 2, 1)
-        grid.addWidget(QLabel("Cycle day"), 2, 2)
-        grid.addWidget(self.cycle_spin, 2, 3)
-        grid.addWidget(QLabel("Usual length"), 3, 0)
-        grid.addWidget(self.length_spin, 3, 1)
-        grid.addWidget(QLabel("Irregular"), 3, 2)
-        grid.addWidget(self.cycle_irregular_combo, 3, 3)
-
-        for w in [self.age_spin, self.bmi_spin, self.sys_spin, self.dia_spin, self.glucose_spin, self.cycle_spin, self.length_spin]:
-            w.valueChanged.connect(self._clinical_changed)
+        grid=QGridLayout()
+        self.age_spin=QDoubleSpinBox(); self.age_spin.setRange(10,80); self.age_spin.setValue(22)
+        self.bmi_spin=QDoubleSpinBox(); self.bmi_spin.setRange(10,60); self.bmi_spin.setValue(23.5); self.bmi_spin.setDecimals(1)
+        self.sys_spin=QDoubleSpinBox(); self.sys_spin.setRange(0,250); self.sys_spin.setValue(0); self.sys_spin.setSpecialValueText("none")
+        self.dia_spin=QDoubleSpinBox(); self.dia_spin.setRange(0,150); self.dia_spin.setValue(0); self.dia_spin.setSpecialValueText("none")
+        self.glucose_spin=QDoubleSpinBox(); self.glucose_spin.setRange(0,500); self.glucose_spin.setValue(0); self.glucose_spin.setSpecialValueText("none")
+        self.cycle_spin=QSpinBox(); self.cycle_spin.setRange(0,120); self.cycle_spin.setValue(0); self.cycle_spin.setSpecialValueText("unknown")
+        self.length_spin=QSpinBox(); self.length_spin.setRange(0,120); self.length_spin.setValue(28)
+        self.cycle_irregular_combo=QComboBox(); self.cycle_irregular_combo.addItems(["unknown","regular","irregular"])
+        fields=[("Age",self.age_spin,0,0),("BMI",self.bmi_spin,0,2),("Systolic BP",self.sys_spin,1,0),("Diastolic BP",self.dia_spin,1,2),("Glucose mg/dL",self.glucose_spin,2,0),("Cycle day",self.cycle_spin,2,2),("Usual length",self.length_spin,3,0),("Cycle pattern",self.cycle_irregular_combo,3,2)]
+        for label,widget,r,c0 in fields:
+            grid.addWidget(QLabel(label),r,c0); grid.addWidget(widget,r,c0+1)
+        for widget in [self.age_spin,self.bmi_spin,self.sys_spin,self.dia_spin,self.glucose_spin,self.cycle_spin,self.length_spin]:
+            widget.valueChanged.connect(self._clinical_changed)
         self.cycle_irregular_combo.currentTextChanged.connect(self._clinical_changed)
-
         root.addLayout(grid)
-
-        self.clinical_text = QTextEdit()
-        self.clinical_text.setReadOnly(True)
-        root.addWidget(self.clinical_text)
-
+        self.clinical_text=QTextEdit(); self.clinical_text.setReadOnly(True); self.clinical_text.setMaximumHeight(120); root.addWidget(self.clinical_text)
         scroll.setWidget(content)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll,1)
         return tab
 
     def _build_ultrasound_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Ultrasound - Periodic clinical imaging\nProvenance preserved: source image -> preprocessing -> detected features -> quality -> uncertainty\nIf feature cannot be reliably extracted: return UNKNOWN, never invent.\nFeatures labelled as CLINICALLY-ENTERED or IMAGE-DERIVED")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.ultrasound_text = QTextEdit()
-        self.ultrasound_text.setReadOnly(True)
-        self.ultrasound_text.setPlaceholderText("Ultrasound features appear here...")
-        layout.addWidget(self.ultrasound_text)
-
-        btn_row = QHBoxLayout()
-        self.cyst_size_spin = QDoubleSpinBox()
-        self.cyst_size_spin.setRange(0, 100)
-        self.cyst_size_spin.setValue(0)
-        self.cyst_size_spin.setSpecialValueText("none")
-        self.cyst_size_spin.setSuffix(" mm")
-        btn_row.addWidget(QLabel("Cyst size"))
-        btn_row.addWidget(self.cyst_size_spin)
-        add_btn = QPushButton("Add Ultrasound (Clinically Entered)")
-        add_btn.clicked.connect(self._add_ultrasound)
-        btn_row.addWidget(add_btn)
-        layout.addLayout(btn_row)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Ultrasound", "Image evidence stays separate from wearable and model signals."))
+        top=QGridLayout()
+        top.addWidget(metric_card("Image status","UNKNOWN","Attach a source image",accent="#39c9ff"),0,0)
+        top.addWidget(metric_card("Follicle count","UNKNOWN","No unsupported inference",accent="#a86bff"),0,1)
+        top.addWidget(metric_card("Morphology","UNKNOWN","Validated model required",accent="#ff9f43"),0,2)
+        layout.addLayout(top)
+        self.ultrasound_text=QTextEdit(); self.ultrasound_text.setReadOnly(True); self.ultrasound_text.setMaximumHeight(150); layout.addWidget(self.ultrasound_text)
+        btn_row=QHBoxLayout()
+        self.cyst_size_spin=QDoubleSpinBox(); self.cyst_size_spin.setRange(0,100); self.cyst_size_spin.setValue(0); self.cyst_size_spin.setSpecialValueText("none"); self.cyst_size_spin.setSuffix(" mm")
+        btn_row.addWidget(QLabel("Cyst size")); btn_row.addWidget(self.cyst_size_spin)
+        add_btn=QPushButton("Add Ultrasound (Clinically Entered)"); add_btn.setObjectName("primary"); add_btn.clicked.connect(self._add_ultrasound); btn_row.addWidget(add_btn)
+        btn_row.addStretch(); layout.addLayout(btn_row)
         return tab
 
     def _build_explanation_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Explainability - Every risk signal explains main contributing factors\nDrivers: e.g. resting HR increased from baseline, HRV decreased, sleep regularity decreased, activity decreased\nThen: 'These changes are not specific to one disease and should not be interpreted as a diagnosis.'")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.explanation_text = QTextEdit()
-        self.explanation_text.setReadOnly(True)
-        layout.addWidget(self.explanation_text)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Explainability", "Visual driver cards plus the existing detailed explanation."))
+        grid=QGridLayout()
+        for i,(t,v,a) in enumerate([
+            ("Baseline","Personal reference","#39c9ff"),
+            ("Longitudinal","Repeated change / recovery","#31d7a1"),
+            ("Quality","Quality gate before inference","#ff9f43"),
+            ("Provenance","Measured / derived / reported","#a86bff"),
+        ]):
+            grid.addWidget(metric_card(t,v,"Existing pipeline stage",accent=a),0,i)
+        layout.addLayout(grid)
+        self.explanation_text=QTextEdit(); self.explanation_text.setReadOnly(True); layout.addWidget(self.explanation_text,1)
         return tab
 
     def _build_report_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Report Generation - Research report with limitations and recommendation: 'Discuss relevant findings with qualified healthcare professional.'\nIncludes: subject ID, observation period, sensor data, data quality, personal baseline, longitudinal changes, disease signals, contributing factors, ultrasound if available, clinical inputs, limitations")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.report_text = QTextEdit()
-        self.report_text.setReadOnly(True)
-        layout.addWidget(self.report_text)
-
-        btn_row = QHBoxLayout()
-        gen_btn = QPushButton("Generate Report")
-        gen_btn.clicked.connect(self._generate_report)
-        btn_row.addWidget(gen_btn)
-        save_btn = QPushButton("Save Report")
-        save_btn.clicked.connect(self._save_report)
-        btn_row.addWidget(save_btn)
-        layout.addLayout(btn_row)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Report", "Visual summary before the detailed research report."))
+        grid=QGridLayout()
+        grid.addWidget(metric_card("Patient",self.participant_id,"Local patient-scoped record",accent="#39c9ff"),0,0)
+        grid.addWidget(metric_card("Windows",str(len(self.feature_history)),"Current longitudinal timeline",accent="#31d7a1"),0,1)
+        grid.addWidget(RingGauge("Quality",float(self.feature_history[-1].signal_quality)*100 if self.feature_history else 0,"%","#7d62ff"),0,2)
+        grid.addWidget(metric_card("PCOD","YES" if self.profile.has_pcod else "UNKNOWN","Patient-reported context",accent="#ff4fa3"),0,3)
+        layout.addLayout(grid)
+        self.report_text=QTextEdit(); self.report_text.setReadOnly(True); self.report_text.setMaximumHeight(220); layout.addWidget(self.report_text)
+        btn_row=QHBoxLayout()
+        gen_btn=QPushButton("Generate Report"); gen_btn.setObjectName("primary"); gen_btn.clicked.connect(self._generate_report); btn_row.addWidget(gen_btn)
+        save_btn=QPushButton("Save Report"); save_btn.setObjectName("secondary"); save_btn.clicked.connect(self._save_report); btn_row.addWidget(save_btn)
+        btn_row.addStretch(); layout.addLayout(btn_row)
         return tab
 
     def _build_validation_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        info = QLabel("Validation - Engineering vs Clinical\nTests: baseline accuracy, trend detection, persistence, recovery, missing sensor handling, noisy data, multimodal fusion, disease module isolation, subject-level validation, reproducibility")
-        info.setWordWrap(True)
-        layout.addWidget(info)
-
-        self.validation_text = QTextEdit()
-        self.validation_text.setReadOnly(True)
-        self.validation_text.setText(
-            "CHRONO-TWIN NEXUS V8.3 Validation Status\n"
-            "========================================\n\n"
-            "Engineering Validation:\n"
-            "- Personal baseline: mean, median, std, MAD, rolling, confidence, min obs, circadian context - IMPLEMENTED\n"
-            "- Longitudinal engine: rolling windows, persistence, trend, change-point, recovery, missing handling, confidence - IMPLEMENTED\n"
-            "- Shared representation: heart_rate, resting_hr, hrv, activity, sleep, temp, gsr, circadian, recovery, baseline_dev, trends, quality - IMPLEMENTED\n"
-            "- Disease modules: PCOS, Sleep, Cardiometabolic, Autonomic with consistent API - IMPLEMENTED\n"
-            "- Sensor quality: missing, impossible, flatline, noise, motion, corruption, stale - IMPLEMENTED\n"
-            "- Hardware failure tests: disconnected MAX30102, temp, corrupted packet, duplicate, delayed, missing, noisy PPG, motion, reconnection - IMPLEMENTED\n"
-            "- Synthetic longitudinal data with 6 scenarios - IMPLEMENTED\n"
-            "- Multimodal fusion with provenance - IMPLEMENTED\n"
-            "- Explainability - IMPLEMENTED\n"
-            "- Subject-level validation (no leakage) - IMPLEMENTED\n"
-            "- Data honesty: REAL, SYNTHETIC, PUBLIC, USER-ENTERED labelled - IMPLEMENTED\n\n"
-            "Clinical Validation: NOT ESTABLISHED\n"
-            "- All modules are research-only signals\n"
-            "- No diagnostic claims\n"
-            "- Requires ethics-approved prospective study\n"
-            "- Model confidence vs data quality vs clinical validation separated\n\n"
-            "Hardware:\n"
-            "- Wearable Nano Pod: MAX30102 + MPU6050 + DS18B20 + optional GSR - PRESERVED from V8.1\n"
-            "- Mega Hub: expanded experimental sensors - PRESERVED\n"
-            "- Software gracefully handles missing sensors - IMPLEMENTED\n"
-        )
-        layout.addWidget(self.validation_text)
-
+        tab=QWidget(); layout=QVBoxLayout(tab); layout.setSpacing(10)
+        layout.addWidget(section_header("Validation & Research Boundaries", "Engineering status stays visual and separate from clinical validation."))
+        g=QGridLayout()
+        g.addWidget(RingGauge("Engineering",100,"%","#31d7a1"),0,0)
+        g.addWidget(RingGauge("Clinical",0,"%","#ff9f43"),0,1)
+        g.addWidget(metric_card("Tests","IMPLEMENTED","Unit/integration coverage",accent="#39c9ff"),0,2)
+        g.addWidget(metric_card("Clinical validation","NOT ESTABLISHED","Research prototype",accent="#ff4fa3"),0,3)
+        layout.addLayout(g)
+        self.validation_text=QTextEdit(); self.validation_text.setReadOnly(True); layout.addWidget(self.validation_text,1)
         return tab
 
-    # ------------------------------------------------- logic
     def _refresh_ports(self):
         # Simple refresh - in real app would scan serial ports
         self.port_combo.addItem("/dev/ttyACM0")
