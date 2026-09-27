@@ -498,7 +498,16 @@ class UnifiedWorkstation(QMainWindow):
         source=str(getattr(f,"source","")).lower()
         if self.current and source not in {"demo","synthetic"} and not source.startswith("demo"):
             row=f.__dict__.copy()
-            self.baseline_capture.add_row(row)
+            result=self.baseline_capture.add_row(row)
+            if result is not None:
+                if result.get("ready"):
+                    self.baseline_progress.setValue(100)
+                    self.baseline_status.setText(
+                        f"Baseline saved for {self.participant_id} • {result['samples']} windows • "
+                        f"quality {result['quality']*100:.0f}% • confidence {result['confidence']:.2f}"
+                    )
+                else:
+                    self.baseline_status.setText("Baseline not saved • " + str(result.get("error","Need more valid live windows.")))
             try:
                 self.personal_model.observe(f, quality=getattr(f,"signal_quality",0.0))
             except Exception as exc:
