@@ -69,7 +69,12 @@ class BaselineCapture:
             self.last_result = result
             return result
 
-        rows = [SimpleNamespace(**r) for r in self.accepted_rows[-max(self.min_samples, 120):]]
+        rows = []
+        for raw in self.accepted_rows[-max(self.min_samples, 120):]:
+            item = dict(raw)
+            if "timestamp_s" not in item:
+                item["timestamp_s"] = item.get("timestamp", time.time())
+            rows.append(SimpleNamespace(**item))
         try:
             engine = baseline_engine(self.participant_id)
             b = engine.capture_from_features(rows, min_samples=self.min_samples)
