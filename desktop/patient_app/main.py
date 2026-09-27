@@ -850,15 +850,26 @@ class PatientWindow(QMainWindow):
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
         vals = {
+            "Heart Rate": (row.get("hr_bpm"), " bpm"),
             "Heart rate": (row.get("hr_bpm"), " bpm"),
             "HRV (RMSSD)": (row.get("rmssd_ms"), " ms"),
-            "Skin temperature": (row.get("skin_temp_c"), " °C"),
+            "Temperature": (row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"), " °C"),
+            "Skin temperature": (row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"), " °C"),
+            "GSR / Stress": (row.get("gsr_tonic"), " rel."),
+            "Activity": (row.get("activity_level"), " %"),
         }
         for title, (value, suffix) in vals.items():
             if title in self.metric_labels:
                 self.metric_labels[title].setText(self._fmt(value, suffix, 1))
-                if value is not None:
-                    self.charts[title].set_value(value)
+                chart=self.charts.get(title)
+                if value is not None and chart is not None:
+                    chart.set_value(value)
+
+        # Some Overview cards are built by the compact card() helper and don't
+        # have entries in metric_labels; update their visible labels too.
+        current = self._current_values()
+        if hasattr(self, "overview_hr_value"):
+            self.overview_hr_value.setText(self._fmt(current["hr"], " bpm", 0))
         if hasattr(self, "measure_chart") and row.get("activity_level") is not None:
             self.measure_chart.set_value(row["activity_level"])
             self.measure_status.setText(f"{row.get('gating','QUALITY_GATE')} • {row.get('provenance','UNKNOWN')} • {len(row.get('status_flags', []))} status flag(s)")
