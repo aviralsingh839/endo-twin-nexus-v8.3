@@ -183,9 +183,9 @@ class PCODProgressPanel(QWidget):
         if not isinstance(value, dict):
             return None
         def n(key, default=None):
-            value = value.get(key, default)
+            raw = value.get(key, default)
             try:
-                return float(value) if value is not None else default
+                return float(raw) if raw is not None else default
             except (TypeError, ValueError):
                 return default
         return FeatureVector(
