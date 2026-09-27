@@ -44,6 +44,8 @@ class PatientWindow(QMainWindow):
         self.case = DEMO_CASES[0]
         self.latest_row = None
         self.feature_history = []
+        self.feature_window_count = 0
+        self.last_feature_time = None
         self.note_text = ""
         self.metric_labels = {}
         self.visual_graphs = {}
@@ -139,9 +141,12 @@ class PatientWindow(QMainWindow):
         self.side_mode.setObjectName("subtitle")
         mv.addWidget(self.side_mode)
         self.side_state = QLabel()
+        self.live_counter = QLabel("LIVE: 0 feature windows")
+        self.live_counter.setObjectName("muted")
         self.side_state.setObjectName("muted")
         self.side_state.setWordWrap(True)
         mv.addWidget(self.side_state)
+        mv.addWidget(self.live_counter)
         sl.addWidget(mode_box)
         shell.addWidget(side, 0, 0)
 
@@ -681,6 +686,8 @@ class PatientWindow(QMainWindow):
         self.participant_id = pid
         self.profile = get_profile(pid)
         self.feature_history = []
+        self.feature_window_count = 0
+        self.last_feature_time = None
         self.visual_graphs.clear()
         self.personal_model.set_participant(pid)
         self.baseline_capture = BaselineCapture(pid, duration_s=60.0, min_samples=60, min_quality=0.45)
@@ -818,26 +825,40 @@ class PatientWindow(QMainWindow):
 
     def _on_features(self, row):
         self.latest_row = row
-        source = str(row.get("source", "")).lower()
-        if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+        self.last_feature_time = time.time()
+        self.feature_window_count += 1
+        self.live_counter.setText(
+            f"LIVE: {self.feature_window_count} feature windows • "
+            f"last quality {float(row.get('signal_quality', 0.0) or 0.0)*100:.0f}%"
+        )
+        is_live = self.mode.mode != "demo" and str(row.get("source", "")).lower() not in {"demo", "synthetic"}
+        if is_live:
             self.feature_history.append(dict(row))
             self.feature_history = self.feature_history[-1000:]
             result = self.baseline_capture.add_row(row)
             if result is not None:
                 self._show_baseline_result(result)
-        try:
-            source = str(row.get("source", "")).lower()
-            if source not in {"demo", "synthetic"} and not source.startswith("demo"):
+            try:
                 self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+                # Read the persisted patient-scoped state back immediately. This
+                # keeps the Patient UI truthful even when another workstation has
+                # touched the shared local JSON file.
+                self.personal_model.sync_from_disk()
                 snap = self.personal_model.snapshot()
                 if snap["samples"] >= 60 and snap["samples"] % 20 == 0:
                     self._auto_sync_baseline()
-            self.personal_model.sync_from_disk()
-            self.profile = get_profile(self.participant_id)
-            if hasattr(self, "personal_text"):
-                self._refresh_personal()
-        except Exception as exc:
-            self.side_state.setText(f"Learning warning • {exc}")
+                if hasattr(self, "personal_text"):
+                    self._refresh_personal()
+                self.side_state.setText(
+                    f"{self.participant_id} • LIVE • {self.feature_window_count} windows • "
+                    f"learning {snap['samples']}"
+                )
+            except Exception as exc:
+                self.side_state.setText(
+                    f"Learning error • {type(exc).__name__}: {exc}"
+                )
+        else:
+            self.side_state.setText(f"{self.participant_id} • {self.feature_window_count} feature windows")
         if hasattr(self, "pcod_progress_panel"):
             self.pcod_progress_panel.set_context(self.profile, self.feature_history, row)
         for key in ("hr_bpm","rmssd_ms","skin_temp_c","gsr_tonic","activity_level"):
