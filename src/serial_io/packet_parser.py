@@ -22,6 +22,16 @@ class PacketParseError(ValueError):
     pass
 
 
+@dataclass
+class PPGCalibrationEvent:
+    profile_id: str
+    baseline_adc: float
+    noise_sd: float
+    peak_to_peak: float
+    quality: float
+    wearable_event_ms: int
+
+
 def xor_crc_ascii(text: str) -> int:
     c = 0
     for ch in text:
@@ -42,6 +52,22 @@ class PacketParser:
         if raw.startswith("$CP,"):
             return self._parse_cp(raw)
         raise PacketParseError(f"bad prefix: {raw[:8]}")
+
+    def parse_calibration_event(self, raw: str) -> PPGCalibrationEvent:
+        parts = raw.strip().split(",")
+        if len(parts) != 7 or parts[0] != "$PCAL":
+            raise PacketParseError("invalid $PCAL event")
+        try:
+            return PPGCalibrationEvent(
+                profile_id=parts[1],
+                baseline_adc=float(parts[2]),
+                noise_sd=float(parts[3]),
+                peak_to_peak=float(parts[4]),
+                quality=float(parts[5]),
+                wearable_event_ms=int(parts[6]),
+            )
+        except (ValueError, IndexError) as exc:
+            raise PacketParseError(f"invalid $PCAL values: {exc}") from exc
 
     def _verify_crc(self, parts: list[str], expected_without_crc: int | None = None) -> None:
         if len(parts) < 2:
