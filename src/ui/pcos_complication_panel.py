@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QPushButton
+from desktop.workstation_runtime import Sparkline
 from PySide6.QtCore import Signal
 from types import SimpleNamespace
 
@@ -250,6 +251,10 @@ class PCODProgressPanel(QWidget):
 
     def _render_progress(self):
         self.progress_table.setRowCount(0)
+        hr_vals=[float(f.hr_bpm) for f in self.feature_history if f.hr_bpm is not None]
+        hrv_vals=[float(f.rmssd_ms) for f in self.feature_history if f.rmssd_ms is not None]
+        self.hr_graph.set_values(hr_vals[-120:])
+        self.hrv_graph.set_values(hrv_vals[-120:])
         key = self._status_value(self.profile)
         if key != "yes":
             msg = (
