@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QPushButton
+from types import SimpleNamespace
 
 from src.disease_modules.pcos_complications import PCOSComplicationContextEngine
 
@@ -54,7 +55,10 @@ class PCOSComplicationPanel(QWidget):
         self.refresh()
 
     def refresh(self) -> None:
-        rows = self.engine.evaluate(self._clinical, self._feature, [])
+        feature = self._feature
+        if isinstance(feature, dict):
+            feature = SimpleNamespace(**feature)
+        rows = self.engine.evaluate(self._clinical, feature, [])
         self.table.setRowCount(len(rows))
         for r, item in enumerate(rows):
             for c, key in enumerate(("domain", "status", "finding", "data_needed")):
