@@ -94,6 +94,7 @@ except ImportError:
 
 from src.personal_twin.profile_store import get_profile, load_state, profile_summary, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_store import baseline_summary
 
 DISCLAIMER = "Research prototype - Understand your physiological patterns over time - Not a medical diagnosis"
 
@@ -476,14 +477,17 @@ if PYSIDE_AVAILABLE:
                 return
             model = PersonalAdaptiveModel(str(pid))
             snap = model.snapshot()
+            baseline = baseline_summary(str(pid))
             label.setText(
                 f"Active participant: {pid}\n"
+                f"Patient: {profile.get('patient_name') or profile.get('alias') or pid}\n"
                 f"{profile_summary(profile)}\n"
                 "Shared source: Personal Twin → Unified / Doctor / Patient / ENDO-TWIN"
             )
             lines = [
                 f"Learning samples: {snap['samples']:,}",
                 f"Quality-weighted samples: {snap['quality_weighted_samples']:.2f}",
+                f"Stored baseline: {'YES' if baseline['available'] else 'NO'}",
                 "",
                 "Learned references:",
             ]
