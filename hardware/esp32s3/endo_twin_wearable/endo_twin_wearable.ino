@@ -363,6 +363,7 @@ void loop(){
       statusBase&=~(1u<<ST_TEMP_ERR);
     }else{
       tempValid=false;
+      tempOK=false;
       statusBase|=(1u<<ST_TEMP_ERR);
       Serial.print("[TEMP] invalid DS18B20 reading: ");
       Serial.println(t);
