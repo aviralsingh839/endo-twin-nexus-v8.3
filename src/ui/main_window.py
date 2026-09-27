@@ -636,6 +636,54 @@ class MainWindow(QMainWindow):
             )
         self.personal_twin_text.setText("\n".join(lines) if lines else "No quality-gated measurements learned yet.")
 
+    def _switch_participant(self):
+        from src.personal_twin.participant_selector import choose_participant
+
+        pid = choose_participant("ENDO-TWIN • Switch Person")
+        if not pid or pid == self.participant_id:
+            return
+
+        try:
+            self.stop_stream()
+        except Exception:
+            pass
+
+        # Clear live analysis buffers so the new person's workstation starts
+        # from that person's own timeline rather than carrying over the prior one.
+        self.feature_history.clear()
+        self.shared_history.clear()
+        self.module_results = {}
+        self.fusion_result = None
+        self.current_shared = None
+        self.clinical_data = {}
+        self.latest_row = None
+        self._sample_count = 0
+
+        select_participant(pid)
+        self.participant_id = str(pid)
+
+        saved = get_profile(self.participant_id)
+        for key, value in saved.items():
+            if hasattr(self.profile, key):
+                try:
+                    setattr(self.profile, key, value)
+                except Exception:
+                    pass
+
+        self.adaptive_model.set_participant(self.participant_id)
+        self._load_saved_profile_into_controls()
+        self._refresh_personal_twin()
+
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(
+                self.clinical_data,
+                None,
+            )
+
+        self.top_patient.setText(f"PATIENT  {self.participant_id}")
+        self.top_mode.setText("●  NO STREAM")
+        self.status_label.setText(f"Active participant: {self.participant_id}")
+
     def _build_complications_tab(self):
         tab = PCOSComplicationPanel("PCOS / Complication Context")
         self.complication_panel = tab
