@@ -31,7 +31,7 @@ from desktop.workstation_theme import APP_QSS, card, section_header, pill, statu
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
-from src.ui.pcos_progress_panel import PCODProgressPanel
+from src.ui.pcos_complication_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 from desktop.prototype_lab import PrototypeLabWidget
 from services.bridge.server import EndoTwinBridgeServer
