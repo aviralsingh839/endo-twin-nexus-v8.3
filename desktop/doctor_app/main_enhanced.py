@@ -30,6 +30,7 @@ from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choo
 from desktop.workstation_theme import APP_QSS, card, section_header, pill, status_badge
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, list_profiles, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.personal_twin.baseline_capture import BaselineCapture
 from src.personal_twin.baseline_store import baseline_summary
 from src.ui.pcos_complication_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
@@ -64,6 +65,7 @@ class DoctorWindow(QMainWindow):
         shared_profile = load_state().get("profile", {})
         self.participant_id = str(shared_profile.get("participant_id") or "LOCAL-PARTICIPANT")
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
+        self.baseline_capture = BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
         self.page_keys = ["dashboard", "patients", "lab", "complications", "personal", "patient", "mobile", "settings"]
 
         self.bridge = EndoTwinBridgeServer(ROOT, 7777)
@@ -1575,6 +1577,15 @@ class DoctorWindow(QMainWindow):
             source = str(row.get("source", "")).lower()
             if self.live_patient and source not in {"demo", "synthetic"} and not source.startswith("demo"):
                 self.personal_model.observe(SimpleNamespace(**row), quality=row.get("signal_quality"))
+                self.feature_history.append(dict(row))
+                self.feature_history = self.feature_history[-1000:]
+                rows = [r for r in self.feature_history[-160:] if str(r.get("gating","")) == "USABLE"]
+                if len(rows) >= 60 and self.personal_model.snapshot()["samples"] % 20 == 0:
+                    cap = BaselineCapture(self.participant_id, duration_s=0, min_samples=60, min_quality=0.45)
+                    cap.accepted_rows = rows[-120:]
+                    cap.started_at = time.time() - 60.0
+                    cap.active = True
+                    cap.finalize(force=True)
             self.personal_model.sync_from_disk()
         except Exception as exc:
             self._log_event("Personal learning warning", str(exc))
