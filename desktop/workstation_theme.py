@@ -113,6 +113,8 @@ def card(title, value, detail, parent=None, accent=None):
     b.setWordWrap(True)
     if accent:
         b.setStyleSheet(f"color:{accent};")
+    frame.value_label = b
+    frame.title_label = a
     lay.addWidget(b)
     c = QLabel(detail)
     c.setObjectName("muted")
