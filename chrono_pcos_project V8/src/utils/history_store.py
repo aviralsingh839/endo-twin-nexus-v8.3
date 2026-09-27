@@ -64,7 +64,9 @@ class HistoryStore:
                     ts REAL NOT NULL,
                     duration_s REAL,
                     quality REAL,
-                    stats_json TEXT
+                    stats_json TEXT,
+                    participant_id TEXT,
+                    calibration_kind TEXT DEFAULT 'GENERAL'
                 );
                 CREATE TABLE IF NOT EXISTS anomalies(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,6 +227,8 @@ class HistoryStore:
             # Migrations for older databases.
             self._ensure_column(conn, "features", "extra_json", "TEXT")
             self._ensure_column(conn, "sessions", "participant_id", "TEXT")
+            self._ensure_column(conn, "calibrations", "participant_id", "TEXT")
+            self._ensure_column(conn, "calibrations", "calibration_kind", "TEXT DEFAULT 'GENERAL'")
             conn.commit()
         finally:
             conn.close()
@@ -331,12 +335,14 @@ class HistoryStore:
             conn.close()
 
     # -------------------------------------------------------- calibration
-    def log_calibration(self, duration_s: float, quality: float, stats_json: str) -> None:
+    def log_calibration(self, duration_s: float, quality: float, stats_json: str,
+                        participant_id: str | None = None,
+                        calibration_kind: str = "GENERAL") -> None:
         conn = self._connect()
         try:
             conn.execute(
-                "INSERT INTO calibrations(ts, duration_s, quality, stats_json) VALUES(?,?,?,?)",
-                (time.time(), duration_s, quality, stats_json),
+                "INSERT INTO calibrations(ts, duration_s, quality, stats_json, participant_id, calibration_kind) VALUES(?,?,?,?,?,?)",
+                (time.time(), duration_s, quality, stats_json, participant_id, calibration_kind),
             )
             conn.commit()
         finally:
