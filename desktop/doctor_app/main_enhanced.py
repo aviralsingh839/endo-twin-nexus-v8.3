@@ -1607,7 +1607,7 @@ class DoctorWindow(QMainWindow):
         if hasattr(self, "live_signal_placeholder"):
             self.live_signal_placeholder.setText(self._fmt(row.get("hr_bpm"), " bpm", 1))
         # Update metric charts when they exist.
-        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
+        history_map = {"hr_bpm": row.get("hr_bpm"), "rmssd_ms": row.get("rmssd_ms"), "activity_level": row.get("activity_level"), "skin_temp_c": row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"), "gsr_tonic": row.get("gsr_tonic"), "spo2_pct": row.get("spo2_pct")}
         for key, value in history_map.items():
             if value is not None:
                 try:
