@@ -50,6 +50,9 @@ class PatientWindow(QMainWindow):
         self.metric_labels = {}
         self.visual_graphs = {}
         self.charts = {}
+        self.overview_kpis = {}
+        self.overview_live_values = {}
+        self.personal_kpis = {}
         self.personal_model = PersonalAdaptiveModel(self.participant_id)
         self.baseline_capture = BaselineCapture(self.participant_id, duration_s=60.0, min_samples=60, min_quality=0.45)
         self._baseline_ui_timer = QTimer(self)
@@ -310,7 +313,9 @@ class PatientWindow(QMainWindow):
         kpis = QGridLayout()
         kpis.setSpacing(9)
         for i, (name, value, detail, kind) in enumerate(kpi_defs):
-            kpis.addWidget(card(name, value, detail), 0, i)
+            frame = card(name, value, detail)
+            self.overview_kpis[name] = frame
+            kpis.addWidget(frame, 0, i)
         o.addLayout(kpis)
 
         main = QGridLayout()
@@ -328,7 +333,9 @@ class PatientWindow(QMainWindow):
             row = QHBoxLayout()
             row.addWidget(QLabel(title_))
             row.addStretch()
-            row.addWidget(QLabel(self._fmt(val, f" {unit}", 1)))
+            value_label = QLabel(self._fmt(val, f" {unit}", 1))
+            self.overview_live_values[attr] = value_label
+            row.addWidget(value_label)
             lv.addLayout(row)
             chart = Sparkline(title_, unit)
             chart.setMinimumHeight(82)
@@ -341,9 +348,15 @@ class PatientWindow(QMainWindow):
         insights.setObjectName("card")
         iv = QVBoxLayout(insights)
         iv.addWidget(section_header("Personal Twin Insights", "Existing baseline + longitudinal context"))
-        iv.addWidget(card("Learning samples", f"{self.personal_model.snapshot()['samples']:,}", "Quality-gated observations"))
-        iv.addWidget(card("Baseline confidence", f"{baseline['confidence']:.2f}" if baseline["available"] else "—", "Stored person-specific baseline"))
-        iv.addWidget(card("PCOD status", "Reported" if self.profile.get("has_pcod") is True else "Not reported" if self.profile.get("has_pcod") is False else "Unknown", "Set in Self-Learning Model"))
+        frame = card("Learning samples", f"{self.personal_model.snapshot()['samples']:,}", "Quality-gated observations")
+        self.personal_kpis["Learning samples"] = frame
+        iv.addWidget(frame)
+        frame = card("Baseline confidence", f"{baseline['confidence']:.2f}" if baseline["available"] else "—", "Stored person-specific baseline")
+        self.personal_kpis["Baseline confidence"] = frame
+        iv.addWidget(frame)
+        frame = card("PCOD status", "Reported" if self.profile.get("has_pcod") is True else "Not reported" if self.profile.get("has_pcod") is False else "Unknown", "Set in Self-Learning Model")
+        self.personal_kpis["PCOD status"] = frame
+        iv.addWidget(frame)
         btn = QPushButton("Open PCOD Healing & Complications")
         btn.setObjectName("primary")
         btn.clicked.connect(lambda: self._go("complications"))
@@ -677,6 +690,18 @@ class PatientWindow(QMainWindow):
             lines.append(f"{name}: mean={item['mean']:.3f} • std={item['std']:.3f} • samples={item['samples']:.1f} • latest={item['last']}")
         self.personal_text.setText("\n".join(lines))
 
+        # Keep all visible KPI cards synchronized with the same patient-scoped
+        # state used by the learner and baseline store.
+        if "Learning samples" in self.personal_kpis:
+            self.personal_kpis["Learning samples"].value_label.setText(f"{snap['samples']:,}")
+        if "Baseline confidence" in self.personal_kpis:
+            self.personal_kpis["Baseline confidence"].value_label.setText(
+                f"{baseline_summary(self.participant_id)['confidence']:.2f}"
+                if baseline_summary(self.participant_id)["available"] else "—"
+            )
+        if "Baseline" in self.overview_kpis:
+            self.overview_kpis["Baseline"].value_label.setText("READY" if baseline_summary(self.participant_id)["available"] else "BUILDING")
+
     def _switch_patient(self):
         pid = choose_participant("ENDO-TWIN • Patient Workstation — Select Patient")
         if not pid or pid == self.participant_id:
@@ -880,6 +905,34 @@ class PatientWindow(QMainWindow):
             "GSR / Stress": (row.get("gsr_tonic"), " rel."),
             "Activity": (row.get("activity_level"), " %"),
         }
+        # Update Overview KPI cards and inline live values.
+        overview_map = {
+            "Heart Rate": (row.get("hr_bpm"), " bpm", 0),
+            "HRV (RMSSD)": (row.get("rmssd_ms"), " ms", 0),
+            "Temperature": (row.get("skin_temp_c") if row.get("skin_temp_c") is not None else row.get("room_temp_c"), " °C", 1),
+            "GSR / Stress": (row.get("gsr_tonic"), " rel.", 2),
+            "Activity": (row.get("activity_level"), " %", 0),
+        }
+        for name, (value, suffix, digits) in overview_map.items():
+            frame = self.overview_kpis.get(name)
+            if frame is not None:
+                frame.value_label.setText(self._fmt(value, suffix, digits))
+        if "Baseline" in self.overview_kpis:
+            frame = self.overview_kpis["Baseline"]
+            frame.value_label.setText(
+                "READY" if baseline_summary(self.participant_id)["available"] else "BUILDING"
+            )
+
+        inline_map = {
+            "hr_bpm": (row.get("hr_bpm"), " bpm"),
+            "rmssd_ms": (row.get("rmssd_ms"), " ms"),
+            "activity_level": (row.get("activity_level"), " %"),
+        }
+        for key, (value, suffix) in inline_map.items():
+            lbl = self.overview_live_values.get(key)
+            if lbl is not None:
+                lbl.setText(self._fmt(value, suffix, 1))
+
         for title, (value, suffix) in vals.items():
             if title in self.metric_labels:
                 self.metric_labels[title].setText(self._fmt(value, suffix, 1))
