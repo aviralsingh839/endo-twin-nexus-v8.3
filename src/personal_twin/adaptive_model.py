@@ -92,8 +92,7 @@ class PersonalAdaptiveModel:
         q = float(max(0.0, min(1.0, quality if quality is not None else getattr(feature, "signal_quality", 0.0))))
         if q < 0.25:
             return
-        self.state = load_state()
-        if self.participant_id not in self.state["people"]:
+        if self.participant_id not in self.state.get("people", {}):
             ensure_person(self.participant_id, make_active=False)
             self.state = load_state()
             self._restore()
@@ -134,8 +133,10 @@ class PersonalAdaptiveModel:
 
         learning["samples"] = int(learning.get("samples", 0)) + 1
         learning["quality_weighted_samples"] = float(learning.get("quality_weighted_samples", 0.0)) + q
-        if learning["samples"] % 10 == 0:
-            self._persist()
+        # Persist every observation so Doctor, Patient, Unified and ENDO-TWIN
+        # processes see the same patient-scoped learning state without waiting
+        # for another polling cycle.
+        self._persist()
 
         append_event({
             "kind": "feature_observation",
