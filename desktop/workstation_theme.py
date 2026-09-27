@@ -13,18 +13,18 @@ QFrame#topbar{
     background:#090f24;border-bottom:1px solid #1d3158;
 }
 QFrame#patientHeader{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #111a35,stop:1 #0a1126;);
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #111a35,stop:1 #0a1126);
     border:1px solid #244663;border-radius:14px;
 }
 QFrame#card{
-    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #101a32,stop:1 #0a1225;);
+    background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #101a32,stop:1 #0a1225);
     border:1px solid #244663;border-radius:14px;
 }
 QFrame#soft{
     background:#0c1530;border:1px solid #243762;border-radius:11px;
 }
 QFrame#hero{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16265a,stop:1 #0b1531;);
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #16265a,stop:1 #0b1531);
     border:1px solid #2a4480;border-radius:12px;
 }
 QLabel#brand{color:#f8fbff;font-size:20px;font-weight:850;}
@@ -49,15 +49,15 @@ QPushButton#nav{
 }
 QPushButton#nav:hover{background:#17224a;color:#ffffff;border-color:#314f9a;}
 QPushButton#nav:checked{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d7bff;);
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d7bff));
     color:#ffffff;border-color:#735cff;
 }
 QPushButton#nav:disabled{color:#536b80;}
 QPushButton#primary{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d8cff;);color:white;border:0;border-radius:9px;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d8cff));color:white;border:0;border-radius:9px;
     padding:9px 14px;font-weight:850;
 }
-QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7d6aff,stop:1 #55a7ff;);}
+QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7d6aff,stop:1 #55a7ff));}
 QPushButton#secondary{
     background:#121e3a;color:#d6e3ff;border:1px solid #304774;
     border-radius:8px;padding:8px 12px;font-weight:750;
