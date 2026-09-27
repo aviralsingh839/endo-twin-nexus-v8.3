@@ -1,23 +1,25 @@
-"""Local adaptive personal-twin model.
-
-This is a personalization engine, not a disease classifier. It learns the user's
-own recurring physiological range using quality-weighted exponential updates,
-robust running variance and hour-of-day context. It can improve individualized
-comparison over time without silently retraining the CHRONO-PCOS disease model.
-"""
+"""Patient-scoped local adaptive Personal Twin."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 import math
 import time
+from types import SimpleNamespace
 from typing import Any
 
-import numpy as np
+from src.personal_twin.profile_store import (
+    append_event,
+    ensure_person,
+    get_learning,
+    load_state,
+    replace_learning,
+    upsert_state,
+)
 
-from src.personal_twin.profile_store import load_state, upsert_state, append_event
-
-
-METRICS = ("hr_bpm", "rmssd_ms", "skin_temp_c", "gsr_tonic", "activity_level", "stress_index", "sleep_probability")
+METRICS = (
+    "hr_bpm", "rmssd_ms", "skin_temp_c", "gsr_tonic",
+    "activity_level", "stress_index", "sleep_probability",
+)
 
 
 @dataclass
@@ -37,11 +39,15 @@ class MetricState:
 
 
 class PersonalAdaptiveModel:
+    """Quality-gated personalization; deliberately not a disease classifier."""
+
     def __init__(self, participant_id: str | None = None, alpha: float = 0.05):
-        self.participant_id = participant_id or "LOCAL"
+        state = load_state()
+        self.participant_id = str(participant_id or state.get("active_participant_id") or "LOCAL")
         self.alpha = float(alpha)
+        ensure_person(self.participant_id, make_active=False)
         self.state = load_state()
-        learning = self.state.setdefault("learning", {})
+        learning = self.state["people"][self.participant_id]["learning"]
         learning.setdefault("metrics", {})
         learning.setdefault("hourly_profiles", {})
         learning.setdefault("samples", 0)
@@ -49,8 +55,9 @@ class PersonalAdaptiveModel:
         self._restore()
 
     def _restore(self) -> None:
-        raw = self.state["learning"].get("metrics", {})
-        self.metrics: dict[str, MetricState] = {}
+        learning = self.state["people"][self.participant_id]["learning"]
+        raw = learning.get("metrics", {})
+        self.metrics = {}
         for name in METRICS:
             item = raw.get(name, {})
             self.metrics[name] = MetricState(
@@ -60,28 +67,41 @@ class PersonalAdaptiveModel:
                 last=item.get("last"),
             )
 
+    @property
+    def learning(self) -> dict[str, Any]:
+        return self.state["people"][self.participant_id]["learning"]
+
     def _persist(self) -> None:
-        self.state["learning"]["metrics"] = {
-            name: {
-                "count": s.count,
-                "mean": s.mean,
-                "m2": s.m2,
-                "last": s.last,
-            }
+        learning = self.learning
+        learning["metrics"] = {
+            name: {"count": s.count, "mean": s.mean, "m2": s.m2, "last": s.last}
             for name, s in self.metrics.items()
         }
-        self.state["learning"]["updated_at"] = time.time()
-        self.state["learning"]["version"] = "adaptive-personal-twin-v1"
-        upsert_state(self.state)
+        learning["updated_at"] = time.time()
+        learning["version"] = "adaptive-personal-twin-v1"
+        replace_learning(self.participant_id, learning)
+        self.state = load_state()
+
+    def set_participant(self, participant_id: str) -> None:
+        self.participant_id = str(participant_id)
+        ensure_person(self.participant_id, make_active=False)
+        self.state = load_state()
+        self._restore()
 
     def observe(self, feature: Any, quality: float | None = None) -> None:
         q = float(max(0.0, min(1.0, quality if quality is not None else getattr(feature, "signal_quality", 0.0))))
         if q < 0.25:
             return
+        self.state = load_state()
+        if self.participant_id not in self.state["people"]:
+            ensure_person(self.participant_id, make_active=False)
+            self.state = load_state()
+            self._restore()
+
         ts = float(getattr(feature, "timestamp_s", time.time()))
-        hour = int(time.localtime(ts).tm_hour)
-        hour_key = str(hour)
-        hp = self.state["learning"].setdefault("hourly_profiles", {})
+        hour_key = str(int(time.localtime(ts).tm_hour))
+        learning = self.learning
+        hp = learning.setdefault("hourly_profiles", {})
         hour_state = hp.setdefault(hour_key, {"samples": 0, "metrics": {}})
 
         for name in METRICS:
@@ -92,7 +112,6 @@ class PersonalAdaptiveModel:
                 continue
             if not math.isfinite(value):
                 continue
-
             s = self.metrics[name]
             weight = max(q, 0.25)
             prev_mean = s.mean
@@ -113,24 +132,20 @@ class PersonalAdaptiveModel:
             hm["mean"] = hmean + (weight / hnew) * (value - hmean)
             hm["count"] = hnew
 
-        hour_state["samples"] = float(hour_state.get("samples", 0.0)) + q
-        self.state["learning"]["samples"] = int(self.state["learning"].get("samples", 0)) + 1
-        self.state["learning"]["quality_weighted_samples"] = float(
-            self.state["learning"].get("quality_weighted_samples", 0.0)
-        ) + q
-
-        # Persist frequently enough that another workstation can open the state
-        # while this process is running.
-        if self.state["learning"]["samples"] % 10 == 0:
+        learning["samples"] = int(learning.get("samples", 0)) + 1
+        learning["quality_weighted_samples"] = float(learning.get("quality_weighted_samples", 0.0)) + q
+        if learning["samples"] % 10 == 0:
             self._persist()
+
         append_event({
             "kind": "feature_observation",
             "participant_id": self.participant_id,
             "quality": q,
-            "metrics": {
-                k: getattr(feature, k, None) for k in METRICS
-            },
+            "metrics": {k: getattr(feature, k, None) for k in METRICS},
         })
+
+    def flush(self) -> None:
+        self._persist()
 
     def baseline(self, name: str) -> dict[str, float] | None:
         s = self.metrics.get(name)
@@ -142,15 +157,15 @@ class PersonalAdaptiveModel:
         if value is None:
             return None
         b = self.baseline(name)
-        if not b:
-            return None
-        return float((float(value) - b["mean"]) / max(b["std"], 1e-3))
+        return None if not b else float((float(value) - b["mean"]) / max(b["std"], 1e-3))
 
     def snapshot(self) -> dict[str, Any]:
+        learning = self.learning
         return {
-            "version": self.state["learning"].get("version", "adaptive-personal-twin-v1"),
-            "samples": int(self.state["learning"].get("samples", 0)),
-            "quality_weighted_samples": round(float(self.state["learning"].get("quality_weighted_samples", 0.0)), 2),
+            "participant_id": self.participant_id,
+            "version": learning.get("version", "adaptive-personal-twin-v1"),
+            "samples": int(learning.get("samples", 0)),
+            "quality_weighted_samples": round(float(learning.get("quality_weighted_samples", 0.0)), 2),
             "metrics": {
                 name: {
                     "mean": round(s.mean, 4),
@@ -160,8 +175,12 @@ class PersonalAdaptiveModel:
                 }
                 for name, s in self.metrics.items() if s.count > 0
             },
+            "hourly_profiles": learning.get("hourly_profiles", {}),
         }
 
     def sync_from_disk(self) -> None:
         self.state = load_state()
+        if self.participant_id not in self.state.get("people", {}):
+            ensure_person(self.participant_id, make_active=False)
+            self.state = load_state()
         self._restore()
