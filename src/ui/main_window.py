@@ -51,7 +51,7 @@ from src.utils.public_study import PublicStudyManager
 from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary, get_profile, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_engine
-from src.ui.pcos_complication_panel import PCOSComplicationPanel
+from src.ui.pcos_progress_panel import PCODProgressPanel
 from src.personal_twin.participant_selector import choose_participant
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
@@ -680,26 +680,44 @@ class MainWindow(QMainWindow):
         self._refresh_personal_twin()
 
         if hasattr(self, "complication_panel"):
-            self.complication_panel.set_context(
-                self.clinical_data,
-                None,
-            )
+            self.complication_panel.set_context(self._shared_pcod_profile(), self.feature_history, self.feature_history[-1] if self.feature_history else None)
 
         self.top_patient.setText(f"PATIENT  {self.participant_id}")
         self.top_mode.setText("●  NO STREAM")
         self.status_label.setText(f"Active participant: {self.participant_id}")
 
+    def _shared_pcod_profile(self):
+        shared = get_profile(self.participant_id)
+        if not shared:
+            shared = {"participant_id": self.participant_id}
+        for key in (
+            "age_years", "bmi", "systolic_bp", "diastolic_bp",
+            "glucose_mg_dl", "cycle_irregular", "days_since_last_period",
+            "usual_cycle_length_days", "years_post_menarche",
+        ):
+            if key not in shared and hasattr(self.profile, key):
+                shared[key] = getattr(self.profile, key)
+        return shared
+
+    def _save_pcod_status(self, value):
+        profile = self._shared_pcod_profile()
+        profile["participant_id"] = self.participant_id
+        profile["has_pcod"] = value
+        profile["updated_at"] = time.time()
+        try:
+            save_profile(profile, set_active=True)
+        except Exception as exc:
+            self.status_label.setText(f"PCOD profile save warning: {exc}")
+
     def _build_complications_tab(self):
-        tab = PCOSComplicationPanel("PCOS / Complication Context")
-        self.complication_panel = tab
+        tab = PCODProgressPanel("PCOD Healing & Complications")
+        tab.pcod_status_changed.connect(self._save_pcod_status)
         tab.set_context(
-            {k: getattr(self.profile, k) for k in (
-                "age_years", "bmi", "systolic_bp", "diastolic_bp",
-                "glucose_mg_dl", "cycle_irregular", "days_since_last_period",
-                "usual_cycle_length_days", "years_post_menarche"
-            )},
+            self._shared_pcod_profile(),
+            self.feature_history,
             self.feature_history[-1] if self.feature_history else None,
         )
+        self.complication_panel = tab
         return tab
 
     def _build_trends_tab(self):
