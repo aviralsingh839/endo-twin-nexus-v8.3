@@ -31,8 +31,7 @@ from src.personal_twin.onboarding import MULTI_PERSON_DISCLAIMER, PersonalTwinOn
 from src.personal_twin.baseline_store import baseline_engine, baseline_summary
 from src.data_models import FeatureVector
 from src.utils.history_store import HistoryStore
-from desktop.workstation_runtime import LiveSession, ModeConfig, choose_mode
-from desktop.visual_widgets import RingGauge, metric_card, trend_panel
+from desktop.workstation_runtime import LiveSession, ModeConfig, choose_mode, RingGauge, metric_card, trend_panel
 
 
 def row_to_feature(row: dict) -> FeatureVector:
