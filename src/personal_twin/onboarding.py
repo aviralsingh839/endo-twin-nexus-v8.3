@@ -61,8 +61,10 @@ class PersonalTwinOnboarding(QDialog):
         form = QFormLayout(content)
         form.setSpacing(9)
 
+        self.patient_name = QLineEdit()
+        self.patient_name.setPlaceholderText("Patient name / local record name")
         self.alias = QLineEdit()
-        self.alias.setPlaceholderText("Optional local name / alias")
+        self.alias.setPlaceholderText("Optional short alias")
         self.sex = QComboBox()
         self.sex.addItems(["Unknown", "Female", "Male", "Intersex / other", "Prefer not to say"])
         self.age = self._spin(10, 100, 17, 1)
@@ -79,7 +81,7 @@ class PersonalTwinOnboarding(QDialog):
         self.ypm = self._spin(0, 80, 0, 1, "Unknown")
 
         for label, widget in [
-            ("Local alias", self.alias), ("Sex", self.sex), ("Age (years)", self.age),
+            ("Patient name", self.patient_name), ("Local alias", self.alias), ("Sex", self.sex), ("Age (years)", self.age),
             ("Height (cm)", self.height), ("Weight (kg)", self.weight), ("Waist (cm)", self.waist),
             ("Systolic BP", self.sbp), ("Diastolic BP", self.dbp),
             ("Glucose mg/dL", self.glucose), ("Cycle status", self.cycle),
@@ -117,6 +119,7 @@ class PersonalTwinOnboarding(QDialog):
 
     def _load(self):
         p = get_profile(self.participant_id) if self.participant_id else {}
+        self.patient_name.setText(str(p.get("patient_name", p.get("alias", ""))))
         self.alias.setText(str(p.get("alias", "")))
         self.sex.setCurrentText(str(p.get("sex", "Unknown")))
         for widget, key in [
@@ -143,6 +146,7 @@ class PersonalTwinOnboarding(QDialog):
         cyc = self.cycle.currentText()
         profile = {
             "participant_id": pid,
+            "patient_name": self.patient_name.text().strip() or self.alias.text().strip() or pid,
             "alias": self.alias.text().strip(),
             "sex": self.sex.currentText(),
             "age_years": float(self.age.value()),
