@@ -77,3 +77,16 @@ The page is intentionally a context/surveillance surface. It does not convert we
 The workstation now avoids the previous duplicate-sample path: the Session owns streaming feature extraction, while the UI consumes its emitted sample/feature signals.
 
 Android application code is not part of this wearable-focused implementation.
+
+
+## V9.1 Front-End Dashboard + PCOD Progress
+
+The Doctor and Patient workstations now use the reference-inspired dark navy / blue-violet UI language and include patient-state cards, live signal presentation, quick actions and a combined PCOD Healing & Complications workspace.
+
+The Self-Learning Model is an explicit START menu option. It collects patient name/details and patient-reported PCOD/PCOS status, captures a person-specific baseline from live wearable data, and stores the result per participant ID. Demo data cannot become a baseline.
+
+The PCOD progress table is a presentation of the existing LongitudinalEngine classifications (normal, single, persistent, progressive, recovery, insufficient and missing). The UI uses those results to describe movement toward the personal baseline; it does not introduce a second disease or healing algorithm.
+
+The complication table is gated by the patient-reported PCOD/PCOS status. When the status is No or Unknown, the existing PCOSComplicationContextEngine is not evaluated and the table remains disabled. When the status is Yes, the existing engine output is displayed as research context and data-needed rows.
+
+See docs/UI_V9_FRONTEND.md for the cross-workstation data flow, UI behavior and backup branch reference.
