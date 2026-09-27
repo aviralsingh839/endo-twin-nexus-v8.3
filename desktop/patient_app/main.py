@@ -689,6 +689,7 @@ class PatientWindow(QMainWindow):
         self._refresh_personal()
         self.session = LiveSession(self.mode, self)
         self.session.features_updated.connect(self._on_features)
+        self.session.calibration_received.connect(self._on_ppg_calibration)
         self.session.state_changed.connect(self._on_state)
         self.session.error_received.connect(self._on_error)
         self.session.start()
