@@ -1,0 +1,53 @@
+name: ENDO-TWIN Patient Web Portal
+
+on:
+  push:
+    branches:
+      - main
+      - feature/v9-self-learning-unified-workstation
+      - feature/patient-web-portal-local-first
+  pull_request:
+    paths:
+      - website/**
+      - tests/test_website_portal.py
+      - .github/workflows/patient-web-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: patient-web-portal-pages
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test website
+        run: python tests/test_website_portal.py
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: quality
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
