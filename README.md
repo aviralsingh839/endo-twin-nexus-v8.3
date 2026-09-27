@@ -14,13 +14,13 @@ ENDO-TWIN is the personalized physiological modelling platform; CHRONO-PCOS is o
 ./START.sh
 ```
 
-Both workstations support DEMO MODE and LIVE SENSOR MODE. Desktop LIVE mode uses dynamically discovered USB serial ports and CRC-checked `$CP/$CP2` packets.
+Both workstations support DEMO MODE and LIVE SENSOR MODE. Desktop LIVE mode uses dynamically discovered USB serial ports and CRC-checked `$CP/$CP2/$CP3` packets. The V9 ESP32-S3 wearable uses the CP3 analog-PGG transport.
 
 ## Live paths
 ```
-ESP8266 sensor pod ── Wi-Fi TCP ── CP2 ──> Android/Desktop
-ESP32-S3 sensor pod ── Wi-Fi TCP ── CP2 ──> Android/Desktop
-Mega lab      ───── USB Serial ────────────── CP2 ──> Python/Desktop
+ESP8266 legacy pod ── Wi-Fi TCP ── legacy CP2 ──> compatible clients
+ESP32-S3 V9 pod   ── USB/Wi-Fi TCP ── CP3 ──> V9 desktop workstations
+Mega lab          ───── USB Serial ────────── CP2 ──> compatible clients
 ```
 
 The current Android network path is board-neutral and uses Wi-Fi/TCP. ESP8266 is the low-cost direct sensor-pod option; ESP32-S3 remains the higher-capability option. The desktop USB path remains available for flashing, debugging and live acquisition.
