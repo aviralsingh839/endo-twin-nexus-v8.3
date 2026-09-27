@@ -32,6 +32,7 @@ from src.personal_twin.baseline_store import baseline_engine, baseline_summary
 from src.data_models import FeatureVector
 from src.utils.history_store import HistoryStore
 from desktop.workstation_runtime import LiveSession, ModeConfig, choose_mode
+from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 
 
 def row_to_feature(row: dict) -> FeatureVector:
@@ -78,6 +79,7 @@ class SelfLearningWindow(QWidget):
         self.session_id = None
         self.baseline_rows: list[FeatureVector] = []
         self.capture_started_at = None
+        self.visual_graphs = {}
         self.history_store = HistoryStore()
 
         root = QVBoxLayout(self)
@@ -145,6 +147,18 @@ class SelfLearningWindow(QWidget):
         baseline_grid.addWidget(self.baseline_captured, 1, 1)
         bv.addLayout(baseline_grid)
         rv.addWidget(self.baseline_card)
+
+        visual = QGridLayout()
+        summary = baseline_summary(self.participant_id) if self.participant_id else {"available": False, "quality": 0.0, "confidence": 0.0}
+        snap = self.personal_model.snapshot() if self.personal_model else {"samples": 0}
+        visual.addWidget(metric_card("Learning samples", f"{snap['samples']:,}", "Patient-specific", accent="#39c9ff"), 0, 0)
+        visual.addWidget(metric_card("Baseline status", "READY" if summary["available"] else "BUILDING", "Stored locally", accent="#31d7a1"), 0, 1)
+        visual.addWidget(RingGauge("Confidence", summary["confidence"] * 100 if summary["available"] else 0, "%", "#7d62ff"), 0, 2)
+        self.baseline_hr_graph = trend_panel("Baseline HR", [], "bpm", "#ff4fa3", 135)
+        self.baseline_hrv_graph = trend_panel("Baseline HRV", [], "ms", "#39c9ff", 135)
+        visual.addWidget(self.baseline_hr_graph, 1, 0, 1, 2)
+        visual.addWidget(self.baseline_hrv_graph, 1, 2)
+        rv.addLayout(visual)
 
         capture_row = QHBoxLayout()
         self.duration = QSpinBox()
@@ -350,6 +364,8 @@ class SelfLearningWindow(QWidget):
             return
         feature = row_to_feature(row)
         self.baseline_rows.append(feature)
+        self.baseline_hr_graph.graph.set_values([x.hr_bpm for x in self.baseline_rows if x.hr_bpm is not None][-120:])
+        self.baseline_hrv_graph.graph.set_values([x.rmssd_ms for x in self.baseline_rows if x.rmssd_ms is not None][-120:])
         if self.session_id is not None:
             try:
                 self.history_store.log_feature(
