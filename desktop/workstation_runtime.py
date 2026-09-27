@@ -384,8 +384,8 @@ def metric_card(title: str, value: str, detail: str, values=None,
         chart.setMaximumHeight(78)
         chart.set_values(list(values))
         row.addWidget(chart, 1)
-    outer.addLayout(row)
-    detail_label = QLabel(str(detail))
+    frame.value_label = value_label
+    frame.detail_label = detail_label = QLabel(str(detail))
     detail_label.setObjectName("muted")
     detail_label.setWordWrap(True)
     outer.addWidget(detail_label)
