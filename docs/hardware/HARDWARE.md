@@ -16,10 +16,10 @@ Firmware:
 `hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
 
 Sensors:
-- Analog Pulse Sensor / PPG: **A5 / GPIO8 / ADC1**
-- GSR/EDA module analog output: **D5 / GPIO5 / ADC1**
-- DS18B20: **D6 / GPIO6**
-- MPU6050: I2C on **SDA GPIO3 / SCL GPIO4**
+- Analog Pulse Sensor / PPG: **GPIO4 / ADC1**
+- GSR/EDA module analog output: **GPIO5 / ADC1**
+- DS18B20: **GPIO6**
+- MPU6050: I2C on **SDA GPIO8 / SCL GPIO9**
 - BME280: I2C on **SDA GPIO3 / SCL GPIO4**
 - BH1750: I2C on **SDA GPIO3 / SCL GPIO4**
 
