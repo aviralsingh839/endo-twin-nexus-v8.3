@@ -139,6 +139,34 @@ class ScreeningResultsTab(BoxLayout):
         self.add_widget(scroll)
 
 
+class ComplicationsTab(BoxLayout):
+    def __init__(self, db, **kwargs):
+        super().__init__(orientation='vertical', **kwargs)
+        self.add_widget(Label(
+            text='Complications - Research Signals',
+            size_hint_y=None, height=dp(40), font_size='18sp', bold=True
+        ))
+        self.add_widget(Label(
+            text='Domain signals only — NOT calibrated individual probabilities. '
+                 'Missing/low-quality data must remain Not established.',
+            size_hint_y=None, height=dp(70)
+        ))
+        for name in [
+            'Insulin-resistance / type-2-diabetes-related domain',
+            'Hypertension-related domain',
+            'Sleep-disordered-breathing domain',
+            'Ovulatory / fertility-related domain',
+            'Metabolic-liver domain'
+        ]:
+            self.add_widget(Label(
+                text=f'{name}: Not established — insufficient evidence',
+                size_hint_y=None, height=dp(45)
+            ))
+        self.add_widget(Label(
+            text='Research output only; clinical assessment is required for actual complication risk.',
+            size_hint_y=None, height=dp(55)
+        ))
+
 class ReportsTab(BoxLayout):
     def __init__(self, db, **kwargs):
         super().__init__(orientation='vertical', **kwargs)
@@ -182,6 +210,11 @@ class DoctorApp(App):
         screen_tab = TabbedPanelItem(text='Screening')
         screen_tab.add_widget(ScreeningResultsTab(self.db))
         tabs.add_widget(screen_tab)
+
+        # Complications
+        complications_tab = TabbedPanelItem(text='Complications')
+        complications_tab.add_widget(ComplicationsTab(self.db))
+        tabs.add_widget(complications_tab)
 
         # Reports
         reports_tab = TabbedPanelItem(text='Reports')
