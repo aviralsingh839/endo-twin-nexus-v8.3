@@ -29,12 +29,22 @@ class DemoSensorStream(QObject):
         self.i = 0
         self.rng = np.random.default_rng(7)
         self.mode = "rest"
+        self._latest_sample: SensorSample | None = None
+        self._sample_pending = False
 
     def start(self) -> None:
         self.t0 = time.time()
         self.i = 0
         self.timer.start(int(1000 / self.fs_hz))
         self.state_changed.emit("demo-running")
+
+    def has_sample(self) -> bool:
+        return self._sample_pending
+
+    def get_sample(self) -> SensorSample | None:
+        sample = self._latest_sample
+        self._sample_pending = False
+        return sample
 
     def stop(self) -> None:
         self.timer.stop()
@@ -101,4 +111,6 @@ class DemoSensorStream(QObject):
             source="demo",
         )
         self.i += 1
+        self._latest_sample = sample
+        self._sample_pending = True
         self.sample_received.emit(sample)
