@@ -937,6 +937,7 @@ class DoctorWindow(QMainWindow):
     def _complications_page(self):
         page = PCOSComplicationPanel("PCOS / Complication Context")
         page.set_context(self._complication_context(), self.latest_row)
+        self.complications_page = page
         return page
 
     def _personal_page(self):
@@ -971,7 +972,7 @@ class DoctorWindow(QMainWindow):
         for name, item in (learning.get("metrics", {}) or {}).items():
             lines.append(
                 f"{name}: mean={float(item.get('mean', 0.0)):.3f}, "
-                f"std={float(item.get('m2', 0.0)):.3f} proxy, last={item.get('last')}"
+                f"std={((float(item.get('m2', 0.0)) / max(float(item.get('count', 1.0)), 1.0)) ** 0.5):.3f}, last={item.get('last')}"
             )
         self.personal_text.setText("\n".join(lines))
 
