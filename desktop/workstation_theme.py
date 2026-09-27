@@ -49,15 +49,15 @@ QPushButton#nav{
 }
 QPushButton#nav:hover{background:#17224a;color:#ffffff;border-color:#314f9a;}
 QPushButton#nav:checked{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d7bff));
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d7bff);
     color:#ffffff;border-color:#735cff;
 }
 QPushButton#nav:disabled{color:#536b80;}
 QPushButton#primary{
-    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d8cff));color:white;border:0;border-radius:9px;
+    background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #5b3cff,stop:1 #2d8cff);color:white;border:0;border-radius:9px;
     padding:9px 14px;font-weight:850;
 }
-QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7d6aff,stop:1 #55a7ff));}
+QPushButton#primary:hover{background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7d6aff,stop:1 #55a7ff);}
 QPushButton#secondary{
     background:#121e3a;color:#d6e3ff;border:1px solid #304774;
     border-radius:8px;padding:8px 12px;font-weight:750;
