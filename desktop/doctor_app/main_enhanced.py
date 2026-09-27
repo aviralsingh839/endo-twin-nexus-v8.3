@@ -989,7 +989,8 @@ class DoctorWindow(QMainWindow):
         self.patient_tabs.setObjectName("patientTabs")
         self.patient_tab_names = [
             "Overview", "Timeline", "Sensor data", "Trends", "Ultrasound",
-            "AI / Models", "Clinical inputs", "Reports", "Notes", "Provenance", "Audit"
+            "AI / Models", "Clinical inputs", "PCOS Complications", "Reports",
+            "Notes", "Provenance", "Audit"
         ]
         # A compact tab row using QPushButtons is more stable across Qt styles.
         tabrow = QHBoxLayout()
@@ -1056,6 +1057,7 @@ class DoctorWindow(QMainWindow):
             "Ultrasound": self._patient_ultrasound,
             "AI / Models": self._patient_models,
             "Clinical inputs": self._patient_clinical,
+            "PCOS Complications": self._patient_complications,
             "Reports": self._patient_reports,
             "Notes": self._patient_notes,
             "Provenance": self._patient_provenance,
@@ -1411,6 +1413,11 @@ class DoctorWindow(QMainWindow):
         o.addWidget(info)
         o.addStretch()
         return w
+
+    def _patient_complications(self):
+        panel = PCOSComplicationPanel("PCOS / Complication Context • Current Patient")
+        panel.set_context(self._complication_context(), self.latest_row)
+        return panel
 
     def _patient_reports(self):
         w = QWidget()
