@@ -16,11 +16,11 @@ Firmware:
 `hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
 
 Sensors:
-- MAX30102 PPG
-- MPU6050 IMU
-- BME280 temperature/humidity/pressure
-- BH1750 ambient light
-- GSR/EDA with external finger electrodes
+- Analog Pulse Sensor / PPG on GPIO4 (single channel)
+- MPU6050 IMU (optional)
+- BME280 temperature/humidity/pressure (optional)
+- BH1750 ambient light (optional)
+- GSR/EDA with external finger electrodes on GPIO34
 
 Transport:
 - USB serial 115200
@@ -28,7 +28,7 @@ Transport:
 - password `endotwins3`
 - TCP port 7777
 
-The ESP32-S3 has Wi-Fi and BLE capability; the current Android transport remains Wi-Fi/TCP so the existing CP2/TCP architecture can be retained. 
+The active V9 firmware uses USB serial at 115200 and a Wi-Fi SoftAP/TCP transport at port 7777. The current wire protocol is CP3. A single analog PPG channel is used for pulse/HR/HRV research features; SpO2 is not computed from the analog channel.
 
 ## Mega hub
 
