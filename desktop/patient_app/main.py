@@ -18,9 +18,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from desktop.demo_data import DEMO_CASES
-from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode
+from desktop.workstation_runtime import LiveSession, ModeConfig, Sparkline, choose_mode, RingGauge, metric_card, trend_panel
 from desktop.workstation_theme import APP_QSS, card, section_header, status_badge
-from desktop.visual_widgets import RingGauge, metric_card, trend_panel
 from src.personal_twin.profile_store import load_state, profile_summary, get_profile, select_participant, save_profile
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
