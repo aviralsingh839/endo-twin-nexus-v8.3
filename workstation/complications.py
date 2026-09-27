@@ -373,7 +373,10 @@ def predict(record: Dict[str, Any]) -> Dict[str, Any]:
         coverage = (avail_w / total_w) if total_w else 0.0
         drivers = sorted([x for x in factors if x.available and (x.score or 0) > 0.02],
                          key=lambda x: -(x.score or 0) * x.weight)
-        missing = [x.need for x in factors if not x.available]
+        missing = []
+        for x in factors:
+            if not x.available and x.need and x.need not in missing:
+                missing.append(x.need)   # one line per distinct input, not per factor
 
         if coverage < 0.34 or avail_w == 0:
             items.append({

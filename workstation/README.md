@@ -197,6 +197,21 @@ falls below 34 % the item returns **`insufficient`** and lists what to add,
 rather than inventing a number. Runs can be stored into `model_results` with
 `label='COMPLICATION_RUN'`.
 
+## Checking it works
+
+```bash
+./tools/verify.sh                       # end-to-end self-check (needs the server running)
+python3 tools/simulate_wearable.py ETN-2041 --seconds 20 --hr 82 --record
+```
+
+`verify.sh` compiles every Python and JS file, hits the static and API routes,
+round-trips a calibration value through the database, runs the complication
+engine and proves that adding clinical data increases factor coverage.
+
+`simulate_wearable.py` speaks the real `$CP2` protocol over the Wi-Fi ingest
+route, so the parser, CRC check, calibration, DSP and database writes can all be
+exercised with no hardware attached.
+
 ## Shortcuts
 
 | Keys | Action |
