@@ -24,7 +24,7 @@ from src.personal_twin.profile_store import load_state, profile_summary, get_pro
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
 from src.personal_twin.baseline_store import baseline_summary
 from src.personal_twin.participant_selector import choose_participant
-from src.ui.pcos_progress_panel import PCODProgressPanel
+from src.ui.pcos_complication_panel import PCODProgressPanel
 from services.bridge.server import EndoTwinBridgeServer
 
 DISCLAIMER = "Research / risk-screening output — not a medical diagnosis."
