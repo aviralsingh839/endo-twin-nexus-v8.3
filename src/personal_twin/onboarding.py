@@ -76,6 +76,8 @@ class PersonalTwinOnboarding(QDialog):
         self.glucose = self._spin(0, 600, 0, 1, "Unknown")
         self.cycle = QComboBox()
         self.cycle.addItems(["Unknown", "Regular", "Irregular"])
+        self.has_pcod = QComboBox()
+        self.has_pcod.addItems(["Unknown", "Yes — patient reports PCOD/PCOS", "No — patient does not report PCOD/PCOS"])
         self.cycle_len = self._spin(0, 120, 28, 0, "Unknown")
         self.days_since = self._spin(0, 365, 0, 0, "Unknown")
         self.ypm = self._spin(0, 80, 0, 1, "Unknown")
@@ -121,6 +123,8 @@ class PersonalTwinOnboarding(QDialog):
         p = get_profile(self.participant_id) if self.participant_id else {}
         self.patient_name.setText(str(p.get("patient_name", p.get("alias", ""))))
         self.alias.setText(str(p.get("alias", "")))
+        hp = p.get("has_pcod", p.get("has_pcos"))
+        self.has_pcod.setCurrentIndex(1 if hp is True else 2 if hp is False else 0)
         self.sex.setCurrentText(str(p.get("sex", "Unknown")))
         for widget, key in [
             (self.age, "age_years"), (self.height, "height_cm"), (self.weight, "weight_kg"),
@@ -154,6 +158,7 @@ class PersonalTwinOnboarding(QDialog):
             "patient_name": self.patient_name.text().strip() or self.alias.text().strip() or pid,
             "alias": self.alias.text().strip(),
             "sex": self.sex.currentText(),
+            "has_pcod": True if self.has_pcod.currentIndex() == 1 else False if self.has_pcod.currentIndex() == 2 else None,
             "age_years": float(self.age.value()),
             "height_cm": h,
             "weight_kg": w,
