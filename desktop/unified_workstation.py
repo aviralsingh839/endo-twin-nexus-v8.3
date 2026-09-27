@@ -26,6 +26,7 @@ from src.core.feature_extraction import RealtimeFeatureExtractor
 from src.disease_modules.pcos import PCOSModule
 from src.disease_modules.pcos_complications import PCOSComplicationContextEngine
 from src.serial_io.arduino_reader import ArduinoReader
+from src.serial_io.network_reader import NetworkReader
 from src.utils.demo_stream import DemoSensorStream
 from desktop.unified_engine import DISCLAIMER, context_ready, compute_research_index
 from desktop.model_lab import ModelLabWidget
@@ -73,7 +74,8 @@ class StartupDialog(QDialog):
         n.setObjectName("muted"); n.setWordWrap(True); v.addWidget(n)
         row=QHBoxLayout()
         demo=QPushButton("Open DEMO MODE"); demo.setObjectName("primary"); demo.clicked.connect(self._demo); row.addWidget(demo)
-        live=QPushButton("Configure LIVE SENSOR MODE"); live.setObjectName("primary"); live.clicked.connect(self._live); row.addWidget(live)
+        live=QPushButton("Configure USB SENSOR MODE"); live.setObjectName("primary"); live.clicked.connect(self._live); row.addWidget(live)
+        wifi=QPushButton("Connect ESP32 Wi-Fi"); wifi.setObjectName("secondary"); wifi.clicked.connect(self._wifi); row.addWidget(wifi)
         v.addLayout(row)
         self.live_box=QFrame(); self.live_box.setObjectName("card"); f=QFormLayout(self.live_box)
         self.port=QLineEdit(); self.port.setPlaceholderText("Auto-detect /dev/ttyACM0, /dev/ttyUSB0 or COM3")
@@ -102,6 +104,9 @@ class StartupDialog(QDialog):
         self.config=LiveConfig("demo","demo"); self.accept()
     def _live(self):
         self.live_box.setFocus()
+    def _wifi(self):
+        self.config=LiveConfig("wifi","tcp",host="192.168.4.1",tcp_port=7777); self.accept()
+
     def _accept_live(self):
         if not self.port.text().strip():
             self.auto_detect_port()
@@ -117,8 +122,12 @@ class Session(QObject):
         self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
     def start(self):
         self.stop(); self.extractor=RealtimeFeatureExtractor(); self.samples=0; self.packet_errors=0; self._last_feature=0.0; self.started=time.monotonic()
-        if self.cfg.mode=="demo": self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
-        else: self.reader=ArduinoReader(self.cfg.port,self.cfg.baud,require_crc=True,parent=self)
+        if self.cfg.mode=="demo":
+            self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
+        elif self.cfg.mode=="wifi":
+            self.reader=NetworkReader(self.cfg.host or "192.168.4.1", int(self.cfg.tcp_port or 7777), require_crc=True, parent=self)
+        else:
+            self.reader=ArduinoReader(self.cfg.port,self.cfg.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample); self.reader.state_changed.connect(self.state_ready); self.reader.error_received.connect(self._on_error); self.reader.start()
     def stop(self):
         if self.reader:
@@ -289,7 +298,7 @@ class UnifiedWorkstation(QMainWindow):
         box=QFrame(); box.setObjectName("card"); bv=QVBoxLayout(box)
         bv.addWidget(QLabel(f"Mode: {self.cfg.mode.upper()}")); bv.addWidget(QLabel(f"Source: {self.cfg.source}")); bv.addWidget(QLabel(f"Baud: {self.cfg.baud}"))
         bv.addWidget(QLabel("Primary wearable: ESP32-S3 • Analog PPG GPIO4 • GSR GPIO34 • I²C SDA GPIO21 / SCL GPIO22 • Status LED GPIO2"))
-        bv.addWidget(QLabel("Transport: USB Serial 115200 or Wi-Fi TCP 7777"))
+        bv.addWidget(QLabel("Transport: USB Serial 115200 or Wi-Fi TCP 7777 (ESP32 SoftAP default: 192.168.4.1)"))
         v.addWidget(box); v.addStretch(); return p
 
     def _go(self,k): self.stack.setCurrentIndex(["patient","doctor","complications","lab","model","settings"].index(k)); [b.setChecked(kk==k) for kk,b in self.nav.items()]
