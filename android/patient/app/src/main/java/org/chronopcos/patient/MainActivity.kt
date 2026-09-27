@@ -105,7 +105,7 @@ fun PatientApp(currentPatientId: String) {
                                     PatientTab.Measure -> Icons.Outlined.MonitorHeart
                                     PatientTab.Timeline -> Icons.Outlined.Timeline
                                     PatientTab.Care -> Icons.Outlined.LocationOn
-                                    PatientTab.Complications -> Icons.Outlined.Warning
+                                    PatientTab.Complications -> Icons.Default.Warning
                                 },
                                 contentDescription = tab.label
                             )
