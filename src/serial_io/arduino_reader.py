@@ -89,6 +89,10 @@ class ArduinoReader(QObject):
                 if not line:
                     if time.time()-last_data>STALE_DATA_TIMEOUT_S: raise _SerialStaleError()
                     continue
+                # Firmware diagnostics/ACKs are human-readable and are not data packets.
+                if line.startswith("[") or line.startswith("$ACK,"):
+                    last_data=time.time()
+                    continue
                 if line.startswith("$PCAL,"):
                     self.calibration_received.emit(self.parser.parse_calibration_event(line))
                     last_data=time.time()
