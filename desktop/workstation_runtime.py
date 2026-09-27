@@ -9,6 +9,7 @@ from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from src.serial_io.arduino_reader import ArduinoReader
+from src.serial_io.network_reader import NetworkReader
 from src.serial_io.packet_parser import decode_status_flags
 from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.imu import IMUProcessor
@@ -20,6 +21,8 @@ from src.utils.demo_stream import DemoSensorStream
 class ModeConfig:
     mode: str = "demo"
     port: str = ""
+    host: str = "192.168.4.1"
+    tcp_port: int = 7777
     baud: int = 115200
 
 class ModeDialog(QDialog):
@@ -33,9 +36,17 @@ class ModeDialog(QDialog):
         root=QVBoxLayout(self); root.setContentsMargins(30,28,30,28); root.setSpacing(16)
         h=QLabel("Choose data mode"); h.setObjectName("modeTitle"); root.addWidget(h)
         s=QLabel("Choose the source before the workstation opens. Demo and live data are kept on separate session paths."); s.setObjectName("muted"); s.setWordWrap(True); root.addWidget(s)
+        wifi = QFrame(); wifi.setObjectName("hero")
+        wl = QVBoxLayout(wifi); wl.setContentsMargins(18,16,18,16); wl.setSpacing(7)
+        for txt,obj in [("ESP32 WI-FI","eyebrow"),("Direct TCP wearable","metricValue")]:
+            x=QLabel(txt); x.setObjectName(obj); x.setWordWrap(True); wl.addWidget(x)
+        wc=QLabel("Connect directly to the ESP32-S3 SoftAP at 192.168.4.1:7777. Uses the same CRC packet parser as USB.")
+        wc.setObjectName("muted"); wc.setWordWrap(True); wl.addWidget(wc)
+        wb=QPushButton("Open Wi-Fi"); wb.setObjectName("primary"); wb.clicked.connect(lambda:self._accept("wifi")); wl.addWidget(wb)
         row=QHBoxLayout(); row.setSpacing(14)
         row.addWidget(self._card("DEMO MODE","Synthetic physiological stream","Hardware-free exhibition mode. Every sample is labelled DEMO_DATA.","Open Demo",lambda:self._accept("demo")))
-        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked $CP/$CP2 packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(self._card("LIVE SENSOR MODE","ESP32-S3 wearable / Mega lab USB","CRC-checked packets feed the real processing chain.","Open Live",lambda:self._accept("live")))
+        row.addWidget(wifi)
         root.addLayout(row)
         box=QFrame(); box.setObjectName("card"); lv=QVBoxLayout(box); lv.setContentsMargins(16,14,16,14); lv.setSpacing(8)
         e=QLabel("LIVE INPUT"); e.setObjectName("eyebrow"); lv.addWidget(e)
@@ -77,6 +88,10 @@ class ModeDialog(QDialog):
         self.port_status.setText(f"Auto-detected USB serial device: {selected}")
 
     def _accept(self,mode):
+        if mode=="wifi":
+            self.choice=ModeConfig(mode="wifi", host="192.168.4.1", tcp_port=7777)
+            self.accept()
+            return
         if mode=="live" and not self.port.currentText().strip():
             self.auto_detect_port()
         if mode=="live" and not self.port.currentText().strip():
@@ -206,7 +221,12 @@ class LiveSession(QObject):
 
     def start(self):
         self.processor.reset()
-        self.reader=DemoSensorStream(fs_hz=20.0,parent=self) if self.mode.mode=="demo" else ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
+        if self.mode.mode=="demo":
+            self.reader=DemoSensorStream(fs_hz=20.0,parent=self)
+        elif self.mode.mode=="wifi":
+            self.reader=NetworkReader(self.mode.host, self.mode.tcp_port, require_crc=True, parent=self)
+        else:
+            self.reader=ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample)
         self.reader.state_changed.connect(self.state_changed)
         self.reader.error_received.connect(self.error_received)
