@@ -94,8 +94,6 @@ except ImportError:
 
 from src.personal_twin.profile_store import get_profile, load_state, profile_summary, select_participant
 from src.personal_twin.adaptive_model import PersonalAdaptiveModel
-from src.ui.pcos_complication_panel import PCOSComplicationPanel
-from src.personal_twin.participant_selector import choose_participant
 
 DISCLAIMER = "Research prototype - Understand your physiological patterns over time - Not a medical diagnosis"
 
@@ -408,6 +406,7 @@ if PYSIDE_AVAILABLE:
             tabs.addTab(personal_tab, "Personal Twin")
 
             # Shared PCOS complication context
+            from src.ui.pcos_complication_panel import PCOSComplicationPanel
             complications_tab = PCOSComplicationPanel("PCOS / Complication Context • ENDO-TWIN")
             profile = get_profile()
             complications_tab.set_context(
@@ -516,10 +515,12 @@ if PYSIDE_AVAILABLE:
 
 def main():
     """Launch ENDO-TWIN general platform"""
-    pid = choose_participant("ENDO-TWIN • Select Patient / Participant")
-    if not pid:
-        return 0
-    select_participant(pid)
+    if PYSIDE_AVAILABLE:
+        from src.personal_twin.participant_selector import choose_participant
+        pid = choose_participant("ENDO-TWIN • Select Patient / Participant")
+        if not pid:
+            return 0
+        select_participant(pid)
     print("="*80)
     print("ENDO-TWIN - Personalized Physiological Modelling Platform")
     print("General platform, CHRONO-PCOS is first disease-specific model")
