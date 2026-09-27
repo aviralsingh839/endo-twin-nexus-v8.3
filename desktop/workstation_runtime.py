@@ -57,7 +57,7 @@ class ModeDialog(QDialog):
         b=QPushButton("Refresh"); b.setObjectName("secondary"); b.clicked.connect(self.refresh_ports)
         line.addWidget(self.port,1); line.addWidget(detect); line.addWidget(b); lv.addLayout(line)
         self.port_status=QLabel("Detecting USB serial devices…"); self.port_status.setObjectName("muted"); self.port_status.setWordWrap(True); lv.addWidget(self.port_status)
-        n=QLabel("Active hardware: ESP32-S3 primary wearable or Arduino Mega bench/lab controller. Both emit the canonical ~20 packets/s CP2 stream; sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
+        n=QLabel("Active hardware: ESP32-S3 primary wearable or Arduino Mega bench/lab controller. The V9 ESP32-S3 emits the CP3 analog wearable stream; compatible Mega/legacy paths may use CP2. Sensor validity still depends on placement, calibration and hardware."); n.setObjectName("muted"); n.setWordWrap(True); lv.addWidget(n)
         root.addWidget(box)
         self.refresh_ports()
         self.auto_detect_port()
@@ -170,6 +170,7 @@ class StreamingFeatureProcessor:
             return None
         self.last_emit=ts
 
+        imu_available=bool(self.imu.times)
         motion=self.imu.features(10.0)
         ppg=(self.analog_ppg.features(motion_index=motion["motion_index"]) if use_analog
              else self.ppg.features(motion_index=motion["motion_index"]))
@@ -184,7 +185,7 @@ class StreamingFeatureProcessor:
         if ppg_sat: ppg_q*=0.50
 
         gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>4090 else 1.0
-        motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45))
+        motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45)) if imu_available else 0.0
         temp_value=getattr(sample,"room_temp_c",None)
         temp_q=1.0 if temp_value is not None and math.isfinite(float(temp_value)) else 0.0
         components=[]
@@ -230,7 +231,7 @@ class StreamingFeatureProcessor:
             "activity_level":motion.get("activity_level",0.0),
             "signal_quality":quality,
             "ppg_quality":ppg_q,
-            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": True, "temperature": temp_q > 0.0},
+            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": imu_available, "temperature": temp_q > 0.0},
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
