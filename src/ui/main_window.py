@@ -210,6 +210,7 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel(f"{APP_NAME} • {APP_VERSION_LABEL} • {DISCLAIMER}")
         self.status_label.setObjectName("SmallMuted")
         shell.addWidget(self.status_label)
+        self._load_saved_profile_into_controls()
         self._select_workstation_page(0)
 
         if start_demo:
@@ -218,6 +219,38 @@ class MainWindow(QMainWindow):
             self.connect_serial(port)
         if net:
             self.connect_network(net)
+
+    def _load_saved_profile_into_controls(self):
+        p = load_state().get("profile", {})
+        if not isinstance(p, dict):
+            p = {}
+        mappings = [
+            (getattr(self, "age_spin", None), p.get("age_years")),
+            (getattr(self, "bmi_spin", None), p.get("bmi")),
+            (getattr(self, "sys_spin", None), p.get("systolic_bp")),
+            (getattr(self, "dia_spin", None), p.get("diastolic_bp")),
+            (getattr(self, "glucose_spin", None), p.get("glucose_mg_dl")),
+            (getattr(self, "cycle_spin", None), p.get("cycle_day")),
+            (getattr(self, "length_spin", None), p.get("usual_cycle_length_days")),
+        ]
+        for widget, value in mappings:
+            if widget is not None and value is not None:
+                try:
+                    widget.setValue(float(value))
+                except Exception:
+                    pass
+        combo = getattr(self, "cycle_irregular_combo", None)
+        if combo is not None:
+            if p.get("cycle_irregular") is True:
+                combo.setCurrentText("irregular")
+            elif p.get("cycle_irregular") is False:
+                combo.setCurrentText("regular")
+        self.participant_id = str(p.get("participant_id") or self.participant_id)
+        self._clinical_changed()
+        if hasattr(self, "personal_profile_text"):
+            self._refresh_personal_twin()
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, self.feature_history[-1] if self.feature_history else None)
 
     def _named_label(self, text: str, object_name: str):
         label = QLabel(text)
@@ -1385,7 +1418,6 @@ class MainWindow(QMainWindow):
             self.baseline_status.setText(f"Baseline failed: {e}")
 
     def _clinical_changed(self):
-        # Update profile
         self.profile.age_years = float(self.age_spin.value())
         bmi = float(self.bmi_spin.value())
         self.profile.bmi = bmi if bmi > 0 else None
@@ -1407,6 +1439,27 @@ class MainWindow(QMainWindow):
         else:
             self.profile.cycle_irregular = None
 
+        saved = load_state().get("profile", {})
+        if not isinstance(saved, dict):
+            saved = {}
+        profile = {
+            **saved,
+            "participant_id": self.participant_id,
+            "age_years": self.profile.age_years,
+            "bmi": self.profile.bmi,
+            "systolic_bp": self.profile.systolic_bp,
+            "diastolic_bp": self.profile.diastolic_bp,
+            "glucose_mg_dl": self.profile.glucose_mg_dl,
+            "cycle_day": self.profile.cycle_day,
+            "usual_cycle_length_days": self.profile.usual_cycle_length_days,
+            "cycle_irregular": self.profile.cycle_irregular,
+            "provenance": "USER-ENTERED",
+        }
+        try:
+            save_profile(profile)
+        except Exception:
+            pass
+
         self.clinical_data = {
             "age_years": self.profile.age_years,
             "bmi": self.profile.bmi,
@@ -1418,8 +1471,12 @@ class MainWindow(QMainWindow):
             "cycle_irregular": self.profile.cycle_irregular,
             "profile": self.profile,
         }
-        self.clinical_text.setText(json.dumps({k: v for k, v in self.clinical_data.items() if k != "profile"}, indent=2))
+        if hasattr(self, "clinical_text"):
+            self.clinical_text.setText(json.dumps({k: v for k, v in self.clinical_data.items() if k != "profile"}, indent=2))
         self.extractor.set_profile(self.profile)
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, self.feature_history[-1] if self.feature_history else None)
+
 
     def _add_ultrasound(self):
         size = float(self.cyst_size_spin.value())
