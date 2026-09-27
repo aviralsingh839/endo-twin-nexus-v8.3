@@ -71,3 +71,13 @@ This project is a research prototype. PCOD/PCOS status is patient-reported conte
 ## UI backup
 
 The pre-redesign feature branch is preserved as backup/pre-ui-redesign-2026-09-27.
+
+## Visual-first workstation pass
+
+The desktop front end now uses a consistent visual language across Patient, Doctor and Unified surfaces: dark navy background, blue/violet active navigation, compact colored KPI cards, radial gauges, large trend charts, quick-action tiles and provenance/status badges.
+
+Patient screens prioritize the reference layout: six-metric KPI strips, live signal graphs, Personal Twin cards, progress gauges, quick actions and PCOD progress/complication views. Doctor screens intentionally keep fewer controls while emphasizing graphs, patient-specific metrics, sensor trends and the combined PCOD progress/complication view for the selected patient.
+
+The Self-Learning baseline window also shows baseline confidence plus live HR/HRV capture graphs. Graphs use the same live feature stream already processed by the existing pipeline; the redesign does not add a new data source or model.
+
+The PCOD progress panel now includes HR and HRV trajectory graphs above the existing tables.
