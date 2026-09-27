@@ -1541,6 +1541,12 @@ def run(start_demo: bool = False, port: str | None = None, net: str | None = Non
     from PySide6.QtWidgets import QApplication
     import sys
     app = QApplication.instance() or QApplication(sys.argv)
+    state = load_state()
+    if not state.get("active_participant_id") or not get_profile(str(state.get("active_participant_id"))):
+        from src.personal_twin.onboarding import PeopleManagerDialog
+        dlg = PeopleManagerDialog()
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return 0
     window = MainWindow(start_demo=start_demo, port=port, net=net, db_path=db_path)
     window.showMaximized()
     return app.exec()
