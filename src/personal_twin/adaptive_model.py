@@ -100,12 +100,21 @@ class PersonalAdaptiveModel:
             self.state = load_state()
             self._restore()
 
+        # Resolve the patient-scoped learning record before first use.
+        learning = self.learning
+        learning.setdefault("metrics", {})
+        learning.setdefault("hourly_profiles", {})
+        learning.setdefault("samples", 0)
+        learning.setdefault("quality_weighted_samples", 0.0)
+        learning.setdefault("quality_sum", 0.0)
+        learning.setdefault("first_observation_ts", None)
+        learning.setdefault("last_observation_ts", None)
+
         ts = float(getattr(feature, "timestamp_s", time.time()))
         if learning.get("first_observation_ts") is None:
             learning["first_observation_ts"] = ts
         learning["last_observation_ts"] = ts
         hour_key = str(int(time.localtime(ts).tm_hour))
-        learning = self.learning
         hp = learning.setdefault("hourly_profiles", {})
         hour_state = hp.setdefault(hour_key, {"samples": 0, "metrics": {}})
 
