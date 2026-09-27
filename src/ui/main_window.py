@@ -48,6 +48,9 @@ from src.utils.demo_stream import DemoSensorStream
 from src.utils.history_store import HistoryStore
 from src.utils.synthetic import generate_subject_timeline, SyntheticSubjectProfile
 from src.utils.public_study import PublicStudyManager
+from src.personal_twin.profile_store import load_state, save_profile, append_event, profile_summary
+from src.personal_twin.adaptive_model import PersonalAdaptiveModel
+from src.ui.pcos_complication_panel import PCOSComplicationPanel
 
 DISCLAIMER = "Research prototype, NOT a diagnosis. Clinical evaluation required."
 
@@ -60,7 +63,15 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(DARK_QSS)
 
         # Core engines
+        state = load_state()
+        saved_profile = state.get("profile", {}) if isinstance(state, dict) else {}
         self.profile = UserProfile()
+        for key, value in saved_profile.items():
+            if hasattr(self.profile, key):
+                try:
+                    setattr(self.profile, key, value)
+                except Exception:
+                    pass
         self.baseline_engine = PersonalBaselineEngine()
         self.longitudinal_engine = LongitudinalEngine(baseline=self.baseline_engine)
         self.extractor = RealtimeFeatureExtractor(profile=self.profile, baseline_engine=self.baseline_engine)
@@ -84,6 +95,12 @@ class MainWindow(QMainWindow):
         self.public_study = PublicStudyManager(self.history_store)
         self.public_study.attach_latest()
         self._last_public_study_log = 0.0
+
+        self.participant_id = str(saved_profile.get("participant_id") or "LOCAL-PARTICIPANT")
+        self.adaptive_model = PersonalAdaptiveModel(participant_id=self.participant_id)
+        self.current_session_id = None
+        self._last_feature_compute = 0.0
+        self._sample_count = 0
 
         # Timers
         self.feature_timer = QTimer()
@@ -146,8 +163,10 @@ class MainWindow(QMainWindow):
         pages = [
             ("⌂", "Command Center"),
             ("◉", "Personal Baseline"),
+            ("◫", "Personal Adaptive Twin"),
             ("∿", "Trends & Analysis"),
             ("✦", "CHRONO-PCOS / Signals"),
+            ("⚕", "PCOS Complications"),
             ("◌", "Data Quality"),
             ("＋", "Clinical Inputs"),
             ("▣", "Ultrasound"),
@@ -174,8 +193,10 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(self._build_overview_tab(), "Dashboard")
         self.tabs.addTab(self._build_baseline_tab(), "Baseline")
+        self.tabs.addTab(self._build_personal_twin_tab(), "Personal Twin")
         self.tabs.addTab(self._build_trends_tab(), "Trends & Analysis")
         self.tabs.addTab(self._build_health_signals_tab(), "Health Signals")
+        self.tabs.addTab(self._build_complications_tab(), "PCOS Complications")
         self.tabs.addTab(self._build_data_quality_tab(), "Data Quality")
         self.tabs.addTab(self._build_clinical_tab(), "Clinical Inputs")
         self.tabs.addTab(self._build_ultrasound_tab(), "Ultrasound")
@@ -527,6 +548,67 @@ class MainWindow(QMainWindow):
         layout.addWidget(scroll)
         return tab
 
+    def _build_personal_twin_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+
+        title = QLabel("Personal Adaptive Twin")
+        title.setObjectName("HeroTitle")
+        layout.addWidget(title)
+        intro = QLabel(
+            "Local personalization engine. It learns recurring patterns from this participant's "
+            "quality-gated observations and updates the personal reference range over time. "
+            "It does not retrain the CHRONO-PCOS disease model or create a diagnosis."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        self.personal_profile_text = QTextEdit()
+        self.personal_profile_text.setReadOnly(True)
+        self.personal_profile_text.setMaximumHeight(95)
+        layout.addWidget(self.personal_profile_text)
+
+        self.personal_twin_text = QTextEdit()
+        self.personal_twin_text.setReadOnly(True)
+        layout.addWidget(self.personal_twin_text, 1)
+
+        refresh = QPushButton("Refresh learned profile")
+        refresh.clicked.connect(self._refresh_personal_twin)
+        layout.addWidget(refresh)
+        self._refresh_personal_twin()
+        return tab
+
+    def _refresh_personal_twin(self):
+        state = self.adaptive_model.snapshot()
+        self.personal_profile_text.setText(
+            f"Participant: {self.participant_id}\n"
+            f"{profile_summary(load_state().get('profile', {}))}\n"
+            f"Learning samples: {state['samples']:,} • quality-weighted: {state['quality_weighted_samples']:.1f}\n"
+            "Learning mode: local adaptive baseline / hour-of-day context"
+        )
+        lines = []
+        for name, item in state.get("metrics", {}).items():
+            lines.append(
+                f"{name}: learned mean {item['mean']:.3f} • std {item['std']:.3f} • "
+                f"weighted observations {item['samples']:.1f} • latest {item['last']}"
+            )
+        self.personal_twin_text.setText("\n".join(lines) if lines else "No quality-gated measurements learned yet.")
+
+    def _build_complications_tab(self):
+        tab = PCOSComplicationPanel("PCOS / Complication Context")
+        self.complication_panel = tab
+        tab.set_context(
+            {k: getattr(self.profile, k) for k in (
+                "age_years", "bmi", "systolic_bp", "diastolic_bp",
+                "glucose_mg_dl", "cycle_irregular", "days_since_last_period",
+                "usual_cycle_length_days", "years_post_menarche"
+            )},
+            self.feature_history[-1] if self.feature_history else None,
+        )
+        return tab
+
     def _build_trends_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -818,48 +900,171 @@ class MainWindow(QMainWindow):
         self.port_combo.addItem("/dev/ttyACM0")
 
     def connect_serial(self, port=None):
-        p = port or self.port_combo.currentText()
-        try:
-            self.arduino_reader = ArduinoReader(port=p, baud=115200)
-            self.arduino_reader.start()
-            self.mode_label.setText(f"Mode: LIVE SERIAL {p}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
-        except Exception as e:
-            self.mode_label.setText(f"Mode: SERIAL FAILED {e}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
-
-    def connect_network(self, hostport: str):
-        if not hostport:
+        self.stop_stream()
+        p = port or self.port_combo.currentText().strip()
+        if not p:
+            self._refresh_ports()
+            p = self.port_combo.currentText().strip()
+        if not p:
+            self.mode_label.setText("Mode: NO SERIAL PORT")
             return
         try:
-            parts = hostport.split(":")
-            host = parts[0]
-            port = int(parts[1]) if len(parts) > 1 else 7777
-            self.network_reader = NetworkReader(host=host, port=port)
-            self.network_reader.start()
-            self.mode_label.setText(f"Mode: LIVE NETWORK {hostport}")
-            self.mode_label.setStyleSheet("font-weight: bold; color: #4ade80;")
+            reader = ArduinoReader(port=p, baud=115200, require_crc=True, parent=self)
+            reader.sample_received.connect(self._on_sample_received)
+            reader.state_changed.connect(self._on_reader_state)
+            reader.error_received.connect(self._on_reader_error)
+            self.arduino_reader = reader
+            self.current_session_id = self.history_store.start_session(
+                source=f"serial:{p}", note="ESP32-S3 / Arduino USB wearable", participant_id=self.participant_id
+            )
+            reader.start()
+            self.mode_label.setText(f"Mode: LIVE USB • {p}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#4ade80;")
         except Exception as e:
-            self.mode_label.setText(f"Mode: NETWORK FAILED {e}")
+            self.mode_label.setText(f"Mode: SERIAL FAILED • {e}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
+
+    def connect_network(self, hostport: str):
+        self.stop_stream()
+        target = hostport.strip() or "192.168.4.1:7777"
+        try:
+            host, sep, raw_port = target.rpartition(":")
+            if not sep:
+                host, raw_port = target, "7777"
+            port = int(raw_port)
+            reader = NetworkReader(host=host, port=port, require_crc=True, parent=self)
+            reader.sample_received.connect(self._on_sample_received)
+            reader.state_changed.connect(self._on_reader_state)
+            reader.error_received.connect(self._on_reader_error)
+            self.network_reader = reader
+            self.current_session_id = self.history_store.start_session(
+                source=f"wifi:{host}:{port}", note="ESP32-S3 Wi-Fi wearable", participant_id=self.participant_id
+            )
+            reader.start()
+            self.mode_label.setText(f"Mode: LIVE Wi-Fi • {host}:{port}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#4ade80;")
+        except Exception as e:
+            self.mode_label.setText(f"Mode: NETWORK FAILED • {e}")
+            self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
 
     def start_demo(self):
-        self.demo_stream = DemoSensorStream()
-        self.demo_stream.start()
-        self.mode_label.setText("Mode: DEMO SYNTHETIC - clearly labelled")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #fbbf24;")
-
-    def stop_stream(self):
-        if self.arduino_reader:
-            self.arduino_reader.stop()
-            self.arduino_reader = None
-        if self.network_reader:
-            self.network_reader.stop()
-            self.network_reader = None
-        if self.demo_stream:
-            self.demo_stream.stop()
-            self.demo_stream = None
+        self.stop_stream()
+        self.demo_stream = DemoSensorStream(fs_hz=20.0, parent=self)
+        self.demo_stream.sample_received.connect(self._on_sample_received)
+        self.demo_stream.state_changed.connect(self._on_read    def stop_stream(self):
+        for reader_name in ("arduino_reader", "network_reader", "demo_stream"):
+            reader = getattr(self, reader_name, None)
+            if reader is not None:
+                try: reader.stop()
+                except Exception: pass
+                setattr(self, reader_name, None)
+        if self.current_session_id is not None:
+            try:
+                self.history_store.end_session(self.current_session_id, sample_count=self._sample_count)
+            except Exception:
+                pass
+            self.current_session_id = None
         self.mode_label.setText("Mode: NO STREAM")
-        self.mode_label.setStyleSheet("font-weight: bold; color: #f87171;")
+        self.mode_label.setStyleSheet("font-weight:bold;color:#f87171;")
+
+    def _on_reader_state(self, state):
+        self.mode_label.setText(f"Mode: {state.replace('_',' ').upper()}")
+
+    def _on_reader_error(self, message):
+        self.status_label.setText(f"Sensor link: {message}")
+
+    def _on_sample_received(self, sample):
+        self._sample_count += 1
+        # Raw acquisition is persisted locally without being allowed to alter
+        # the decoded source values.
+        if str(getattr(sample, "source", "")).startswith("serial") or str(getattr(sample, "source", "")).startswith("wifi"):
+            append_event({
+                "kind": "raw_sensor_sample",
+                "participant_id": self.participant_id,
+                "ms": getattr(sample, "ms", None),
+                "source": getattr(sample, "source", None),
+                "values": {
+                    name: getattr(sample, name, None) for name in (
+                        "analog_ppg_raw", "ir", "red", "gsr_raw",
+                        "ax_g", "ay_g", "az_g", "gx_dps", "gy_dps", "gz_dps",
+                        "temp_c", "room_temp_c", "humidity_pct", "pressure_hpa", "lux",
+                        "status"
+                    )
+                }
+            })
+
+        self.extractor.add_sample(sample)
+        now = time.time()
+        if now - self._last_feature_compute < 0.5:
+            return
+        self._last_feature_compute = now
+        try:
+            fv = self.extractor.compute()
+        except Exception as exc:
+            self.status_label.setText(f"Feature computation failed: {exc}")
+            return
+        self.feature_history.append(fv)
+        if self.current_session_id is not None:
+            try:
+                self.history_store.log_feature(
+                    self.current_session_id,
+                    {
+                        "ts": fv.timestamp_s,
+                        "hr": fv.hr_bpm,
+                        "rmssd": fv.rmssd_ms,
+                        "spo2": fv.spo2_pct,
+                        "skin_temp": fv.skin_temp_c,
+                        "gsr": fv.gsr_tonic,
+                        "motion": fv.motion_index,
+                        "activity": fv.activity_level,
+                        "stress": fv.stress_index,
+                        "sleep_prob": fv.sleep_probability,
+                        "circadian": fv.circadian_disruption,
+                        "anomaly": fv.anomaly_score,
+                        "signal_quality": fv.signal_quality,
+                    },
+                    extra_json=json.dumps({
+                        "calibration_status": getattr(fv, "calibration_status", None),
+                        "calibration_ready_fraction": getattr(fv, "calibration_ready_fraction", 0.0),
+                        "participant_id": self.participant_id,
+                    }),
+                )
+            except Exception:
+                pass
+
+        src = str(getattr(sample, "source", "")).lower()
+        is_real = src not in {"demo", "synthetic"} and not src.startswith("demo")
+        if is_real:
+            try:
+                self.adaptive_model.observe(fv, quality=fv.signal_quality)
+            except Exception as exc:
+                self.status_label.setText(f"Personal learning warning: {exc}")
+
+        self._update_vital_cards(fv)
+        try:
+            shared = self.shared_extractor.extract(fv, self.feature_history[-50:])
+            self.current_shared = shared
+            self.shared_history.append(shared)
+            if len(self.shared_history) > 500:
+                self.shared_history = self.shared_history[-500:]
+            self.shared_text.setText(self.explanation_engine.explain_shared_features(shared))
+        except Exception:
+            pass
+        self.top_quality.setText(f"QUALITY  {float(fv.signal_quality):.2f}")
+        self.top_baseline.setText(
+            f"PERSONAL LEARNING  {self.adaptive_model.snapshot()['samples']:,}"
+        )
+        self.top_patient.setText(f"PATIENT  {self.participant_id}")
+        if hasattr(self, "complication_panel"):
+            self.complication_panel.set_context(self.clinical_data, fv)
+        self._refresh_personal_twin()
+        try:
+            self._update_risk()
+        except Exception:
+            pass
+
 
     def _load_scenario_dialog(self):
         # Load one of the 6 scenarios as demo
