@@ -4,7 +4,7 @@
 
 | Controller | Role | Active |
 |---|---|---|
-| **ESP32-S3-DevKitC-1** | **Primary wireless wearable** | YES |
+| **Adafruit Feather ESP32-S3 2MB PSRAM** | **Primary wireless wearable** | YES |
 | **Arduino Mega 2560** | Bench / lab / expanded controller | YES |
 | ESP8266 | Superseded wearable implementation | Legacy |
 | ESP32 original wearable | Historical implementation | Legacy |
@@ -16,20 +16,26 @@ Firmware:
 `hardware/esp32s3/endo_twin_wearable/endo_twin_wearable.ino`
 
 Sensors:
-- Analog Pulse Sensor / PPG on GPIO4 (single channel)
-- MPU6050 IMU (optional)
-- BME280 temperature/humidity/pressure (optional)
-- BH1750 ambient light (optional)
-- GSR/EDA with external finger electrodes on GPIO34
+- Analog Pulse Sensor / PPG: **A5 / GPIO8 / ADC1**
+- GSR/EDA module analog output: **D5 / GPIO5 / ADC1**
+- DS18B20: **D6 / GPIO6**
+- MPU6050: I2C on **SDA GPIO3 / SCL GPIO4**
+- BME280: I2C on **SDA GPIO3 / SCL GPIO4**
+- BH1750: I2C on **SDA GPIO3 / SCL GPIO4**
+
+Expected I2C addresses:
+- MPU6050: 0x68 or 0x69
+- BME280: 0x76 or 0x77
+- BH1750: 0x23 or 0x5C
 
 Transport:
 - USB serial 115200
 - Wi-Fi SoftAP `ENDO-TWIN-S3`
 - password `endotwins3`
 - TCP port 7777
+- V9 packet: `$CP3,ms,ppg_raw,gsr_raw,ax,ay,az,gx,gy,gz,skinT,roomT,hum,press,lux,status,crc`
 
-The active V9 firmware uses USB serial at 115200 and a Wi-Fi SoftAP/TCP transport at port 7777. The current wire protocol is CP3. A single analog PPG channel is used for pulse/HR/HRV research features; SpO2 is not computed from the analog channel.
-
+The V9 firmware uses the Feather's native I2C pins instead of generic ESP32 DevKit pins. The single analog PPG channel is used for pulse/HR/HRV research features; conventional SpO2 is not computed from one analog channel.
 ## Mega hub
 
 Firmware:
