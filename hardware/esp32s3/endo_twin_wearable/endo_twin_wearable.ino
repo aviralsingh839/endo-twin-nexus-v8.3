@@ -41,6 +41,7 @@ float ax_g=0,ay_g=0,az_g=1,gx_dps=0,gy_dps=0,gz_dps=0;
 float axBias=0,ayBias=0,azBiasError=0,gxBias=0,gyBias=0,gzBias=0;
 float luxValue=NAN,roomTemp=NAN,humidity=NAN,pressure=NAN;
 uint32_t lastPPG=0,lastIMU=0,lastGSR=0,lastEnv=0,lastPacket=0,lastStatus=0;
+bool i2cInitAttempted=false;
 
 String commandBuffer;
 String ppgProfileId="default";
@@ -50,8 +51,7 @@ bool ppgCalibrated=false;
 static uint8_t xorCRC(const char* s){uint8_t c=0;while(*s)c^=(uint8_t)*s++;return c;}
 static void setLed(bool on){pinMode(STATUS_LED_PIN,OUTPUT);digitalWrite(STATUS_LED_PIN,on?HIGH:LOW);}
 static void scanI2C(){
-  Serial.println("[I2C] scan SDA=21 SCL=22");
-  for(uint8_t a=1;a<127;a++){Wire.beginTransmission(a);if(Wire.endTransmission()==0){Serial.print("[I2C] FOUND 0x");if(a<16)Serial.print('0');Serial.println(a,HEX);}}
+  Serial.println("[I2C] Full scan deferred; CP3 streaming starts first");
 }
 static uint16_t readADCMedian(uint8_t pin){
   uint16_t v[5];for(int i=0;i<5;i++)v[i]=(uint16_t)analogRead(pin);
@@ -161,17 +161,29 @@ void setup(){
   Serial.println("ESP32-S3 PRIMARY ANALOG WEARABLE");
   Serial.println("USB SERIAL 115200 • CP3 • personal PPG calibration");
   Serial.println("==============================================");
-  Wire.begin(I2C_SDA_PIN,I2C_SCL_PIN);Wire.setClock(400000L);scanI2C();
+  Wire.begin(I2C_SDA_PIN,I2C_SCL_PIN);Wire.setClock(100000L);Wire.setTimeOut(25);scanI2C();
   analogReadResolution(12);analogSetPinAttenuation(ANALOG_PPG_PIN,ADC_11db);analogSetPinAttenuation(GSR_PIN,ADC_11db);
   pinMode(ANALOG_PPG_PIN,INPUT);pinMode(GSR_PIN,INPUT);
-  setupMPU();setupEnv();calibrateIMU();
+  // Optional I2C sensors initialize after CP3 streaming starts.
   if(!prefs.begin("endo_ppg",true)){Serial.println("[PPG] Preferences unavailable");}else{prefs.end();loadPPGProfile(ppgProfileId);}
   setupWiFi();setLed(true);
   Serial.println("[READY] Streaming $CP3 every 50 ms");
   Serial.println("[READY] PPG_PERSON=<ID> then PPG_NEW_PERSON");
+  Serial.println("[READY] Optional I2C sensor initialization deferred");
 }
 void loop(){
   uint32_t now=millis();
+
+  if(!i2cInitAttempted && now>=1500){
+    i2cInitAttempted=true;
+    Serial.println("[I2C] Initializing optional MPU6050/BH1750/BME280...");
+    setupMPU();
+    setupEnv();
+    calibrateIMU();
+    Serial.print("[I2C] MPU6050="); Serial.print(mpuOK?"OK":"ERR");
+    Serial.print(" BH1750="); Serial.print(lightOK?"OK":"ERR");
+    Serial.print(" BME280="); Serial.println(bmeOK?"OK":"ERR");
+  }
   WiFiClient in=server.available();if(in){if(tcpClient&&tcpClient.connected())tcpClient.stop();tcpClient=in;tcpClient.setNoDelay(true);tcpClient.println("$ACK,CONNECTED,ENDO-TWIN-ESP32S3-ANALOG");}
   if(now-lastPPG>=PPG_PERIOD_MS){lastPPG=now;ppgRaw=readADCMedian(ANALOG_PPG_PIN);}
   if(now-lastGSR>=GSR_PERIOD_MS){lastGSR=now;gsrRaw=readADCMedian(GSR_PIN);}
