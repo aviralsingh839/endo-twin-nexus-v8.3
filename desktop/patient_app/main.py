@@ -374,8 +374,12 @@ class PatientWindow(QMainWindow):
         for row in self.feature_history:
             if isinstance(row, dict):
                 value = row.get(key)
+                if value is None and key == "skin_temp_c":
+                    value = row.get("room_temp_c")
             else:
                 value = getattr(row, key, None)
+                if value is None and key == "skin_temp_c":
+                    value = getattr(row, "room_temp_c", None)
             try:
                 if value is not None:
                     values.append(float(value))
@@ -824,7 +828,10 @@ class PatientWindow(QMainWindow):
         for key in ("hr_bpm","rmssd_ms","skin_temp_c","gsr_tonic","activity_level"):
             graph=self.visual_graphs.get(key)
             if graph is not None:
-                graph.set_value(row.get(key))
+                value=row.get(key)
+                if value is None and key=="skin_temp_c":
+                    value=row.get("room_temp_c")
+                graph.set_value(value)
         q = row.get("signal_quality")
         if q is not None:
             self.quality_badge.setText(f"●  Data quality: {float(q)*100:.0f}%")
