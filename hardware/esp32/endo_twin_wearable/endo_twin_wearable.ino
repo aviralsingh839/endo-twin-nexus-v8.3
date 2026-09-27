@@ -35,6 +35,8 @@
 #include <Adafruit_Sensor.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Adafruit_BME280.h>
+#include <BH1750.h>
 #include <math.h>
 
 static constexpr uint8_t SDA_PIN = 8;
@@ -51,6 +53,7 @@ static constexpr uint32_t GSR_PERIOD_MS = 100;    // 10 Hz
 static constexpr uint32_t TEMP_PERIOD_MS = 1000;  // 1 Hz
 static constexpr uint32_t PACKET_PERIOD_MS = 50;  // 20 Hz
 static constexpr uint32_t STATUS_PERIOD_MS = 2000;
+static constexpr uint32_t ENV_PERIOD_MS = 1000; // 1 Hz
 
 #define ST_PPG_ABSENT 0
 #define ST_PPG_SAT    1
@@ -58,6 +61,8 @@ static constexpr uint32_t STATUS_PERIOD_MS = 2000;
 #define ST_TEMP_ERR   3
 #define ST_GSR_SAT    4
 #define ST_I2C_ERR    5
+#define ST_BME_ERR    8
+#define ST_BH1750_ERR 12
 
 static const char* SERVICE_UUID = "7f300001-6c12-4f70-9e6b-8e9f7b8b1001";
 static const char* DATA_UUID    = "7f300002-6c12-4f70-9e6b-8e9f7b8b1001";
@@ -67,6 +72,8 @@ MAX30105 ppg;
 Adafruit_MPU6050 mpu;
 OneWire ow(ONE_WIRE_BUS);
 DallasTemperature tempSensor(&ow);
+Adafruit_BME280 bme;
+BH1750 lightMeter;
 
 BLECharacteristic* dataChar = nullptr;
 bool bleConnected = false;
@@ -75,6 +82,8 @@ bool ppgOK = false;
 bool mpuOK = false;
 bool tempOK = false;
 bool analogPpgOK = false;
+bool bmeOK = false;
+bool lightOK = false;
 
 uint16_t statusBase = 0;
 
@@ -85,6 +94,10 @@ int gsr = 0;
 float ax = 0.0f, ay = 0.0f, az = 1.0f;
 float gx = 0.0f, gy = 0.0f, gz = 0.0f;
 float temp0 = NAN;
+float roomT = NAN;
+float humidity = NAN;
+float pressure = NAN;
+float luxValue = -1.0f;
 
 float axb = 0.0f, ayb = 0.0f, azb = 0.0f;
 float gxb = 0.0f, gyb = 0.0f, gzb = 0.0f;
@@ -95,6 +108,7 @@ uint32_t lastGSR = 0;
 uint32_t lastTEMP = 0;
 uint32_t lastPACKET = 0;
 uint32_t lastStatus = 0;
+uint32_t lastENV = 0;
 
 String commandBuffer;
 
@@ -176,6 +190,365 @@ static void setupSensors() {
   } else {
     statusBase |= (1u << ST_TEMP_ERR);
     Serial.println("[SENSOR] DS18B20: NOT FOUND (non-fatal)");
+  }
+
+  printStage("Sensor initialization: BH1750");
+  lightOK = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire);
+  if (lightOK) {
+    Serial.println("[SENSOR] BH1750 @ 0x23: OK");
+  } else {
+    // Some BH1750 boards use the alternate address 0x5C.
+    lightOK = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire);
+    if (lightOK) {
+      Serial.println("[SENSOR] BH1750 @ 0x5C: OK");
+    } else {
+      statusBase |= (1u << ST_BH1750_ERR);
+      Serial.println("[SENSOR] BH1750: NOT FOUND (non-fatal)");
+    }
+  }
+
+  printStage("Sensor initialization: BME280");
+  bmeOK = bme.begin(0x76, &Wire);
+  if (!bmeOK) {
+    bmeOK = bme.begin(0x77, &Wire);
+  }
+
+  if (bmeOK) {
+    Serial.println("[SENSOR] BME280: OK");
+  } else {
+    statusBase |= (1u << ST_BME_ERR);
+    Serial.println("[SENSOR] BME280: NOT FOUND (non-fatal)");
+  }
+
+  printStage("Sensor initialization complete");
+}
+
+static void calibrateIMU() {
+  if (!mpuOK) {
+    Serial.println("[IMU] Calibration skipped: MPU6050 unavailable");
+    return;
+  }
+
+  Serial.println("[IMU] Keep wearable still: calibrating for ~1.3 s");
+
+  const int N = 160;
+  float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+  float sgx = 0.0f, sgy = 0.0f, sgz = 0.0f;
+
+  for (int i = 0; i < N; ++i) {
+    sensors_event_t a, g, t;
+    mpu.getEvent(&a, &g, &t);
+
+    sx += a.acceleration.x / 9.80665f;
+    sy += a.acceleration.y / 9.80665f;
+    sz += a.acceleration.z / 9.80665f;
+
+    sgx += g.gyro.x * 57.29578f;
+    sgy += g.gyro.y * 57.29578f;
+    sgz += g.gyro.z * 57.29578f;
+
+    delay(8);
+  }
+
+  axb = sx / N;
+  ayb = sy / N;
+  azb = (sz / N) - 1.0f;
+  gxb = sgx / N;
+  gyb = sgy / N;
+  gzb = sgz / N;
+
+  Serial.println("[IMU] Calibration complete");
+}
+
+static uint16_t getStatus() {
+  uint16_t s = statusBase;
+
+  const uint32_t ppgValue = ppgOK ? ir : ir;
+  if ((ppgOK || analogPpgOK) && ppgValue < 5) {
+    s |= (1u << ST_PPG_ABSENT);
+  }
+
+  if (ppgOK && (ir > 250000UL || red > 250000UL)) {
+    s |= (1u << ST_PPG_SAT);
+  }
+
+  if (tempOK && !(temp0 > -20.0f && temp0 < 80.0f)) {
+    s |= (1u << ST_TEMP_ERR);
+  }
+
+  if (gsr < 5 || gsr > 4090) {
+    s |= (1u << ST_GSR_SAT);
+  }
+
+  return s;
+}
+
+static String makePacket() {
+  char ft0[16], ft1[16], frt[16], fhum[16], fpress[16], flux[16];
+
+  if (isnan(temp0)) snprintf(ft0, sizeof(ft0), "nan");
+  else snprintf(ft0, sizeof(ft0), "%.2f", temp0);
+
+  // ESP32-S3 wearable currently has one DS18B20.
+  snprintf(ft1, sizeof(ft1), "nan");
+
+  if (isnan(roomT)) snprintf(frt, sizeof(frt), "nan");
+  else snprintf(frt, sizeof(frt), "%.2f", roomT);
+
+  if (isnan(humidity)) snprintf(fhum, sizeof(fhum), "nan");
+  else snprintf(fhum, sizeof(fhum), "%.1f", humidity);
+
+  if (isnan(pressure)) snprintf(fpress, sizeof(fpress), "nan");
+  else snprintf(fpress, sizeof(fpress), "%.1f", pressure);
+
+  snprintf(flux, sizeof(flux), "%.1f", luxValue);
+
+  // Keep the CP2 field layout compatible with the project's extended Mega
+  // firmware. Unsupported wearable channels remain explicit placeholders:
+  // micRaw=0, micRms=0, micPitch=0, ecg=-1, fsr=-1, buttons=0.
+  char payload[360];
+  const uint16_t s = getStatus();
+
+  snprintf(
+    payload,
+    sizeof(payload),
+    "$CP2,%lu,%lu,%lu,%.4f,%.4f,%.4f,%.3f,%.3f,%.3f,%s,%s,%d,0,0.00,0.0,-1,-1,%s,%s,%s,%s,0,%u",
+    static_cast<unsigned long>(millis()),
+    static_cast<unsigned long>(ir),
+    static_cast<unsigned long>(red),
+    ax, ay, az,
+    gx, gy, gz,
+    ft0, ft1,
+    gsr,
+    flux, frt, fhum, fpress,
+    s
+  );
+
+  const uint8_t c = crc8(payload);
+
+  char out[390];
+  snprintf(out, sizeof(out), "%s,%02X", payload, c);
+  return String(out);
+}*
+  ENDO-TWIN NEXUS — ESP32-S3 Wearable Firmware
+  Serial-safe diagnostic build.
+
+  IMPORTANT:
+  - USB Serial (CDC) is initialized before any sensor/BLE code.
+  - Startup progress is printed at every stage.
+  - Sensor failures are non-fatal.
+  - BLE advertising starts even when optional sensors are absent.
+  - USB Serial remains available for PC bring-up and diagnostics.
+
+  Current harness:
+    I2C SDA = GPIO8
+    I2C SCL = GPIO9
+    DS18B20 DATA = GPIO6
+    GSR = GPIO34
+    Analog PPG = GPIO4
+    Status LED = GPIO2
+    VCC = 3V3
+    GND = GND
+
+  Note:
+  GPIO40 -> GPIO4 is NOT assumed by the firmware. The analog PPG output
+  must actually reach GPIO4 for ANALOG_PPG to change.
+*/
+
+#include <Arduino.h>
+#include <Wire.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+#include "MAX30105.h"
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <Adafruit_BME280.h>
+#include <BH1750.h>
+#include <math.h>
+
+static constexpr uint8_t SDA_PIN = 8;
+static constexpr uint8_t SCL_PIN = 9;
+static constexpr uint8_t ONE_WIRE_BUS = 6;
+static constexpr uint8_t GSR_PIN = 34;
+static constexpr uint8_t ANALOG_PPG_PIN = 4;
+static constexpr uint8_t STATUS_LED_PIN = 2;
+
+static constexpr uint32_t BAUD_RATE = 115200;
+static constexpr uint32_t PPG_PERIOD_MS = 20;     // 50 Hz
+static constexpr uint32_t IMU_PERIOD_MS = 20;     // 50 Hz
+static constexpr uint32_t GSR_PERIOD_MS = 100;    // 10 Hz
+static constexpr uint32_t TEMP_PERIOD_MS = 1000;  // 1 Hz
+static constexpr uint32_t PACKET_PERIOD_MS = 50;  // 20 Hz
+static constexpr uint32_t STATUS_PERIOD_MS = 2000;
+static constexpr uint32_t ENV_PERIOD_MS = 1000; // 1 Hz
+
+#define ST_PPG_ABSENT 0
+#define ST_PPG_SAT    1
+#define ST_MPU_ERR    2
+#define ST_TEMP_ERR   3
+#define ST_GSR_SAT    4
+#define ST_I2C_ERR    5
+#define ST_BME_ERR    8
+#define ST_BH1750_ERR 12
+
+static const char* SERVICE_UUID = "7f300001-6c12-4f70-9e6b-8e9f7b8b1001";
+static const char* DATA_UUID    = "7f300002-6c12-4f70-9e6b-8e9f7b8b1001";
+static const char* CMD_UUID     = "7f300003-6c12-4f70-9e6b-8e9f7b8b1001";
+
+MAX30105 ppg;
+Adafruit_MPU6050 mpu;
+OneWire ow(ONE_WIRE_BUS);
+DallasTemperature tempSensor(&ow);
+Adafruit_BME280 bme;
+BH1750 lightMeter;
+
+BLECharacteristic* dataChar = nullptr;
+bool bleConnected = false;
+
+bool ppgOK = false;
+bool mpuOK = false;
+bool tempOK = false;
+bool analogPpgOK = false;
+bool bmeOK = false;
+bool lightOK = false;
+
+uint16_t statusBase = 0;
+
+uint32_t ir = 0;
+uint32_t red = 0;
+int gsr = 0;
+
+float ax = 0.0f, ay = 0.0f, az = 1.0f;
+float gx = 0.0f, gy = 0.0f, gz = 0.0f;
+float temp0 = NAN;
+float roomT = NAN;
+float humidity = NAN;
+float pressure = NAN;
+float luxValue = -1.0f;
+
+float axb = 0.0f, ayb = 0.0f, azb = 0.0f;
+float gxb = 0.0f, gyb = 0.0f, gzb = 0.0f;
+
+uint32_t lastPPG = 0;
+uint32_t lastIMU = 0;
+uint32_t lastGSR = 0;
+uint32_t lastTEMP = 0;
+uint32_t lastPACKET = 0;
+uint32_t lastStatus = 0;
+uint32_t lastENV = 0;
+
+String commandBuffer;
+
+static void flushSerial() {
+  Serial.flush();
+  delay(10);
+}
+
+static void printStage(const char* stage) {
+  Serial.print("[ENDO-TWIN] ");
+  Serial.println(stage);
+  flushSerial();
+}
+
+static uint8_t crc8(const char* text) {
+  uint8_t c = 0;
+  while (*text) {
+    c ^= static_cast<uint8_t>(*text++);
+  }
+  return c;
+}
+
+static void setLed(bool on) {
+  digitalWrite(STATUS_LED_PIN, on ? HIGH : LOW);
+}
+
+static bool setupAnalogPPG() {
+  pinMode(ANALOG_PPG_PIN, INPUT);
+  analogSetPinAttenuation(ANALOG_PPG_PIN, ADC_11db);
+
+  const int sample = analogRead(ANALOG_PPG_PIN);
+  analogPpgOK = (sample >= 0 && sample <= 4095);
+
+  Serial.print("[SENSOR] Analog PPG GPIO");
+  Serial.print(ANALOG_PPG_PIN);
+  Serial.print(" initial=");
+  Serial.println(sample);
+
+  return analogPpgOK;
+}
+
+static void setupSensors() {
+  printStage("Sensor initialization: MAX3010x");
+  if (ppg.begin(Wire, I2C_SPEED_FAST)) {
+    ppgOK = true;
+    ppg.setup(0x24, 4, 2, 100, 411, 4096);
+    ppg.setPulseAmplitudeRed(0x24);
+    ppg.setPulseAmplitudeIR(0x24);
+    ppg.setPulseAmplitudeGreen(0);
+    Serial.println("[SENSOR] MAX3010x: OK");
+  } else {
+    statusBase |= (1u << ST_I2C_ERR);
+    Serial.println("[SENSOR] MAX3010x: NOT FOUND (non-fatal)");
+  }
+
+  printStage("Sensor initialization: analog PPG");
+  setupAnalogPPG();
+
+  printStage("Sensor initialization: MPU6050");
+  if (mpu.begin()) {
+    mpuOK = true;
+    mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
+    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+    Serial.println("[SENSOR] MPU6050: OK");
+  } else {
+    statusBase |= (1u << ST_MPU_ERR);
+    Serial.println("[SENSOR] MPU6050: NOT FOUND (non-fatal)");
+  }
+
+  printStage("Sensor initialization: DS18B20");
+  tempSensor.begin();
+  const uint8_t deviceCount = tempSensor.getDeviceCount();
+
+  if (deviceCount > 0) {
+    tempOK = true;
+    Serial.print("[SENSOR] DS18B20: OK devices=");
+    Serial.println(deviceCount);
+  } else {
+    statusBase |= (1u << ST_TEMP_ERR);
+    Serial.println("[SENSOR] DS18B20: NOT FOUND (non-fatal)");
+  }
+
+  printStage("Sensor initialization: BH1750");
+  lightOK = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23, &Wire);
+  if (lightOK) {
+    Serial.println("[SENSOR] BH1750 @ 0x23: OK");
+  } else {
+    // Some BH1750 boards use the alternate address 0x5C.
+    lightOK = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire);
+    if (lightOK) {
+      Serial.println("[SENSOR] BH1750 @ 0x5C: OK");
+    } else {
+      statusBase |= (1u << ST_BH1750_ERR);
+      Serial.println("[SENSOR] BH1750: NOT FOUND (non-fatal)");
+    }
+  }
+
+  printStage("Sensor initialization: BME280");
+  bmeOK = bme.begin(0x76, &Wire);
+  if (!bmeOK) {
+    bmeOK = bme.begin(0x77, &Wire);
+  }
+
+  if (bmeOK) {
+    Serial.println("[SENSOR] BME280: OK");
+  } else {
+    statusBase |= (1u << ST_BME_ERR);
+    Serial.println("[SENSOR] BME280: NOT FOUND (non-fatal)");
   }
 
   printStage("Sensor initialization complete");
@@ -464,6 +837,20 @@ void loop() {
     gsr = analogRead(GSR_PIN);
   }
 
+  if (now - lastENV >= ENV_PERIOD_MS) {
+    lastENV = now;
+
+    if (lightOK) {
+      luxValue = lightMeter.readLightLevel();
+    }
+
+    if (bmeOK) {
+      roomT = bme.readTemperature();
+      humidity = bme.readHumidity();
+      pressure = bme.readPressure() / 100.0f;
+    }
+  }
+
   if (now - lastTEMP >= TEMP_PERIOD_MS) {
     lastTEMP = now;
 
@@ -487,7 +874,19 @@ void loop() {
     Serial.print(mpuOK ? "OK" : "ERR");
     Serial.print(" TEMP=");
     Serial.print(tempOK ? "OK" : "ERR");
-    Serial.print(" GSR=");
+    Serial.print(" BME=");
+    Serial.print(bmeOK ? "OK" : "ERR");
+    Serial.print(" BH1750=");
+    Serial.print(lightOK ? "OK" : "ERR");
+    Serial.print(" ENV[T=");
+    Serial.print(roomT, 1);
+    Serial.print("C H=");
+    Serial.print(humidity, 1);
+    Serial.print("% P=");
+    Serial.print(pressure, 1);
+    Serial.print("hPa L=");
+    Serial.print(luxValue, 1);
+    Serial.print("lx] GSR=");
     Serial.print(gsr);
     Serial.print(" BLE=");
     Serial.print(bleConnected ? "CONNECTED" : "ADVERTISING");
