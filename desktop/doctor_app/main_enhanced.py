@@ -1055,7 +1055,7 @@ class DoctorWindow(QMainWindow):
         self.patient_tabs.setObjectName("patientTabs")
         self.patient_tab_names = [
             "Overview", "Timeline", "Sensor data", "Trends", "Ultrasound",
-            "AI / Models", "Clinical inputs", "PCOS Complications", "Reports",
+            "AI / Models", "Clinical inputs", "PCOD Healing & Complications", "Reports",
             "Notes", "Provenance", "Audit"
         ]
         # A compact tab row using QPushButtons is more stable across Qt styles.
@@ -1123,14 +1123,17 @@ class DoctorWindow(QMainWindow):
             "Ultrasound": self._patient_ultrasound,
             "AI / Models": self._patient_models,
             "Clinical inputs": self._patient_clinical,
-            "PCOS Complications": self._patient_complications,
+            "PCOD Healing & Complications": self._patient_complications,
             "Reports": self._patient_reports,
             "Notes": self._patient_notes,
             "Provenance": self._patient_provenance,
             "Audit": self._patient_audit,
         }
+        self.patient_tab_widgets = {}
         for name in self.patient_tab_names:
-            self.patient_stack.addWidget(builders[name]())
+            widget = builders[name]()
+            self.patient_tab_widgets[name] = widget
+            self.patient_stack.addWidget(widget)
         self._show_patient_tab("Overview")
 
     def _patient_overview(self):
