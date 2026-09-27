@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -258,7 +259,7 @@ class DoctorWindow(QMainWindow):
             self.patient_badge.setText(f"Patient • {self.current_case.patient}")
         elif self.live_patient:
             alias = str(self.live_patient.get("display_name") or self.live_patient.get("anonymous_id") or "Local patient")
-            pid = str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "")
+            pid = str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or self.live_patient.get("participant_id") or "")
             self.current_patient_btn.setText(f"◉  {alias}  ·  {pid}")
             self.current_patient_btn.setVisible(True)
             self.current_group.setVisible(True)
@@ -296,7 +297,7 @@ class DoctorWindow(QMainWindow):
             }
         if self.live_patient:
             return {
-                "pid": str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or "LOCAL"),
+                "pid": str(self.live_patient.get("anonymous_id") or self.live_patient.get("patient_id") or self.live_patient.get("participant_id") or "LOCAL"),
                 "alias": str(self.live_patient.get("display_name") or "Local patient"),
                 "age": self.live_patient.get("age_years", "—"),
                 "bmi": self.live_patient.get("bmi", "—"),
