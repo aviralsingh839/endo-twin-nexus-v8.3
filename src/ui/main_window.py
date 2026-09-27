@@ -910,7 +910,7 @@ class MainWindow(QMainWindow):
         grid.addWidget(metric_card("Patient",self.participant_id,"Local patient-scoped record",accent="#39c9ff"),0,0)
         grid.addWidget(metric_card("Windows",str(len(self.feature_history)),"Current longitudinal timeline",accent="#31d7a1"),0,1)
         grid.addWidget(RingGauge("Quality",float(self.feature_history[-1].signal_quality)*100 if self.feature_history else 0,"%","#7d62ff"),0,2)
-        grid.addWidget(metric_card("PCOD","YES" if self.profile.has_pcod else "UNKNOWN","Patient-reported context",accent="#ff4fa3"),0,3)
+        grid.addWidget(metric_card("PCOD","YES" if getattr(self.profile, "has_pcod", None) is True else "UNKNOWN","Patient-reported context",accent="#ff4fa3"),0,3)
         layout.addLayout(grid)
         self.report_text=QTextEdit(); self.report_text.setReadOnly(True); self.report_text.setMaximumHeight(220); layout.addWidget(self.report_text)
         btn_row=QHBoxLayout()
