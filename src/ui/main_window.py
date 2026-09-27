@@ -607,9 +607,15 @@ class MainWindow(QMainWindow):
         self.personal_twin_text.setReadOnly(True)
         layout.addWidget(self.personal_twin_text, 1)
 
+        actions = QHBoxLayout()
         refresh = QPushButton("Refresh learned profile")
         refresh.clicked.connect(self._refresh_personal_twin)
-        layout.addWidget(refresh)
+        actions.addWidget(refresh)
+        switch = QPushButton("Switch Person")
+        switch.clicked.connect(self._switch_participant)
+        actions.addWidget(switch)
+        actions.addStretch()
+        layout.addLayout(actions)
         self._refresh_personal_twin()
         return tab
 
@@ -1553,4 +1559,4 @@ def run(start_demo: bool = False, port: str | None = None, net: str | None = Non
 
 
 if __name__ == "__main__":
-    raise SystemExit(run(start_demo=True))
+    raise SystemExit(run(start_demo=False))
