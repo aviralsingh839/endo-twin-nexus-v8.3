@@ -232,6 +232,7 @@ class LiveSession(QObject):
     sample_received=Signal(object)
     state_changed=Signal(str)
     error_received=Signal(str)
+    calibration_received=Signal(object)
 
     def __init__(self,mode:ModeConfig,parent=None):
         super().__init__(parent)
@@ -246,6 +247,7 @@ class LiveSession(QObject):
         else:
             self.reader=ArduinoReader(self.mode.port,self.mode.baud,require_crc=True,parent=self)
         self.reader.sample_received.connect(self._on_sample)
+        if hasattr(self.reader, "calibration_received"):\n            self.reader.calibration_received.connect(self.calibration_received)
         self.reader.state_changed.connect(self.state_changed)
         self.reader.error_received.connect(self.error_received)
         self.reader.start()
