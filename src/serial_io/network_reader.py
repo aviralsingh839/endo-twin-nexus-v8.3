@@ -23,6 +23,7 @@ from src.serial_io.packet_parser import PacketParser
 
 class NetworkReader(QObject):
     sample_received = Signal(object)  # SensorSample
+    calibration_received = Signal(object)  # PPGCalibrationEvent
     error_received = Signal(str)
     state_changed = Signal(str)
 
@@ -118,6 +119,9 @@ class NetworkReader(QObject):
                     if not line:
                         continue
                     try:
+                        if line.startswith("$PCAL,"):
+                            self.calibration_received.emit(self.parser.parse_calibration_event(line))
+                            continue
                         sample = self.parser.parse(line)
                         with self._sample_lock:
                             self._latest_sample = sample
