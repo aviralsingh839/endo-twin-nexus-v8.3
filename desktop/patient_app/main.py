@@ -50,11 +50,7 @@ class PatientWindow(QMainWindow):
         self.bridge = EndoTwinBridgeServer(ROOT, 7778)
         self.bridge.start()
 
-        self.session = LiveSession(mode, self)
-        self.session.features_updated.connect(self._on_features)
-        self.session.state_changed.connect(self._on_state)
-        self.session.error_received.connect(self._on_error)
-        self.session.start()
+        self.session = None
 
         self.setWindowTitle("Endo-Twin Nexus — Patient Desktop • V8.6")
         self.resize(1480, 920)
@@ -62,6 +58,12 @@ class PatientWindow(QMainWindow):
         self.setStyleSheet(APP_QSS)
         self._build()
         self._refresh_header()
+
+        self.session = LiveSession(mode, self)
+        self.session.features_updated.connect(self._on_features)
+        self.session.state_changed.connect(self._on_state)
+        self.session.error_received.connect(self._on_error)
+        self.session.start()
 
     def closeEvent(self, event):
         self.session.stop()
