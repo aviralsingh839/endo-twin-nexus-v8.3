@@ -14,6 +14,8 @@ from src.serial_io.packet_parser import decode_status_flags
 from src.signal_processing.gsr import GSRProcessor
 from src.signal_processing.imu import IMUProcessor
 from src.signal_processing.ppg import PPGProcessor
+from src.signal_processing.analog_ppg import AnalogPPGProcessor
+from src.core.raw_calibration import RawAutoCalibrator
 from src.signal_processing.temperature import TemperatureProcessor
 from src.utils.demo_stream import DemoSensorStream
 
@@ -110,9 +112,11 @@ QComboBox{background:#091827;border:1px solid #1c3a52;border-radius:10px;padding
 """
 
 class StreamingFeatureProcessor:
-    """Decode-ready feature layer with sensor-specific sampling and quality gates."""
+    """Decode-ready feature layer shared by doctor/patient desktop workstations."""
     def __init__(self):
         self.ppg=PPGProcessor(history_s=180,fs_hz=20.0)
+        self.analog_ppg=AnalogPPGProcessor(history_s=180,fs_hz=20.0)
+        self.calibrator=RawAutoCalibrator()
         self.imu=IMUProcessor(history_s=180,fs_hz=20.0)
         self.gsr=GSRProcessor(history_s=600,fs_hz=10.0)
         self.temp=TemperatureProcessor(history_s=3600)
@@ -129,17 +133,31 @@ class StreamingFeatureProcessor:
         self.samples+=1
         ts=float(sample.timestamp_s)
         self.times.append(ts)
+        self.calibrator.update(sample)
+        cal=self.calibrator.transform_sample(sample)
 
-        # PPG and IMU follow the received workstation packet stream (~20 Hz).
-        self.ppg.add_sample(ts,sample.ir,sample.red)
-        self.imu.add_sample(ts,sample.ax_g,sample.ay_g,sample.az_g,sample.gx_dps,sample.gy_dps,sample.gz_dps)
+        imu_vals=[cal.get(k) for k in ("ax_g","ay_g","az_g","gx_dps","gy_dps","gz_dps")]
+        if all(v is not None for v in imu_vals):
+            self.imu.add_sample(ts,*[float(v) for v in imu_vals])
 
-        # Do not oversample slower channels merely because the transport packet is faster.
+        use_analog=getattr(sample,"analog_ppg_raw",None) is not None
+        if use_analog:
+            ap=cal.get("analog_ppg_raw")
+            if ap is not None:
+                self.analog_ppg.add_sample(ts,float(ap))
+        else:
+            self.ppg.add_sample(ts,sample.ir,sample.red)
+
         if self.last_gsr_ts<=0.0 or ts-self.last_gsr_ts>=0.10:
             self.gsr.add_sample(ts,sample.gsr_raw)
             self.last_gsr_ts=ts
-        if self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0:
-            self.temp.add_sample(ts,sample.temp_c)
+
+        # CP3 has BME280 room temperature; do not relabel it as skin temperature.
+        if (self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0) and getattr(sample,"room_temp_c",None) is not None:
+            try:
+                self.temp.add_sample(ts,float(sample.room_temp_c))
+            except (TypeError,ValueError):
+                pass
             self.last_temp_ts=ts
 
         if ts-self.last_emit<0.5:
@@ -147,31 +165,27 @@ class StreamingFeatureProcessor:
         self.last_emit=ts
 
         motion=self.imu.features(10.0)
-        ppg=self.ppg.features(motion_index=motion["motion_index"])
+        ppg=(self.analog_ppg.features(motion_index=motion["motion_index"]) if use_analog
+             else self.ppg.features(motion_index=motion["motion_index"]))
         gsr=self.gsr.features(60.0)
-        temp=self.temp.features(300.0)
 
         ppg_q=float(ppg.get("ppg_quality") or 0.0)
         flags=decode_status_flags(int(sample.status))
-        ppg_absent=any("PPG finger absent" in x for x in flags)
+        ppg_low=any("PPG" in x and ("absent" in x.lower() or "low" in x.lower()) for x in flags)
         ppg_sat=any("PPG saturated" in x for x in flags)
         gsr_bad=any("GSR saturated" in x for x in flags)
-        temp_bad=any("DS18B20 error" in x for x in flags)
-
-        if ppg_absent: ppg_q*=0.35
+        if ppg_low: ppg_q*=0.35
         if ppg_sat: ppg_q*=0.50
 
-        gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>1018 else 1.0
-        temp_q=0.0 if temp_bad else (1.0 if temp.get("skin_temp_c") is not None else 0.0)
+        gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>4090 else 1.0
         motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45))
-
-        quality=max(0.0,min(1.0,0.65*ppg_q+0.12*gsr_q+0.10*temp_q+0.13*motion_q))
-        usable=quality>=0.45 and not ppg_absent and not ppg_sat
+        quality=max(0.0,min(1.0,0.72*ppg_q+0.14*gsr_q+0.14*motion_q))
+        usable=quality>=0.45 and not ppg_low and not ppg_sat
 
         hr=ppg.get("hr_bpm") if usable else None
         rmssd=ppg.get("rmssd_ms") if usable else None
         sdnn=ppg.get("sdnn_ms") if usable else None
-        spo2=ppg.get("spo2_pct") if quality>=0.55 and not ppg_absent and not ppg_sat else None
+        spo2=None if use_analog else (ppg.get("spo2_pct") if quality>=0.55 and not ppg_low and not ppg_sat else None)
 
         rate=None
         if len(self.times)>=5:
@@ -185,8 +199,11 @@ class StreamingFeatureProcessor:
             "rmssd_ms":rmssd,
             "sdnn_ms":sdnn,
             "spo2_pct":spo2,
-            "skin_temp_c":temp.get("skin_temp_c"),
-            "temp_slope_c_per_min":temp.get("temp_slope_c_per_min",0.0),
+            "skin_temp_c":None,
+            "room_temp_c":getattr(sample,"room_temp_c",None),
+            "humidity_pct":getattr(sample,"humidity_pct",None),
+            "pressure_hpa":getattr(sample,"pressure_hpa",None),
+            "lux":getattr(sample,"lux",None),
             "gsr_tonic":gsr.get("gsr_tonic"),
             "gsr_phasic_per_min":gsr.get("gsr_phasic_per_min",0.0),
             "motion_index":motion.get("motion_index",0.0),
@@ -196,14 +213,15 @@ class StreamingFeatureProcessor:
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
+            "raw_analog_ppg":getattr(sample,"analog_ppg_raw",None),
             "gsr_raw":sample.gsr_raw,
             "status_flags":flags,
             "source":sample.source,
             "status":int(sample.status),
             "ecg_raw":sample.ecg_raw,
-            "room_temp_c":sample.room_temp_c,
-            "humidity_pct":sample.humidity_pct,
-            "pressure_hpa":sample.pressure_hpa,
+            "ppg_mode":"ANALOG_GPIO4" if use_analog else "DIGITAL_MAX30102_COMPAT",
+            "calibration_status":self.calibrator.status,
+            "calibration_ready_fraction":self.calibrator.ready_fraction,
             "provenance":"DEMO_DATA" if sample.source=="demo" else "MEASURED",
             "gating":"USABLE" if usable else "QUALITY_GATE",
             "derived_provenance":"DERIVED"
