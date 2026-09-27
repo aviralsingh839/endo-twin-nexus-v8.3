@@ -158,10 +158,15 @@ class StreamingFeatureProcessor:
             self.gsr.add_sample(ts,sample.gsr_raw)
             self.last_gsr_ts=ts
 
-        # CP3 has BME280 room temperature; do not relabel it as skin temperature.
-        if (self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0) and getattr(sample,"room_temp_c",None) is not None:
+        # Prefer the direct DS18B20 channel when present; otherwise use BME280 room temperature.
+        temp_sample = getattr(sample,"temp_c",None)
+        if temp_sample is None or not math.isfinite(float(temp_sample)):
+            temp_sample = getattr(sample,"room_temp_c",None)
+        if (self.last_temp_ts<=0.0 or ts-self.last_temp_ts>=1.0) and temp_sample is not None:
             try:
-                self.temp.add_sample(ts,float(sample.room_temp_c))
+                value=float(temp_sample)
+                if math.isfinite(value):
+                    self.temp.add_sample(ts,value)
             except (TypeError,ValueError):
                 pass
             self.last_temp_ts=ts
@@ -186,8 +191,12 @@ class StreamingFeatureProcessor:
 
         gsr_q=0.0 if gsr_bad or sample.gsr_raw<5 or sample.gsr_raw>4090 else 1.0
         motion_q=max(0.0,min(1.0,1.0-float(motion["motion_index"])/0.45)) if imu_available else 0.0
-        temp_value=getattr(sample,"room_temp_c",None)
-        temp_q=1.0 if temp_value is not None and math.isfinite(float(temp_value)) else 0.0
+        skin_value=getattr(sample,"temp_c",None)
+        room_value=getattr(sample,"room_temp_c",None)
+        skin_q=1.0 if skin_value is not None and math.isfinite(float(skin_value)) else 0.0
+        room_q=1.0 if room_value is not None and math.isfinite(float(room_value)) else 0.0
+        temp_value=skin_value if skin_q>0.0 else room_value
+        temp_q=max(skin_q,room_q)
         components=[]
         if ppg_q>0.0:
             components.append((ppg_q,0.55))
@@ -219,8 +228,8 @@ class StreamingFeatureProcessor:
             "rmssd_ms":rmssd,
             "sdnn_ms":sdnn,
             "spo2_pct":spo2,
-            "skin_temp_c":None,
-            "temperature_provenance":"ROOM_SENSOR" if temp_q>0.0 else "UNKNOWN",
+            "skin_temp_c":skin_value if skin_q>0.0 else None,
+            "temperature_provenance":"SKIN_SENSOR" if skin_q>0.0 else ("ROOM_SENSOR" if room_q>0.0 else "UNKNOWN"),
             "room_temp_c":getattr(sample,"room_temp_c",None),
             "humidity_pct":getattr(sample,"humidity_pct",None),
             "pressure_hpa":getattr(sample,"pressure_hpa",None),
@@ -231,7 +240,7 @@ class StreamingFeatureProcessor:
             "activity_level":motion.get("activity_level",0.0),
             "signal_quality":quality,
             "ppg_quality":ppg_q,
-            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": imu_available, "temperature": temp_q > 0.0},
+            "available_channels": {"ppg": ppg_q > 0.0, "gsr": gsr_q > 0.0, "motion": imu_available, "temperature": temp_q > 0.0, "skin_temperature": skin_q > 0.0, "room_temperature": room_q > 0.0},
             "sample_rate_hz":rate,
             "raw_ir":sample.ir,
             "raw_red":sample.red,
@@ -241,7 +250,7 @@ class StreamingFeatureProcessor:
             "source":sample.source,
             "status":int(sample.status),
             "ecg_raw":sample.ecg_raw,
-            "ppg_mode":"ANALOG_GPIO4" if use_analog else "DIGITAL_MAX30102_COMPAT",
+            "ppg_mode":"ANALOG_GPIO8" if use_analog else "DIGITAL_MAX30102_COMPAT",
             "calibration_status":self.calibrator.status,
             "calibration_ready_fraction":self.calibrator.ready_fraction,
             "provenance":"DEMO_DATA" if sample.source=="demo" else "MEASURED",
