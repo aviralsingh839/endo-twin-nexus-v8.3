@@ -993,7 +993,14 @@ class MainWindow(QMainWindow):
         self.stop_stream()
         self.demo_stream = DemoSensorStream(fs_hz=20.0, parent=self)
         self.demo_stream.sample_received.connect(self._on_sample_received)
-        self.demo_stream.state_changed.connect(self._on_reader_state)\n        self.demo_stream.error_received.connect(self._on_reader_error)\n        self.demo_stream.start()\n        self.current_session_id = self.history_store.start_session(source="demo", note="Synthetic showcase stream", participant_id=self.participant_id)\n        self.mode_label.setText("Mode: DEMO DATA • synthetic")\n        self.mode_label.setStyleSheet("font-weight:bold;color:#60a5fa;")\n\n    def stop_stream(self):
+        self.demo_stream.state_changed.connect(self._on_reader_state)
+        self.demo_stream.error_received.connect(self._on_reader_error)
+        self.demo_stream.start()
+        self.current_session_id = self.history_store.start_session(source="demo", note="Synthetic showcase stream", participant_id=self.participant_id)
+        self.mode_label.setText("Mode: DEMO DATA • synthetic")
+        self.mode_label.setStyleSheet("font-weight:bold;color:#60a5fa;")
+
+    def stop_stream(self):
         for reader_name in ("arduino_reader", "network_reader", "demo_stream"):
             reader = getattr(self, reader_name, None)
             if reader is not None:
